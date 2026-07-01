@@ -145,6 +145,13 @@ Track future work.
 Potential v0.2:
 - more local file datasets after license and evidence gates
 - richer comparison outputs
+- closed/defunct institution zero-value warning: the `15118998` source records a
+  literal `0` (not blank) for closed or no-data schools — e.g. 동부산대학교 has
+  `0` across all five indicators, and the 취업률 column holds `0` for 49 of 488
+  institutions. Ingestion faithfully mirrors the source `0` (no fabrication; not a
+  Source-First violation), but a naive consumer may misread `0%` as a real metric.
+  Add a non-destructive warning/flag for institutions whose default indicators are
+  all-zero (likely closed / no-data) — annotate only, never alter the source `0`.
 
 Potential v0.3:
 - optional OpenAPI bridge
