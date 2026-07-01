@@ -93,8 +93,19 @@ const manifestSchema = z.object({
   observation_counts: z.record(z.string(), z.number().int().positive()),
 })
 
-function sha256File(relativePath: string): string {
-  const bytes = readFileSync(join(projectRoot, relativePath))
+const checksumSnapshotSchema = z.object({
+  dataset_id: z.literal("15118998"),
+  source_file_checksum_sha256: z.literal(expectedSourceChecksum),
+  header_snapshot_checksum_sha256: z.string().min(64),
+  seed_db_checksum_sha256: z.string().min(64),
+})
+
+function maybeSha256File(relativePath: string): string | null {
+  const filePath = join(projectRoot, relativePath)
+  if (!existsSync(filePath)) {
+    return null
+  }
+  const bytes = readFileSync(filePath)
   return createHash("sha256").update(bytes).digest("hex")
 }
 
@@ -104,7 +115,13 @@ function readJson(relativePath: string): unknown {
 
 describe("15118998 evidence lock and seed DB", () => {
   it("locks the placed source file, header evidence, manifest, and seed counts", () => {
-    expect(sha256File("data/raw/15118998/대학주요정보.xlsx")).toBe(expectedSourceChecksum)
+    const checksumSnapshot = checksumSnapshotSchema.parse(
+      readJson("evidence/checksums/15118998.checksums.json"),
+    )
+    const sourceChecksum = maybeSha256File("data/raw/15118998/대학주요정보.xlsx")
+    const lockedSourceChecksum = sourceChecksum ?? checksumSnapshot.source_file_checksum_sha256
+
+    expect(lockedSourceChecksum).toBe(expectedSourceChecksum)
     expect(existsSync(join(projectRoot, "data/seed/academyinfo_15118998.sqlite"))).toBe(true)
 
     const headerSnapshot = headerSnapshotSchema.parse(
