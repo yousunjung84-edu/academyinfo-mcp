@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto"
-import { existsSync, readFileSync } from "node:fs"
+import { existsSync, readFileSync, statSync } from "node:fs"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
 import { describe, expect, it } from "vitest"
@@ -53,6 +53,14 @@ const expectedIndicators = [
   },
 ] as const
 
+function isIsoUtcTimestamp(value: string): boolean {
+  const parsed = Date.parse(value)
+
+  return !Number.isNaN(parsed) && new Date(parsed).toISOString() === value
+}
+
+const isoUtcTimestampSchema = z.string().refine(isIsoUtcTimestamp)
+
 const headerSnapshotSchema = z.object({
   dataset_id: z.literal("15118998"),
   sheet_name: z.literal("Sheet1"),
@@ -72,6 +80,8 @@ const headerSnapshotSchema = z.object({
 const manifestSchema = z.object({
   dataset_id: z.literal("15118998"),
   source_file_name: z.literal("대학주요정보.xlsx"),
+  source_downloaded_at: isoUtcTimestampSchema,
+  seed_built_at: isoUtcTimestampSchema,
   source_file_checksum_sha256: z.literal(expectedSourceChecksum),
   header_snapshot_checksum_sha256: z.string().min(64),
   seed_db_checksum_sha256: z.string().min(64),
@@ -109,6 +119,15 @@ function maybeSha256File(relativePath: string): string | null {
   return createHash("sha256").update(bytes).digest("hex")
 }
 
+function maybeSourceMtimeIso(relativePath: string): string | null {
+  const filePath = join(projectRoot, relativePath)
+  if (!existsSync(filePath)) {
+    return null
+  }
+
+  return statSync(filePath).mtime.toISOString()
+}
+
 function readJson(relativePath: string): unknown {
   return JSON.parse(readFileSync(join(projectRoot, relativePath), "utf8"))
 }
@@ -119,6 +138,7 @@ describe("15118998 evidence lock and seed DB", () => {
       readJson("evidence/checksums/15118998.checksums.json"),
     )
     const sourceChecksum = maybeSha256File("data/raw/15118998/대학주요정보.xlsx")
+    const sourceMtimeIso = maybeSourceMtimeIso("data/raw/15118998/대학주요정보.xlsx")
     const lockedSourceChecksum = sourceChecksum ?? checksumSnapshot.source_file_checksum_sha256
 
     expect(lockedSourceChecksum).toBe(expectedSourceChecksum)
@@ -134,6 +154,10 @@ describe("15118998 evidence lock and seed DB", () => {
     expect(existsSync(join(projectRoot, "evidence/sample-rows/15118998.sample.json"))).toBe(true)
     expect(existsSync(join(projectRoot, "evidence/checksums/15118998.checksums.json"))).toBe(true)
     expect(JSON.stringify(manifest)).not.toMatch(/[A-Za-z]:[\\/]/u)
+    expect(manifest.source_downloaded_at).not.toBe("NotVerified")
+    if (sourceMtimeIso !== null) {
+      expect(manifest.source_downloaded_at).toBe(sourceMtimeIso)
+    }
 
     for (const expectedIndicator of expectedIndicators) {
       expect(headerSnapshot.columns).toEqual(

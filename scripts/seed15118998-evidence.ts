@@ -38,6 +38,8 @@ export function buildManifest(
   observationCounts: ObservationCountMap,
 ): Record<string, unknown> {
   const stats = statSync(rawFilePath)
+  const sourceDownloadedAt = stats.mtime.toISOString()
+  const seedBuiltAt = new Date().toISOString()
 
   return {
     dataset_id: datasetId,
@@ -48,9 +50,11 @@ export function buildManifest(
     derived_database: true,
     bundled: true,
     source_file_name: sourceFileName,
-    source_file_downloaded_at: "NotVerified",
-    source_file_modified_or_observed_at: stats.mtime.toISOString(),
-    source_page_observed_at: new Date().toISOString(),
+    source_downloaded_at: sourceDownloadedAt,
+    seed_built_at: seedBuiltAt,
+    source_file_downloaded_at: sourceDownloadedAt,
+    source_file_modified_or_observed_at: sourceDownloadedAt,
+    source_page_observed_at: seedBuiltAt,
     source_file_checksum_sha256: sourceChecksum,
     header_snapshot_checksum_sha256: headerSnapshotChecksum,
     seed_db_checksum_sha256: seedChecksum,
