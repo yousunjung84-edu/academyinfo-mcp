@@ -114,6 +114,14 @@ All attribution must remain neutral and source-based.
 - Source columns, units, and years must be verified from actual downloaded headers or official documentation before implementation.
 - Code license and data license remain separate.
 
+## Resolved v0.1 Release Facts
+
+- Code license is MIT, recorded in `package.json` and `LICENSE`.
+- Bundled data attribution for `15118998` is recorded in `DATA_LICENSE.md`, `NOTICE.md`, and `data/seed/LICENSE.15118998.md`.
+- `15118998` source headers, source columns, units, and per-indicator years were verified for the five bundled default indicators.
+- Runtime dependency versions use explicit semver ranges with caret notation.
+- v0.1 keeps the built-in `node:sqlite` runtime and declares `engines.node >=24.15.0`.
+
 ## Options
 
 Option A: Keep v0.1 file-first and bundle only verified `15118998` data.
@@ -130,8 +138,6 @@ It satisfies the no-key v0.1 policy, keeps licensing risk bounded, and preserves
 
 ## Unresolved
 
-- Final code license.
-- Final attribution wording for dataset `15118998`.
-- Verified headers, source columns, units, and base years for `15118998`.
+- Data refresh cadence and exact maintenance owner after public transition.
 - v0.3 granular employment design for `15139279`.
 - v0.3 OpenAPI bridge design.

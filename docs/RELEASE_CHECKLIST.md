@@ -1,54 +1,42 @@
-# Release Checklist — academyinfo-mcp
+# Release Checklist: academyinfo-mcp
 
-Current state: private v0.1 candidate. Verified five-indicator `15118998` seed.
-Public transition and `npm publish` remain separate human-approved steps.
+Current state: v0.1 public-transition candidate. `docs/release-audit.md` recommends GitHub public GO; `npm publish` remains on hold.
 
-## A. Before public transition (pre-public gate)
+## Completed pre-public gates
 
-- [ ] **Decide package version**: `0.0.0` → `0.1.0` (or `0.1.0-alpha.0` to signal early).
-- [ ] **Decide SQLite driver**: resolve the `node:sqlite` experimental warning — either
-  (a) accept it, document "requires Node >= 22, experimental sqlite", and pin `engines`,
-  or (b) switch to `better-sqlite3` (native, prebuild friction). Pick one and document it.
-- [ ] **Decide on `evidence/sample-rows`**: contains real institution rows (public KOGL-1
-  data, legally fine) — recommend excluding from the public repo unless useful.
-- [ ] **Polish README for public**: one-line pitch · `npx`/clone quickstart working from
-  the bundled seed only · Claude Desktop / Cursor config examples · KOGL-1 attribution made
-  prominent · non-affiliation disclaimer · **data vintage stated** (2025 disclosure; 등록금
-  2026; `seed_is_latest_claim=false` = not the latest).
-- [ ] **Closed-school zero note** in README (until the v0.2 warning ships): "0 may mean
-  closed / no-data, not a real 0%".
-- [ ] **GitHub repo description + topics** (`mcp`, `korea`, `university`, `public-data`, `kogl`).
-- [ ] **Final re-audit**: `npm pack --dry-run` excludes raw / `.env` / `.omo/ulw-loop` /
-  service keys / `15139279` data; update `docs/release-audit.md`.
-- [ ] **Scan git history** for secrets / private paths (public exposes history too).
-- [ ] **Final owner approval** before flipping to public.
+- [x] Package version set to `0.1.0`.
+- [x] Runtime decision made: keep built-in `node:sqlite`.
+- [x] Node engine set to `>=24.15.0`.
+- [x] Code license set to `MIT`.
+- [x] Code license and bundled data license documented separately.
+- [x] Runtime and dev dependencies use explicit semver ranges with caret notation.
+- [x] README polished for public readers: quickstart, no-key operation, client config, non-affiliation disclaimer, KOGL-1 attribution, data vintage, and data refresh policy.
+- [x] Closed-school or no-data zero-value caveat documented.
+- [x] `npm pack --dry-run` package posture reviewed: raw files, `.env`, `.omo/ulw-loop`, service keys, private paths, `.insane-review`, and `15139279` data artifacts excluded.
+- [x] Git-history secret/private-path scan externally verified with 0 hits.
+- [x] `git ls-files .insane-review` verified empty.
+- [x] `.insane-review/` is gitignored.
+- [x] `data/raw` and `.env` externally verified as never tracked.
+- [x] Release audit updated for public transition.
 
-## B. Immediately after going public (launch)
+## Open before flipping GitHub public
 
-- [ ] Flip private → public (GitHub settings); verify README render, description, topics.
-- [ ] **External-user smoke**: clone / `npx` in a clean environment → install in Claude / Cursor
-  → run a comparison, from an outside user's perspective.
-- [ ] (Optional) Register in an MCP directory (modelcontextprotocol servers, Smithery, etc.)
-  — discoverability drives stars.
-- [ ] Watch issues / feedback for 1–2 days and respond.
-- [ ] **`npm publish` is a separate later decision** (public GitHub → real-use QA → npm).
+- [ ] Flip private to public in GitHub settings.
+- [ ] Verify README rendering, repository description, and repository topics after visibility change.
+- [ ] Optional: decide whether to run a history scrub before public transition. Current audit does not treat this as a blocker.
 
-## C. Ongoing updates & maintenance
+## Open after GitHub public
 
-- [ ] ⭐ **Data refresh SOP** (most important — freshness drives trust for a public tool):
-  download the new 대학알리미 XLSX → re-run evidence-lock → rebuild seed → update manifest
-  year/checksum → re-run release-audit. Record the cadence and procedure as an SOP in docs.
-- [ ] **Header-change detection**: if a new file's year / unit / column names change, the
-  evidence-lock must fail-closed and catch it (verify every refresh; never remap silently).
-- [ ] **Burn down v0.2 backlog**: closed-school zero-value warning · more KCUE disclosure
-  datasets + institution identity resolver · richer comparison output.
-- [ ] **v0.3**: OpenAPI bridge (reserved service key = freshness) · `15139279` granular
-  employment stats.
-- [ ] Track `node:sqlite` stabilization · maintain deps / Node version · handle issues & PRs ·
-  **keep KOGL-1 attribution intact**.
+- [ ] Run an external-user smoke test from a clean environment: clone or install, configure a real MCP client, and run a comparison.
+- [ ] Monitor issues and feedback for the first 1-2 days.
+- [ ] Keep `npm publish` on hold until clean-environment install, MCP client smoke test, npm account/package-name checks, and owner approval pass.
+- [ ] Optional: register in MCP directories after public smoke testing.
 
-## Key point
+## Maintenance
 
-After going public, stars hinge on **data freshness** more than features. The current seed is
-2025 disclosure (marked not-latest). Decide the refresh cadence and state it in the README before
-public, so the tool is not mistaken for stale data.
+- [ ] Keep the data refresh SOP current: download source XLSX, rerun evidence lock, rebuild seed, update manifest and checksum, rerun package audit.
+- [ ] Verify header-change detection on every refresh.
+- [ ] Track `node:sqlite` stabilization and maintain the Node version requirement.
+- [ ] Keep KOGL-1 attribution intact.
+- [ ] Burn down v0.2 backlog items separately.
+- [ ] Keep v0.3 OpenAPI and `15139279` granular employment work outside v0.1.

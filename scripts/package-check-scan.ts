@@ -31,12 +31,17 @@ function is15139279DataArtifactPath(normalizedPath: string): boolean {
 
 export function isForbiddenArtifactPath(path: string): boolean {
   const normalizedPath = normalizePath(path)
+  const pathSegments = normalizedPath.split("/")
   return (
     is15139279DataArtifactPath(normalizedPath) ||
     normalizedPath.includes(".insane-review/") ||
     normalizedPath.includes("data/raw/") ||
     normalizedPath.includes("data/external/") ||
-    normalizedPath.split("/").includes(".env") ||
+    pathSegments.includes(".env") ||
+    pathSegments.some((segment) => segment.startsWith(".env.")) ||
+    pathSegments.includes(".npmrc") ||
+    pathSegments.includes("service-account.json") ||
+    normalizedPath.endsWith(".pem") ||
     normalizedPath.endsWith(".xlsx") ||
     normalizedPath.endsWith(".csv")
   )

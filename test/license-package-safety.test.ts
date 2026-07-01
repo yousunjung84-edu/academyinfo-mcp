@@ -134,4 +134,13 @@ describe("license and package safety gate", () => {
     expect(isForbiddenArtifactPath("data/external/15139279/sample.json")).toBe(true)
     expect(isForbiddenArtifactPath("docs/15139279-backlog-note.md")).toBe(false)
   })
+
+  it("treats credential package paths as forbidden", () => {
+    expect(isForbiddenArtifactPath(".env.local")).toBe(true)
+    expect(isForbiddenArtifactPath("packages/worker/.env.production")).toBe(true)
+    expect(isForbiddenArtifactPath(".npmrc")).toBe(true)
+    expect(isForbiddenArtifactPath("certs/private-key.pem")).toBe(true)
+    expect(isForbiddenArtifactPath("config/service-account.json")).toBe(true)
+    expect(isForbiddenArtifactPath("data/seed/academyinfo_15118998.manifest.json")).toBe(false)
+  })
 })

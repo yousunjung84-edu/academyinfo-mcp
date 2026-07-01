@@ -2,9 +2,11 @@
 
 Audit date: 2026-07-02
 
-Scope: pre-public hardening review for `academyinfo-mcp` v0.1 after the GPT-5.5 Pro review fixes. This audit supports private `origin/main` push only. It does not approve `npm publish` and does not approve making the repository public.
+Scope: public-transition audit for `academyinfo-mcp` v0.1 after the GPT-5.5 Pro pre-public review fixes and follow-up documentation cleanup.
 
-Recommendation: `GO-WITH-WARNINGS` for private GitHub push.
+Recommendation: `GitHub public GO`; `npm publish HOLD`.
+
+This audit supports switching the GitHub repository from private to public after owner approval. It does not approve publishing the package to npm.
 
 ## Current Package State
 
@@ -14,10 +16,22 @@ Recommendation: `GO-WITH-WARNINGS` for private GitHub push.
 | Code license | `MIT` in `package.json`; code license remains separate from bundled data license |
 | Runtime | `node:sqlite` retained; no `better-sqlite3` dependency or type shim |
 | Node engine | `>=24.15.0` because v0.1 uses the built-in `node:sqlite` release-candidate API |
-| Runtime mode | file-first, no API key required |
-| OpenAPI | not implemented in v0.1 |
-| Bundled data | only normalized derivative seed for dataset `15118998` |
-| Non-bundled data | dataset `15139279` remains v0.3/local-ingest backlog only |
+| Dependencies | Explicit semver ranges using caret notation for runtime and dev dependencies |
+| Runtime mode | File-first, no API key required |
+| OpenAPI | Not implemented in v0.1 |
+| Bundled data | Only normalized derivative seed for dataset `15118998` |
+| Non-bundled data | Dataset `15139279` remains v0.3/local-ingest backlog only |
+
+## Public-Transition Evidence
+
+| Gate | Status | Evidence |
+| --- | --- | --- |
+| `.insane-review` tracked files | PASS | `git ls-files .insane-review` returned no tracked files. |
+| `.insane-review` ignore policy | PASS | `.gitignore` includes `.insane-review/`; local check-ignore output maps `.insane-review/test.md` to that rule. |
+| Git-history secret/private-path scan | PASS | Externally verified scan result: 0 hits. |
+| Raw/private data tracking | PASS | Externally verified: `data/raw` and `.env` were never tracked. Local path-history spot check also returned no tracked entries for `data/raw` or `.env`. |
+| Public docs posture | PASS | README includes non-affiliation, Node requirement, no-key operation, KOGL-1 attribution, data snapshot policy, and code/data license separation. |
+| Package artifact posture | PASS | Package allowlist excludes raw files, external data, `.env`, `.omo`, `.insane-review`, service keys, local paths, local user names, and `15139279` data artifacts. |
 
 ## Fix Verification Matrix
 
@@ -28,14 +42,10 @@ Recommendation: `GO-WITH-WARNINGS` for private GitHub push.
 | Ambiguous responses include `data.error` | PASS | `search_university` ambiguous results include `data.error.code=ambiguous` with candidates and count metadata. |
 | Search truncation exposes totals | PASS | Broad search returns `returned_count`, `total_matched`, and `truncated` instead of reporting only the sliced count. |
 | Blank source values are surfaced | PASS | Metrics responses expose `missing_metrics[]` with `reason: blank_in_source`, `value: null`, source `raw_value`, and `source_column`. |
-| Package metadata | PASS | `package.json` now has `version=0.1.0`, `license=MIT`, `engines.node=>=24.15.0`, caret-pinned runtime deps, and no `better-sqlite3`. |
+| Package metadata | PASS | `package.json` has `version=0.1.0`, `license=MIT`, `engines.node >=24.15.0`, explicit caret semver ranges, and no `better-sqlite3`. |
 | Package license gate | PASS | `scripts/package-check-config.ts` enforces `LICENSE`, `DATA_LICENSE.md`, `NOTICE.md`, and `data/seed/LICENSE.15118998.md`. |
-| Package scan hardening | PASS | Text `.map`, `.json`, `.md`, and `.txt` files are scanned regardless of size; `.insane-review/` is ignored locally and forbidden if presented as a package path. |
+| Package scan hardening | PASS | Text `.map`, `.json`, `.md`, and `.txt` files are scanned regardless of size; local review artifacts and sensitive package paths (`.env`, `.env.*`, `.npmrc`, `.pem`, `service-account.json`) are forbidden. |
 | README | PASS | README states Node requirement, `node:sqlite`, no API key, point-in-time data refresh policy, and `missing_metrics` behavior. |
-
-## External Verification Already Recorded
-
-The GPT-5.5 Pro pre-public review states that git-history secret scan and DB re-query were verified externally before this fix pass. This repository-side audit records that external verification as supporting evidence, not as a substitute for the local package gate below.
 
 ## Five-Indicator Seed Counts
 
@@ -53,31 +63,27 @@ Raw rows in seed DB: 488.
 
 ## Required Serial Gate
 
-Commands run serially before push:
+Commands run before this audit update:
 
 | Command | Result |
 | --- | --- |
 | `npm run build` | PASS |
-| `npm run test` | PASS, 5 test files and 19 tests |
-| `npm run doctor` | PASS, `status: ok` and `api_key_required: false` |
+| `npm run test` | PASS, 5 test files and 20 tests |
 | `npm run package:check` | PASS, `package_check: ok` |
-| `npm run prepublishOnly` | PASS; no publish was run |
-| `npm pack --dry-run` | PASS |
-| `npm pack --dry-run --json` | PASS, 128 files |
+| `npm pack --dry-run --json` | PASS, 128 files; required seed artifacts present; forbidden artifacts absent |
+| `npm audit --omit=dev --audit-level=high` | PASS, 0 vulnerabilities |
 
-Dry-run package includes the three required seed artifacts:
+Dry-run package must include:
 
 - `data/seed/academyinfo_15118998.sqlite`
 - `data/seed/academyinfo_15118998.manifest.json`
 - `data/seed/LICENSE.15118998.md`
 
-Forbidden dry-run matches: 0 for `data/raw`, `data/external`, `15139279` data artifacts, raw spreadsheets, raw CSV files, `.env`, credentials, service keys, local paths, local user names, `.omo`, `.ultrawork`, `.insane-review`, and `node_modules`.
-
-Additional MCP stdio surface check: PASS. The direct MCP harness returned `invalid_request` for `indicators:["not_real"]`, ambiguous search counts with `returned_count=20`, `total_matched=482`, `truncated=true`, and `missing_metrics[0].reason=blank_in_source` for a source `-` marker.
+Dry-run package must exclude `data/raw`, `data/external`, `15139279` data artifacts, raw spreadsheets, raw CSV files, `.env`, `.env.*`, `.npmrc`, `.pem`, `service-account.json`, credentials, service keys, local paths, local user names, `.omo`, `.ultrawork`, `.insane-review`, and `node_modules`.
 
 ## Remaining Risks
 
+- `npm publish` remains on hold until an independent clean-environment install, MCP client smoke test, and npm account/package-name checks pass.
 - The project intentionally keeps `node:sqlite`; Node documents this as a release-candidate API. v0.1 requires Node `>=24.15.0`.
-- The local development machine may emit Node/npm engine or `node:sqlite` warnings if it runs below the documented release floor; public release verification should run on Node `>=24.15.0`.
 - The bundled seed is a point-in-time snapshot and does not claim to be latest. Refresh requires source-file, checksum, manifest, DB, and package dry-run review.
-- Public repository conversion and `npm publish` remain out of scope for this audit.
+- Optional history scrub remains a human decision. Current public-transition evidence supports public GO without treating scrub as a blocker.
