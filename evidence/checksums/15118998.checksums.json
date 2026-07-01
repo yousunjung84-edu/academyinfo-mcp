@@ -1,0 +1,10 @@
+{
+  "dataset_id": "15118998",
+  "source_file_name": "대학주요정보.xlsx",
+  "source_file_checksum_sha256": "53f7e7fbb446206a47fab1adc622d551ba88ba7f3c25ae0cdc8e41cddc637621",
+  "header_snapshot_checksum_sha256": "4b643dd4b24a65ce965727abe3b13060702501dc3b540254315cf74461931572",
+  "seed_db_checksum_sha256": "2e061f5859d99672e7a8ad548220ad1ec864a33b76142f742e1467c649d208c7",
+  "manifest_checksum_sha256": "e5fc454adc4e9778769205dbd764a581ca018f7cd75a80bf8e332207d7ab933d",
+  "indicator_dictionary_checksum_sha256": "bb3d5fe3bdabeee7fa514290bb8cf8977e16a269c0d42712789022a42110f004",
+  "observed_at": "2026-07-01T06:03:14.886Z"
+}

@@ -14,7 +14,10 @@ v0.1 will not redistribute dataset `15139279`.
 
 v0.1 will not bundle raw, normalized, seed, sample, or fixture data from `15139279`.
 
-v0.1 will not enable `employment_rate` by default.
+v0.1 will not use dataset `15139279` for default `employment_rate`.
+
+v0.1 will not provide granular, per-department, or health-insurance-linked
+employment statistics.
 
 v0.1 will not produce official rankings.
 

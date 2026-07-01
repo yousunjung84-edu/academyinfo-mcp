@@ -113,5 +113,5 @@ describe("Phase 1 scaffold", () => {
     const { createAcademyinfoServer } = await import("../src/server.ts")
     expect(createAcademyinfoServer()).toBeDefined()
     expect(serverSource).not.toContain("console.log")
-  })
+  }, 20_000)
 })

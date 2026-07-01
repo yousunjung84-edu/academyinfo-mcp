@@ -31,7 +31,7 @@ const toolArguments: Record<ToolName, Record<string, unknown>> = {
   search_university: { query: "test" },
   get_university_metrics: { university_name: "test" },
   compare_universities: { university_names: ["test-a", "test-b"] },
-  explain_indicator: { indicator: "freshman_competition_rate" },
+  explain_indicator: { indicator: "competition_rate" },
   validate_source_coverage: {},
 }
 
@@ -59,6 +59,27 @@ const responseSchema = z
     generated_at: z.string(),
   })
   .and(z.union([z.object({ source: sourceSchema }), z.object({ sources: z.array(sourceSchema) })]))
+
+const indicatorSchema = z.object({
+  indicator: z.string(),
+  label: z.string(),
+  dataset_id: z.string(),
+  source_column: z.string(),
+  source_column_verified: z.boolean(),
+  base_year: z.string(),
+  unit: z.string(),
+  enabled: z.boolean(),
+})
+
+const expectedEmploymentIndicator = {
+  indicator: "employment_rate",
+  dataset_id: "15118998",
+  source_column: "취업률\n(2025,%)",
+  source_column_verified: true,
+  base_year: "2025",
+  unit: "%",
+  enabled: true,
+} as const
 
 function reservedKeyOverrides(dataValue: string, academyinfoValue: string): Record<string, string> {
   return Object.fromEntries([
@@ -113,7 +134,7 @@ describe("v0.1 no-API-key policy", () => {
     })
   }, 20_000)
 
-  it("keeps employment_rate disabled and tied to non-bundled local-ingest metadata", async () => {
+  it("explains employment_rate as a bundled 15118998 default indicator without requiring API keys", async () => {
     await withMcpServer(reservedKeyOverrides("", ""), async (harness) => {
       const result = await harness.callTool("explain_indicator", {
         indicator: "employment_rate",
@@ -122,17 +143,27 @@ describe("v0.1 no-API-key policy", () => {
       const sources = "sources" in response ? response.sources : [response.source]
       const employmentSource = sources[0]
 
-      expect(response.status).toBe("disabled")
+      expect(response.status).toBe("ok")
+
+      const data = z.object({ indicator: indicatorSchema }).parse(response.data)
+
+      expect(data.indicator).toEqual(expect.objectContaining(expectedEmploymentIndicator))
       expect(sources).toHaveLength(1)
       expect(employmentSource).toBeDefined()
       if (employmentSource === undefined) {
         throw new Error("employment_rate source metadata was missing")
       }
 
-      expect(employmentSource.dataset_id).toBe("15139279")
-      expect(employmentSource.bundled).toBe(false)
-      expectSourceContract(employmentSource)
-      expect(JSON.stringify(response.data)).toContain("local_ingest_only")
+      expect(employmentSource).toEqual(
+        expect.objectContaining({
+          dataset_id: "15118998",
+          bundled: true,
+          source_column: expectedEmploymentIndicator.source_column,
+          base_year: expectedEmploymentIndicator.base_year,
+          unit: expectedEmploymentIndicator.unit,
+        }),
+      )
+      expect(JSON.stringify(response.data)).not.toContain("local_ingest_only")
     })
   }, 20_000)
 

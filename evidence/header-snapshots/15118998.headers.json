@@ -1,0 +1,178 @@
+{
+  "dataset_id": "15118998",
+  "sheet_name": "Sheet1",
+  "column_count": 24,
+  "source_file_name": "대학주요정보.xlsx",
+  "source_file_checksum_sha256": "53f7e7fbb446206a47fab1adc622d551ba88ba7f3c25ae0cdc8e41cddc637621",
+  "observed_at": "2026-07-01T06:03:14.718Z",
+  "columns": [
+    {
+      "raw_header": "No",
+      "parsed_label": "No",
+      "parsed_year": null,
+      "parsed_unit": null,
+      "checksum_sha256": "1ea442a134b2a184bd5d40104401f2a37fbc09ccf3f4bc9da161c6099be3691d"
+    },
+    {
+      "raw_header": "학교명",
+      "parsed_label": "학교명",
+      "parsed_year": null,
+      "parsed_unit": null,
+      "checksum_sha256": "10e8d679c2430fc1f013518201887c4f3389043f6c86cddcd95787f5a2fb4107"
+    },
+    {
+      "raw_header": "본분교명",
+      "parsed_label": "본분교명",
+      "parsed_year": null,
+      "parsed_unit": null,
+      "checksum_sha256": "a3b371541ebba95a8f2ece65ecb9479d6dad098f68c1cf2db3a2555c3d6f2b91"
+    },
+    {
+      "raw_header": "학교종류",
+      "parsed_label": "학교종류",
+      "parsed_year": null,
+      "parsed_unit": null,
+      "checksum_sha256": "ffbf530893e1cf402bd0c9606a6009b82bde3bc5cc762c0b12ffd778acc07e35"
+    },
+    {
+      "raw_header": "학교유형",
+      "parsed_label": "학교유형",
+      "parsed_year": null,
+      "parsed_unit": null,
+      "checksum_sha256": "a592a426b64b6787f384f45087a201261595dc3ef5cad1b0457a11bcd3d52c93"
+    },
+    {
+      "raw_header": "설립유형",
+      "parsed_label": "설립유형",
+      "parsed_year": null,
+      "parsed_unit": null,
+      "checksum_sha256": "6a927ca3330b199d9cff3aeba48376f54cfb479d109525fc91808969d8729eef"
+    },
+    {
+      "raw_header": "지역명",
+      "parsed_label": "지역명",
+      "parsed_year": null,
+      "parsed_unit": null,
+      "checksum_sha256": "3ac8d41df6401a02fb6a992ea16d70baf6486586977bd288133685bb0e89a0cf"
+    },
+    {
+      "raw_header": "입학정원\n(2025,명)",
+      "parsed_label": "입학정원",
+      "parsed_year": 2025,
+      "parsed_unit": "명",
+      "checksum_sha256": "0247bbad07cfd9e1ab9011c672b05ff189868839ad1da4c245a4fa2cd4d55693"
+    },
+    {
+      "raw_header": "졸업생수\n(2025,명)",
+      "parsed_label": "졸업생수",
+      "parsed_year": 2025,
+      "parsed_unit": "명",
+      "checksum_sha256": "8b18e8cdde556ae3f98e4d5bda4240fe7add9d0ce4efc6a0c6d001bc26ec180f"
+    },
+    {
+      "raw_header": "전임교원수(학부+대학원)\n(2025,명)",
+      "parsed_label": "전임교원수(학부+대학원)",
+      "parsed_year": 2025,
+      "parsed_unit": "명",
+      "checksum_sha256": "95980ea4314b1193a4f9eb183c32e81df23b3c0e4228510fc09ad87d03c62b96"
+    },
+    {
+      "raw_header": "재학생\n(2025,명)",
+      "parsed_label": "재학생",
+      "parsed_year": 2025,
+      "parsed_unit": "명",
+      "checksum_sha256": "81fba3c3b15d9bbd3c4bc94e25b5d3bb9a21fb54a6c46502ea4ec3731a15d4fa"
+    },
+    {
+      "raw_header": "신입생 경쟁률\n(2025,:1)",
+      "parsed_label": "신입생 경쟁률",
+      "parsed_year": 2025,
+      "parsed_unit": ":1",
+      "checksum_sha256": "5c96c4109aabf9b49f7bd9a7ceacc4f649c380b855cc8d7fd6ed23a5ce591992"
+    },
+    {
+      "raw_header": "신입생 충원율\n(2025,%)",
+      "parsed_label": "신입생 충원율",
+      "parsed_year": 2025,
+      "parsed_unit": "%",
+      "checksum_sha256": "104b5fa1726befb7400fe88f4e21187854f4c7a3163332bef1db587ce0fadf26"
+    },
+    {
+      "raw_header": "취업률\n(2025,%)",
+      "parsed_label": "취업률",
+      "parsed_year": 2025,
+      "parsed_unit": "%",
+      "checksum_sha256": "365261c81d8e7c365d3139b43342a15caf4dda23741af1a7e8894f65ba6e3b39"
+    },
+    {
+      "raw_header": "외국인 학생 수\n(2025,명)",
+      "parsed_label": "외국인 학생 수",
+      "parsed_year": 2025,
+      "parsed_unit": "명",
+      "checksum_sha256": "826e08204dfbfac773a9b956c20a05d48f20c0f203f374390fb026813a5ec0d5"
+    },
+    {
+      "raw_header": "전임교원 1인당 학생 수(학생정원기준)(학부+대학원)\n(2025,명)",
+      "parsed_label": "전임교원 1인당 학생 수(학생정원기준)(학부+대학원)",
+      "parsed_year": 2025,
+      "parsed_unit": "명",
+      "checksum_sha256": "d9671fe4dcd0fb7ca8badd68b6b079f4e3f5ef988a5ea28046805c99c90d58da"
+    },
+    {
+      "raw_header": "전임교원 확보율(학생정원기준)(학부+대학원)\n(2025,%)",
+      "parsed_label": "전임교원 확보율(학생정원기준)(학부+대학원)",
+      "parsed_year": 2025,
+      "parsed_unit": "%",
+      "checksum_sha256": "7d86f2c8cee0601b62a5f7652b0b8662863548905d1a10b30aec85453b1bede0"
+    },
+    {
+      "raw_header": "전임 교원 확보율(재학생 기준)(학부+대학원)\n(2025,%)",
+      "parsed_label": "전임 교원 확보율(재학생 기준)(학부+대학원)",
+      "parsed_year": 2025,
+      "parsed_unit": "%",
+      "checksum_sha256": "9a3e1bf784992936cd4b99a48f1489f1e12ff8265b6d896cc1d13859ebf1e1f8"
+    },
+    {
+      "raw_header": "전임교원 강의 담당 비율\n(2025,%)",
+      "parsed_label": "전임교원 강의 담당 비율",
+      "parsed_year": 2025,
+      "parsed_unit": "%",
+      "checksum_sha256": "aa259e0539fc99fb54d87299dc5895d8a742aeeb973ea1eb8cd44dedd0c1f569"
+    },
+    {
+      "raw_header": "학생 1인당 연간 장학금\n(2025,원)",
+      "parsed_label": "학생 1인당 연간 장학금",
+      "parsed_year": 2025,
+      "parsed_unit": "원",
+      "checksum_sha256": "427677831200c84bc09cb832040bcf5d01b04fed6bc582d1a6357ecd56795996"
+    },
+    {
+      "raw_header": "평균 등록금\n(2026,천원)",
+      "parsed_label": "평균 등록금",
+      "parsed_year": 2026,
+      "parsed_unit": "천원",
+      "checksum_sha256": "307cadbb777bc80afca83f021793ed77e37746423b2dd4d4b86a8135d26cd059"
+    },
+    {
+      "raw_header": "학생 1인당 교육비(학부+대학원)\n(2025,천원)",
+      "parsed_label": "학생 1인당 교육비(학부+대학원)",
+      "parsed_year": 2025,
+      "parsed_unit": "천원",
+      "checksum_sha256": "1145a24204239f9652152a6f57f796f2d2e255e8a3787158adb2ec5b5fb21935"
+    },
+    {
+      "raw_header": "기숙사 수용율(학부+대학원)\n(2025,%)",
+      "parsed_label": "기숙사 수용율(학부+대학원)",
+      "parsed_year": 2025,
+      "parsed_unit": "%",
+      "checksum_sha256": "3bd70d433927d7aad95350f50222799a4b78fc18a7c4397fe29e1127d1de6e09"
+    },
+    {
+      "raw_header": "학생 1인당 도서 자료 수(학부+대학원)\n(2025,권)",
+      "parsed_label": "학생 1인당 도서 자료 수(학부+대학원)",
+      "parsed_year": 2025,
+      "parsed_unit": "권",
+      "checksum_sha256": "5420b673d36c260ec3e6faaca02c16d8ebc05b94b0a267cc26885918096fed51"
+    }
+  ]
+}

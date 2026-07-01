@@ -10,9 +10,17 @@ This ticket may modify only this plan file.
 - v0.1 is a file-first, read-only MCP server and must run without API keys.
 - Dataset `15118998` is the only bundled seed dataset in v0.1.
 - Dataset `15118998` license policy is KOGL-1 / 공공누리 제1유형(출처표시); release must lock the exact license evidence before packaging.
-- Default bundled indicators from `15118998`: 신입생경쟁률, 신입생충원율, 연평균등록금, 학생1인당장학금.
-- Dataset `15139279` is employment data and is non-bundled / local ingest only.
-- `employment_rate` is disabled by default.
+- Default bundled indicators from `15118998` are five verified-header indicators:
+  `competition_rate`, `fill_rate`, `employment_rate`, `scholarship_per_student`,
+  and `avg_tuition`.
+- `15118998` header cells embed indicator-specific year and unit in the second-line
+  suffix; there is no single `공시년도` column.
+- Default indicators must not be described as undergraduate-only unless the source
+  header or official documentation explicitly says so.
+- Dataset `15139279` is deferred to the v0.3 backlog for granular, per-department,
+  or health-insurance-linked employment statistics and remains non-bundled.
+- `employment_rate` is enabled by default only when sourced from bundled
+  `15118998`, where it is a school-level employment rate.
 - OpenAPI is v0.3 backlog only. v0.1 must not implement live OpenAPI calls.
 - `DATA_GO_KR_SERVICE_KEY` and `ACADEMYINFO_SERVICE_KEY` are optional reserved values for a future v0.3 OpenAPI bridge and are not required by v0.1 default tools.
 - Service keys, `.env`, credentials, local absolute paths, and local user names must never appear in logs, MCP responses, manifests, test snapshots, docs examples, or package artifacts.
@@ -78,7 +86,8 @@ Behavioral requirements:
 - Ambiguous university matches return `status='ambiguous'` and `candidates`; the server must not guess.
 - Missing or unverified units return `unit='NotVerified'` and a warning.
 - Missing or unverified source columns return `source_column='NotVerified'`, `source_column_verified=false`, and a warning.
-- `employment_rate` is not returned by default.
+- `employment_rate` is returned by default only from bundled `15118998`; `15139279`
+  must never be used as the default employment source in v0.1.
 - stdout logging is forbidden in stdio MCP runtime.
 
 ## Phase 0: Planning And Governance Lock
@@ -209,7 +218,7 @@ Risk gate:
 - `15118998` license evidence must match KOGL-1 / 공공누리 제1유형(출처표시) before seed packaging.
 - Code license and data license must remain separate.
 - The code license must not be applied to bundled public data.
-- `15139279` must be documented as non-bundled/local-ingest only.
+- `15139279` must be documented as non-bundled v0.3 backlog only.
 
 Acceptance criteria:
 
@@ -325,6 +334,8 @@ Test strategy:
 - Raw-row preservation tests.
 - Join-audit tests.
 - Employment-data separation tests.
+- Tests proving `employment_rate` is enabled by default only when its source is
+  bundled `15118998`.
 
 Commands:
 
@@ -335,22 +346,28 @@ Commands:
 Risk gate:
 
 - `15139279` data must not enter the seed DB.
-- `indicators.json` may include `employment_rate` only as disabled/non-bundled/local-ingest metadata.
-- Default indicator listings must include only the four `15118998` indicators.
+- `indicators.json` includes the five default `15118998` indicators:
+  `competition_rate`, `fill_rate`, `employment_rate`, `scholarship_per_student`,
+  and `avg_tuition`.
+- `employment_rate` is enabled by default only when its source is `15118998`.
+- `15139279` appears only as non-bundled v0.3 backlog metadata for granular
+  employment statistics.
 - Unknown units or columns stay `NotVerified`.
 
 Acceptance criteria:
 
 - SQLite schema includes `source_files`, `institutions`, `indicators`, `observations`, `raw_rows`, and `join_audits`.
-- `indicators.json` includes 신입생경쟁률, 신입생충원율, 연평균등록금, 학생1인당장학금 from `15118998`.
-- `indicators.json` includes disabled `employment_rate` metadata without bundled data.
+- `indicators.json` includes `competition_rate`, `fill_rate`, `employment_rate`,
+  `scholarship_per_student`, and `avg_tuition` from `15118998`.
+- Each default indicator stores per-indicator year and unit from the verified header.
 - Every observation can trace to source metadata and raw-row audit data.
 - Tests fail if a bundled/default indicator points to `15139279`.
 
 Failure recovery:
 
 - Remove any schema/dictionary field that implies bundled employment data.
-- Restore `employment_rate` to disabled/non-bundled metadata only.
+- Restore `employment_rate` to `15118998` school-level metadata only and keep
+  `15139279` non-bundled v0.3 backlog metadata.
 
 ## Phase 5: `15118998` Ingestion And Seed DB Build
 
@@ -501,7 +518,7 @@ Test strategy:
 - Per-tool tests.
 - stdio smoke test.
 - no-stdout logging test.
-- disabled employment indicator tests.
+- bundled `15118998` employment indicator tests.
 
 Commands:
 
@@ -522,12 +539,14 @@ Risk gate:
 Acceptance criteria:
 
 - `list_sources` returns bundled `15118998` metadata and does not return bundled `15139279`.
-- `list_indicators` returns the four default indicators and does not enable `employment_rate`.
+- `list_indicators` returns the five default `15118998` indicators and includes
+  `employment_rate` as enabled only from `15118998`.
 - `search_university` returns candidates instead of guesses for ambiguity.
 - `get_university_metrics` returns per-metric provenance and warnings.
 - `compare_universities` preserves provenance and warns about non-comparable coverage.
 - `explain_indicator` reports definition, source, license, verification, unit, year/base year, and warnings without inferred fields.
-- `validate_source_coverage` flags verified, `NotVerified`, disabled, bundled, and non-bundled states.
+- `validate_source_coverage` flags verified, `NotVerified`, bundled, non-bundled,
+  and v0.3 backlog states.
 
 Failure recovery:
 
@@ -588,24 +607,26 @@ Failure recovery:
 - Remove key reads from file-first code paths.
 - Mask or suppress any environment value before it reaches logs, errors, snapshots, docs, or manifests.
 
-## Phase 9: Optional Non-Bundled Employment Local-Ingest Skeleton
+## Phase 9: `15139279` v0.3 Backlog Boundary
 
-Purpose: support explicit local employment ingest without bundling `15139279` data.
+Purpose: preserve a future v0.3 boundary for granular `15139279` employment
+statistics without bundling `15139279` data, adding v0.1 runtime ingest code, or
+replacing the default school-level `employment_rate` sourced from `15118998`.
 
 Create or modify:
 
-- `src/ingest/local-employment.ts`
-- `src/config/employment.ts`
-- `docs/local-employment-ingest.md`
-- `test/employment-disabled.test.ts`
-- `test/employment-local-ingest-skeleton.test.ts`
+- `docs/backlog-v0.2-v0.3.md`
+- `docs/granular-employment-backlog.md`
+- `test/employment-15118998-default.test.ts`
+- `test/employment-backlog-boundary.test.ts`
 - `test/employment-package-separation.test.ts`
 
 Test strategy:
 
-- Disabled-by-default tests.
-- Local-path privacy tests.
-- Header validation tests with synthetic column-name fixtures that do not contain real `15139279` data.
+- Tests proving default `employment_rate` remains sourced from `15118998`.
+- Backlog-boundary tests proving no v0.1 runtime ingest path exists for `15139279`.
+- Header validation planning notes with synthetic column-name examples only; do not
+  include real `15139279` data.
 - Package exclusion tests.
 
 Commands:
@@ -617,22 +638,25 @@ Commands:
 Risk gate:
 
 - Do not include raw, normalized, seed, sample, fixture, SQLite, CSV, JSON, or derived data from `15139279`.
-- Do not add package artifact paths containing `15139279`.
+- Do not add package data artifact paths containing `15139279`.
 - Do not put local absolute paths in responses, logs, snapshots, manifests, docs examples, or package artifacts.
-- Keep `employment_rate` disabled unless explicit local ingest is configured at runtime.
+- Do not add v0.1 runtime ingest code for `15139279`.
+- Do not let `15139279` override or replace the default `15118998`
+  school-level `employment_rate`.
 
 Acceptance criteria:
 
-- Default `list_indicators` and metric tools do not return active `employment_rate`.
-- Local ingest skeleton validates headers before enabling any local employment observation.
-- Package inspection returns zero artifacts containing `15139279`.
+- Default `list_indicators` and metric tools return active `employment_rate` only
+  from `15118998`.
+- v0.1 has no `15139279` runtime ingest path; only backlog documentation exists.
+- Package inspection returns zero `15139279` data artifacts.
 - Tests reject any bundled employment data or fixture.
 
 Failure recovery:
 
 - Remove generated employment artifacts.
-- Re-disable `employment_rate`.
-- Keep only non-bundled policy metadata and local-ingest instructions.
+- Restore default `employment_rate` to the bundled `15118998` school-level source.
+- Keep only non-bundled `15139279` v0.3 backlog policy metadata.
 
 ## Phase 10: Package Gate
 
@@ -663,7 +687,10 @@ Commands:
 Risk gate:
 
 - Distribution must be controlled by `package.json` `files` allowlist, not `.gitignore`.
-- `npm pack --dry-run` must have zero hits for `15139279`, `data/raw`, `data/external`, `.env`, raw `*.xlsx`, raw `*.csv`, service key values, and local absolute paths.
+- `npm pack --dry-run` must have zero hits for `15139279` data artifacts,
+  `data/raw`, `data/external`, `.env`, raw `*.xlsx`, raw `*.csv`, service key
+  values, and local absolute paths.
+- Documentation text may mention `15139279` as non-bundled v0.3 backlog policy.
 - Package checks must reject forbidden artifacts but must not fail merely because npm includes standard package metadata such as `package.json`.
 - Package must include the required seed 3종 once the seed phase is complete.
 
@@ -722,7 +749,7 @@ Acceptance criteria:
 - README states file-first v0.1.
 - README states no API key required.
 - README states only `15118998` is bundled.
-- README states `15139279` is non-bundled/local-ingest only.
+- README states `15139279` is non-bundled v0.3 backlog only.
 - README includes non-affiliation disclaimer.
 - Docs explain `ACADEMYINFO_DB_PATH` fallback to bundled seed DB.
 
@@ -799,7 +826,7 @@ Failure recovery:
 ### 2. Package Gate
 
 - Distribution is controlled by `package.json` `files` allowlist, not `.gitignore`.
-- `npm pack --dry-run` has zero hits for `15139279`.
+- `npm pack --dry-run` has zero hits for `15139279` data artifacts.
 - `npm pack --dry-run` has zero hits for `data/raw`.
 - `npm pack --dry-run` has zero hits for `data/external`.
 - `npm pack --dry-run` has zero hits for `.env`.
@@ -808,6 +835,8 @@ Failure recovery:
 - `npm pack --dry-run` has zero service key values.
 - `npm pack --dry-run` has zero local absolute paths.
 - `npm pack --dry-run` may include standard npm metadata such as `package.json`; this does not fail the gate by itself.
+- `npm pack --dry-run` may include documentation that mentions `15139279`
+  non-bundling policy; this does not fail the gate by itself.
 - `npm pack --dry-run` includes `dist/**`.
 - `npm pack --dry-run` includes `data/seed/academyinfo_15118998.sqlite`.
 - `npm pack --dry-run` includes `data/seed/academyinfo_15118998.manifest.json`.
@@ -836,14 +865,16 @@ Failure recovery:
 - All source objects include `dataset_id`, `dataset_name`, `provider`, `source_url`, `license`, `derived_database`, and `bundled`.
 - Indicator responses include `source_column`, `year` or `base_year`, and `unit` when applicable.
 - Ambiguous university matches return `status='ambiguous'` and `candidates`.
-- `employment_rate` is not returned by default.
+- `employment_rate` is returned by default only from bundled `15118998`.
 - stdout logging is forbidden in stdio MCP runtime.
 
 ### 6. Data Model
 
 - SQLite schema includes `source_files`, `institutions`, `indicators`, `observations`, `raw_rows`, and `join_audits`.
-- `indicators.json` includes the four default `15118998` indicators.
-- `indicators.json` includes disabled `employment_rate`.
+- `indicators.json` includes five default `15118998` indicators:
+  `competition_rate`, `fill_rate`, `employment_rate`, `scholarship_per_student`,
+  and `avg_tuition`.
+- `employment_rate` is enabled by default only from bundled `15118998`.
 - `15139279` data is absent from the seed DB.
 
 ### 7. CLI/UX
@@ -955,7 +986,7 @@ Forbidden v0.1 package artifacts:
 
 - `data/raw/**`
 - `data/external/**`
-- any package artifact path containing `15139279`
+- any `15139279` data artifact path
 - raw `*.xlsx`
 - raw `*.csv`
 - `.env`

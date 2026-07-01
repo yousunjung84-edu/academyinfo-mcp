@@ -1,7 +1,7 @@
 # Dataset 15118998 License
 
 - Dataset ID: `15118998`
-- Dataset name: `교육부_대학알리미_대학주요정보_학생_교원_연구_재정_교육여건`
+- Dataset name: `교육부_대학알리미_대학주요정보`
 - Provider: `교육부`
 - Source URL: `https://www.data.go.kr/data/15118998/fileData.do`
 - License: `KOGL-1 / 공공누리 제1유형(출처표시)`

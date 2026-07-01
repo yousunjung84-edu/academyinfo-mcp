@@ -17,7 +17,7 @@
     "test": "node node_modules/vitest/vitest.mjs run",
     "lint": "node node_modules/typescript/bin/tsc -p tsconfig.json --noEmit",
     "doctor": "node scripts/doctor.ts",
-    "package:check": "node scripts/package-check.ts",
+    "package:check": "npm run build && node dist/scripts/package-check.js",
     "prepublishOnly": "npm run build && npm run package:check"
   },
   "dependencies": {

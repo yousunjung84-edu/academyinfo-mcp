@@ -4,73 +4,17 @@ import { fileURLToPath } from "node:url"
 import { describe, expect, it } from "vitest"
 import { z } from "zod"
 
+import {
+  expectedDefaultIndicators,
+  expectBundled15118998SourceContract,
+  indicatorSchema,
+  metricContractSchema,
+  reservedKeyOverrides,
+  responseSchema,
+} from "./mcp-contract-helpers.ts"
 import { withMcpServer } from "./support/mcp-stdio-harness.ts"
 
 const projectRoot = fileURLToPath(new URL("..", import.meta.url))
-const reservedDataKeyName = ["DATA", "GO", "KR", "SERVICE", "KEY"].join("_")
-const reservedAcademyinfoKeyName = ["ACADEMYINFO", "SERVICE", "KEY"].join("_")
-
-const sourceSchema = z.object({
-  dataset_id: z.string(),
-  dataset_name: z.string(),
-  provider: z.string(),
-  source_url: z.string(),
-  license: z.string(),
-  derived_database: z.boolean(),
-  bundled: z.boolean(),
-  source_column: z.string(),
-  year: z.string().optional(),
-  base_year: z.string(),
-  unit: z.string(),
-})
-
-const responseSchema = z
-  .object({
-    status: z.string(),
-    tool: z.string(),
-    query: z.record(z.string(), z.unknown()),
-    data: z.unknown(),
-    warnings: z.array(z.string()),
-    generated_at: z.string(),
-  })
-  .and(z.union([z.object({ source: sourceSchema }), z.object({ sources: z.array(sourceSchema) })]))
-
-const indicatorSchema = z.object({
-  indicator: z.string(),
-  label: z.string(),
-  dataset_id: z.string(),
-  source_column: z.string(),
-  source_column_verified: z.boolean(),
-  base_year: z.string(),
-  unit: z.string(),
-  enabled: z.boolean(),
-})
-
-const metricContractSchema = z.object({
-  indicator: z.string(),
-  dataset_id: z.string(),
-  source_column: z.string(),
-  base_year: z.string(),
-  unit: z.string(),
-  source: sourceSchema,
-  warnings: z.array(z.string()),
-})
-
-function reservedKeyOverrides(dataValue: string, academyinfoValue: string): Record<string, string> {
-  return Object.fromEntries([
-    [reservedDataKeyName, dataValue],
-    [reservedAcademyinfoKeyName, academyinfoValue],
-  ])
-}
-
-function expectSourceContract(source: z.infer<typeof sourceSchema>): void {
-  expect(source.dataset_id).toBe("15118998")
-  expect(source.license).toContain("KOGL-1")
-  expect(source.bundled).toBe(true)
-  expect(source.source_column).toBeTruthy()
-  expect(source.base_year).toBeTruthy()
-  expect(source.unit).toBeTruthy()
-}
 
 describe("MCP response contract", () => {
   it("keeps default indicator and comparison responses within the verified v0.1 contract", async () => {
@@ -81,19 +25,21 @@ describe("MCP response contract", () => {
         .object({ indicators: z.array(indicatorSchema) })
         .parse(indicatorResponse.data)
 
-      expect(JSON.stringify(indicatorResponse.data)).not.toContain("employment_rate")
-      expect(indicatorData.indicators.map((indicator) => indicator.dataset_id)).toEqual([
-        "15118998",
-        "15118998",
-        "15118998",
-        "15118998",
-      ])
-
-      for (const indicator of indicatorData.indicators) {
-        expect(indicator.source_column).toBeTruthy()
-        expect(indicator.base_year).toBeTruthy()
-        expect(indicator.unit).toBeTruthy()
-      }
+      expect(indicatorData.indicators).toHaveLength(expectedDefaultIndicators.length)
+      expect(indicatorData.indicators).toEqual(
+        expectedDefaultIndicators.map((indicator) =>
+          expect.objectContaining({
+            indicator: indicator.indicator,
+            label_ko: indicator.label_ko,
+            dataset_id: "15118998",
+            source_column: indicator.source_column,
+            source_column_verified: true,
+            base_year: indicator.base_year,
+            unit: indicator.unit,
+            enabled: true,
+          }),
+        ),
+      )
 
       const compareResult = await harness.callTool("compare_universities", {
         university_names: ["test-a", "test-b"],
@@ -105,27 +51,46 @@ describe("MCP response contract", () => {
           comparisons: z.array(z.unknown()),
         })
         .parse(compareResponse.data)
+      const expectedByName = new Map(
+        expectedDefaultIndicators.map((indicator) => [indicator.indicator, indicator]),
+      )
 
       expect(compareResponse.warnings.length).toBeGreaterThan(0)
-      expect(JSON.stringify(compareResponse.data)).not.toContain("employment_rate")
       expect(compareData.comparisons).toHaveLength(0)
-      expect(compareData.metric_contracts).toHaveLength(4)
+      expect(compareData.metric_contracts).toHaveLength(expectedDefaultIndicators.length)
 
       for (const metric of compareData.metric_contracts) {
+        const expected = expectedByName.get(metric.indicator)
+
+        expect(expected).toBeDefined()
+        if (expected === undefined) {
+          throw new Error(`Unexpected metric contract: ${metric.indicator}`)
+        }
+
+        expect(metric.dataset_id).toBe("15118998")
+        expect(metric.source_column).toBe(expected.source_column)
+        expect(metric.base_year).toBe(expected.base_year)
+        expect(metric.unit).toBe(expected.unit)
         expect(metric.warnings.length).toBeGreaterThan(0)
-        expectSourceContract(metric.source)
+        expectBundled15118998SourceContract(metric.source, expected)
       }
 
       const metricsResult = await harness.callTool("get_university_metrics", {
         university_name: "test",
       })
       const metricsResponse = responseSchema.parse(metricsResult.structuredContent)
+      const metricsData = z
+        .object({ metric_contracts: z.array(metricContractSchema), metrics: z.array(z.unknown()) })
+        .parse(metricsResponse.data)
 
-      expect(JSON.stringify(metricsResponse.data)).not.toContain("employment_rate")
+      expect(metricsData.metrics).toHaveLength(0)
+      expect(metricsData.metric_contracts.map((metric) => metric.indicator)).toEqual(
+        expectedDefaultIndicators.map((indicator) => indicator.indicator),
+      )
     })
   }, 20_000)
 
-  it("returns structured MCP errors for missing DB, not_found, ambiguous, and disabled employment", async () => {
+  it("returns structured MCP errors for missing DB, not_found, ambiguous, and explains bundled employment", async () => {
     await withMcpServer(
       { ...reservedKeyOverrides("", ""), ACADEMYINFO_DB_PATH: "__missing__/academyinfo.sqlite" },
       async (harness) => {
@@ -166,16 +131,41 @@ describe("MCP response contract", () => {
       expect(ambiguousResponse.status).toBe("ambiguous")
       expect(ambiguousData.candidates).toHaveLength(0)
 
-      const disabledResult = await harness.callTool("explain_indicator", {
+      const employmentResult = await harness.callTool("explain_indicator", {
         indicator: "employment_rate",
       })
-      const disabledResponse = responseSchema.parse(disabledResult.structuredContent)
-      const disabledData = z
-        .object({ error: z.object({ code: z.literal("disabled_employment") }) })
-        .parse(disabledResponse.data)
+      const employmentResponse = responseSchema.parse(employmentResult.structuredContent)
+      const employmentData = z.object({ indicator: indicatorSchema }).parse(employmentResponse.data)
+      const expectedEmployment = expectedDefaultIndicators.find(
+        (indicator) => indicator.indicator === "employment_rate",
+      )
 
-      expect(disabledResponse.status).toBe("disabled")
-      expect(disabledData.error.code).toBe("disabled_employment")
+      expect(expectedEmployment).toBeDefined()
+      if (expectedEmployment === undefined) {
+        throw new Error("employment_rate expectation was missing")
+      }
+
+      expect(employmentResponse.status).toBe("ok")
+      expect(employmentData.indicator).toEqual(
+        expect.objectContaining({
+          indicator: "employment_rate",
+          dataset_id: "15118998",
+          source_column: expectedEmployment.source_column,
+          source_column_verified: true,
+          base_year: "2025",
+          unit: "%",
+          enabled: true,
+        }),
+      )
+      expect("sources" in employmentResponse ? employmentResponse.sources : [employmentResponse.source]).toEqual([
+        expect.objectContaining({
+          dataset_id: "15118998",
+          bundled: true,
+          source_column: expectedEmployment.source_column,
+          base_year: "2025",
+          unit: "%",
+        }),
+      ])
     })
   }, 20_000)
 

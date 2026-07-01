@@ -75,15 +75,16 @@ Required outputs:
 - no mutation of raw files
 - warnings for unverified fields
 
-### Ticket 6: Optional Non-Bundled `15139279` Local Ingest Skeleton
+### Ticket 6: `15139279` v0.3 Backlog Boundary
 
-Support local user-provided employment data without bundling it.
+Document the v0.3-only boundary for granular employment statistics without
+bundling `15139279` data or adding v0.1 runtime ingest code.
 
 Required outputs:
-- optional local ingest path
 - package artifact guard against `15139279`
-- `employment_rate` disabled by default
-- warnings when employment data is absent
+- `employment_rate` enabled by default only from bundled `15118998`
+- `15139279` deferred to v0.3 granular employment statistics
+- warnings if a caller asks for `15139279`-sourced granular employment data in v0.1
 
 ### Ticket 7: MCP Server And Tools
 
@@ -101,7 +102,7 @@ Prepare package artifacts.
 
 Required outputs:
 - bundled seed derived only from verified `15118998`
-- no `15139279` raw, normalized, seed, sample, or fixture data
+- no `15139279` raw, normalized, seed, sample, fixture, SQLite, CSV, JSON, or derived data
 - no API keys, service keys, private paths, or local user names
 
 ### Ticket 9: Tests And Quality Gates

@@ -52,6 +52,25 @@ function runNpmPackDryRun(): readonly string[] {
     .flatMap((result) => result.files.map((file) => file.path))
 }
 
+function isForbidden15139279DataArtifactPath(packPath: string): boolean {
+  const normalizedPath = packPath.replaceAll("\\", "/").toLowerCase()
+
+  if (!normalizedPath.includes("15139279")) {
+    return false
+  }
+
+  if (normalizedPath.endsWith(".md") || normalizedPath.endsWith(".txt")) {
+    return false
+  }
+
+  return (
+    normalizedPath.startsWith("data/") ||
+    normalizedPath.includes("fixture") ||
+    normalizedPath.includes("sample") ||
+    /\.(?:sqlite|db|csv|xlsx|xls|json|jsonl|parquet|tsv)$/u.test(normalizedPath)
+  )
+}
+
 describe("license and package safety gate", () => {
   it("has required license files and documents bundled/non-bundled policy", async () => {
     const requiredFiles = [
@@ -74,7 +93,7 @@ describe("license and package safety gate", () => {
     expect(combinedText).toContain("KOGL-1")
     expect(combinedText).toContain("공공누리 제1유형(출처표시)")
     expect(combinedText).toContain("15139279")
-    expect(combinedText).toContain("non-bundled / local ingest only")
+    expect(combinedText).toContain("v0.3 backlog")
   })
 
   it("uses an npm files allowlist and packs only the allowed seed artifacts", async () => {
@@ -89,13 +108,18 @@ describe("license and package safety gate", () => {
     expect(packageJson.files).toEqual([...expectedPackageFiles])
 
     const packPaths = runNpmPackDryRun()
+    const packagePolicyText = await Promise.all([
+      readFile(join(projectRoot, "README.md"), "utf8"),
+      readFile(join(projectRoot, "DATA_LICENSE.md"), "utf8"),
+    ])
 
     expect(packPaths).toContain("data/seed/academyinfo_15118998.sqlite")
     expect(packPaths).toContain("data/seed/academyinfo_15118998.manifest.json")
     expect(packPaths).toContain("data/seed/LICENSE.15118998.md")
     expect(packPaths.some((packPath) => packPath.includes("data/raw"))).toBe(false)
     expect(packPaths.some((packPath) => packPath.includes("data/external"))).toBe(false)
-    expect(packPaths.some((packPath) => packPath.includes("15139279"))).toBe(false)
+    expect(packagePolicyText.join("\n")).toContain("15139279")
+    expect(packPaths.some(isForbidden15139279DataArtifactPath)).toBe(false)
     expect(packPaths.some((packPath) => packPath.split("/").includes(".env"))).toBe(false)
     expect(packPaths.some((packPath) => packPath.endsWith(".xlsx"))).toBe(false)
     expect(packPaths.some((packPath) => packPath.endsWith(".csv"))).toBe(false)

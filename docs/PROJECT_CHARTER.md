@@ -46,10 +46,17 @@ Dataset `15118998` is the only bundled dataset in v0.1.
 It may be used for the v0.1 bundled seed only after the license gate and source-column evidence gate pass.
 
 The intended v0.1 indicators from `15118998` are:
-- freshman competition rate
-- freshman fill rate
-- average undergraduate tuition
-- scholarship per undergraduate student
+- `competition_rate`: 신입생 경쟁률, year `2025`, unit `:1`
+- `fill_rate`: 신입생 충원율, year `2025`, unit `%`
+- `employment_rate`: 취업률, year `2025`, unit `%`
+- `scholarship_per_student`: 학생 1인당 연간 장학금, year `2025`, unit `원`
+- `avg_tuition`: 평균 등록금, year `2026`, unit `천원`
+
+The verified `15118998` header embeds year and unit in each indicator column
+suffix and has no single `공시년도` column. Default indicator metadata is
+therefore per-indicator. The verified column names do not contain `(학부)`, so
+the project must not claim undergraduate-only defaults unless a verified source
+says so.
 
 Each indicator must retain source, license, year or base year, unit, source column, derived database, bundled status, and warnings in MCP responses.
 
@@ -57,11 +64,13 @@ Each indicator must retain source, license, year or base year, unit, source colu
 
 Dataset `15139279` is employment data.
 
-It is optional local-ingest only and must not be bundled in v0.1.
+It is v0.3 backlog only and must not be bundled in v0.1.
 
 The project must not include raw, normalized, seed, sample, or fixture data from `15139279` in package artifacts.
 
-`employment_rate` is disabled by default.
+`employment_rate` is enabled by default only when sourced from `15118998`.
+Dataset `15139279` is deferred to the v0.3 backlog for granular,
+per-department, or health-insurance-linked employment statistics.
 
 ## Read-Only MCP Scope
 
@@ -101,7 +110,7 @@ All attribution must remain neutral and source-based.
 ## Assumptions
 
 - `15118998` is the only v0.1 bundled dataset candidate.
-- `15139279` remains non-bundled unless a future ticket changes policy after license review.
+- `15139279` remains non-bundled and deferred to v0.3 granular employment statistics.
 - Source columns, units, and years must be verified from actual downloaded headers or official documentation before implementation.
 - Code license and data license remain separate.
 
@@ -117,12 +126,12 @@ Option C: Add live OpenAPI calls to v0.1.
 
 Use Option A.
 
-It satisfies the no-key v0.1 policy, keeps licensing risk bounded, and preserves a clean path for later optional local-ingest and v0.3 OpenAPI work.
+It satisfies the no-key v0.1 policy, keeps licensing risk bounded, and preserves a clean path for later v0.3 granular employment and OpenAPI work.
 
 ## Unresolved
 
 - Final code license.
 - Final attribution wording for dataset `15118998`.
 - Verified headers, source columns, units, and base years for `15118998`.
-- Optional local ingest design for `15139279`.
+- v0.3 granular employment design for `15139279`.
 - v0.3 OpenAPI bridge design.

@@ -3,6 +3,7 @@ import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js"
 import {
   bundledSource,
   commonWarnings,
+  sourceForIndicator,
   defaultIndicators,
   type SourceMetadata,
 } from "./catalog.js"
@@ -34,9 +35,9 @@ export function compareMetricContracts(): readonly MetricContract[] {
     source_column: indicator.source_column,
     base_year: indicator.base_year,
     unit: indicator.unit,
-    source: bundledSource,
+    source: sourceForIndicator(indicator),
     warnings: commonWarnings([
-      "Comparison values are unavailable until verified observations exist in the seed DB.",
+      "Metric values are served from the normalized bundled 15118998 derivative seed DB when available.",
     ]),
   }))
 }

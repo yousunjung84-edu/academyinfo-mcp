@@ -26,14 +26,26 @@ Only dataset `15118998` may be bundled in v0.1.
 
 Dataset `15118998` is used for the default indicators:
 
-- freshman competition rate
-- freshman fill rate
-- average undergraduate tuition
-- scholarship per undergraduate student
+- `competition_rate`: 신입생 경쟁률, year `2025`, unit `:1`
+- `fill_rate`: 신입생 충원율, year `2025`, unit `%`
+- `employment_rate`: 취업률, year `2025`, unit `%`
+- `scholarship_per_student`: 학생 1인당 연간 장학금, year `2025`, unit `원`
+- `avg_tuition`: 평균 등록금, year `2026`, unit `천원`
 
 The bundled data must be a normalized derivative seed DB, not raw XLSX/CSV files.
 
 The bundled data must include attribution and license metadata.
+
+The verified `15118998` header embeds year and unit in each indicator column
+suffix, for example `신입생 경쟁률\n(2025,:1)`. There is no single `공시년도`
+column. v0.1 must treat year and unit as per-indicator metadata.
+
+Column names do not contain `(학부)`. Do not claim that default indicators are
+undergraduate-only unless a verified source header or official documentation
+states that.
+
+`employment_rate` is enabled by default only when sourced from bundled dataset
+`15118998`, where it is a school-level employment rate.
 
 ### Non-Bundled Dataset
 
@@ -43,16 +55,17 @@ Dataset `15139279` must not be bundled in v0.1.
 
 Do not include raw, normalized, seed, sample, fixture, SQLite, CSV, JSON, or derived data from `15139279` in package artifacts.
 
-`employment_rate` must be disabled by default.
-
-`employment_rate` may be supported only through explicit local ingest.
+Dataset `15139279` is deferred to the v0.3 backlog for granular, per-department,
+or health-insurance-linked employment statistics.
 
 ## Source Map Basis
 
 The project source map currently treats:
 
-- `15118998` as the file source for competition rate, fill rate, average undergraduate tuition, and scholarship indicators.
-- `15139279` as the file source for employment rate.
+- `15118998` as the file source for `competition_rate`, `fill_rate`,
+  school-level `employment_rate`, `scholarship_per_student`, and `avg_tuition`.
+- `15139279` as a future v0.3 source candidate only for granular employment
+  statistics that are not bundled or enabled by default in v0.1.
 - OpenAPI operation names, request parameters, response fields, and file columns as requiring verification before implementation.
 
 Do not treat unverified source-map notes as final schema. Verify actual downloaded headers before mapping columns.
@@ -154,7 +167,7 @@ The npm package must exclude:
 
 - `data/raw/**`
 - `data/external/**`
-- any path containing `15139279`
+- any data artifact path containing `15139279`
 - raw `*.xlsx`
 - raw `*.csv`
 - `.env`

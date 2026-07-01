@@ -1,22 +1,5 @@
 {
   "dataset_id": "15118998",
-  "dataset_name": "교육부_대학알리미_대학주요정보",
-  "provider": "교육부",
-  "source_url": "https://www.data.go.kr/data/15118998/fileData.do",
-  "license": "KOGL-1 / 공공누리 제1유형(출처표시)",
-  "derived_database": true,
-  "bundled": true,
-  "source_file_name": "대학주요정보.xlsx",
-  "source_file_downloaded_at": "NotVerified",
-  "source_file_modified_or_observed_at": "2026-07-01T03:37:59.560Z",
-  "source_page_observed_at": "2026-07-01T06:03:14.856Z",
-  "source_file_checksum_sha256": "53f7e7fbb446206a47fab1adc622d551ba88ba7f3c25ae0cdc8e41cddc637621",
-  "header_snapshot_checksum_sha256": "4b643dd4b24a65ce965727abe3b13060702501dc3b540254315cf74461931572",
-  "seed_db_checksum_sha256": "2e061f5859d99672e7a8ad548220ad1ec864a33b76142f742e1467c649d208c7",
-  "seed_is_latest_claim": false,
-  "api_key_required": false,
-  "source_file_private_path_excluded": true,
-  "per_indicator_year_unit": true,
   "indicators": [
     {
       "indicator_id": "competition_rate",
@@ -69,17 +52,5 @@
       "source_column_verified": true,
       "enabled_by_default": true
     }
-  ],
-  "observation_counts": {
-    "competition_rate": 443,
-    "fill_rate": 488,
-    "employment_rate": 488,
-    "scholarship_per_student": 443,
-    "avg_tuition": 488
-  },
-  "warnings": [
-    "The bundled seed DB is a normalized derivative of dataset 15118998, not a raw source file.",
-    "seed_is_latest_claim=false; this seed does not claim to be the latest source unless separately verified.",
-    "Dataset 15139279 remains non-bundled v0.3 backlog data and is absent from this seed."
   ]
 }
