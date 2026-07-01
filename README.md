@@ -1,112 +1,124 @@
 # academyinfo-mcp
 
-`academyinfo-mcp` is a public, read-only, file-first MCP server for Korean
-university disclosure indicators. It lets Claude Desktop, Cursor, Codex, and
-generic MCP clients query a normalized local database.
+Query and compare **Korean university disclosure indicators (대학알리미)** from Claude
+Desktop, Cursor, Codex, and other MCP clients — **no API key, works offline** from a
+bundled, attribution-compliant dataset.
 
-This project is not affiliated with, endorsed by, or officially maintained by
-the Ministry of Education, KCUE, KEDI, data.go.kr, or academyinfo.go.kr.
+> Not affiliated with, endorsed by, or maintained by the Ministry of Education, KCUE,
+> KEDI, data.go.kr, or academyinfo.go.kr. This is an independent open-source tool.
 
-## v0.1 Policy
+## What it does
 
-v0.1 requires no API key.
+Ask your MCP client to compare universities on official public-disclosure metrics —
+admission competition, enrollment fill rate, employment rate, scholarship per student,
+and average tuition — served from a normalized local database. No account, no key, no
+network call.
 
-v0.1 is file-first and does not call live OpenAPI endpoints. The default MCP
-tools work when `DATA_GO_KR_SERVICE_KEY` and `ACADEMYINFO_SERVICE_KEY` are
-unset. Those environment variable names are reserved only for a future v0.3
-OpenAPI bridge.
+Example prompt: *"전남대학교 본교와 부산대학교를 5개 지표로 비교해줘"*
 
-## Bundled Data
+## Indicators (v0.1)
 
-Dataset `15118998` is the only bundled v0.1 dataset. It is bundled as a
-normalized derivative seed database, not as raw XLSX or CSV source files.
+All five default indicators come from data.go.kr dataset `15118998` (교육부 대학알리미
+대학주요정보), covering 488 institutions:
 
-Bundled seed artifacts:
+| indicator | 지표 | year | unit |
+|---|---|---|---|
+| `competition_rate` | 신입생 경쟁률 | 2025 | `:1` |
+| `fill_rate` | 신입생 충원율 | 2025 | `%` |
+| `employment_rate` | 취업률 | 2025 | `%` |
+| `scholarship_per_student` | 학생 1인당 연간 장학금 | 2025 | `원` |
+| `avg_tuition` | 평균 등록금 | 2026 | `천원` |
 
-- `data/seed/academyinfo_15118998.sqlite`
-- `data/seed/academyinfo_15118998.manifest.json`
-- `data/seed/LICENSE.15118998.md`
+**Data vintage:** these are the 2025 disclosure figures (tuition is the 2026 figure). The
+bundled seed sets `seed_is_latest_claim=false` — it is a point-in-time snapshot, not a live
+feed. A few closed / no-data institutions carry a literal `0` in the source; treat `0` as
+"possibly closed / no data", not necessarily a real `0%`.
 
-Dataset `15118998` is documented as KOGL-1 / 공공누리 제1유형(출처표시).
-The source-code license and bundled data license are separate.
+## Quickstart
 
-Default indicators sourced from `15118998`:
+The server currently runs from source (an npm package is planned). It serves the bundled
+seed with no configuration.
 
-- `competition_rate`: 신입생 경쟁률, year `2025`, unit `:1`
-- `fill_rate`: 신입생 충원율, year `2025`, unit `%`
-- `employment_rate`: 취업률, year `2025`, unit `%`
-- `scholarship_per_student`: 학생 1인당 연간 장학금, year `2025`, unit `원`
-- `avg_tuition`: 평균 등록금, year `2026`, unit `천원`
+```bash
+git clone https://github.com/yousunjung84-edu/academyinfo-mcp.git
+cd academyinfo-mcp
+npm install
+npm run build
+```
 
-The verified `15118998` header embeds year and unit in each indicator column
-suffix. There is no single 공시년도 column, so v0.1 treats year and unit as
-per-indicator metadata. The verified column names do not contain `(학부)`, so
-the default indicators must not be described as undergraduate-only unless a
-future verified source says so.
+Then point your MCP client at the built server. **Claude Desktop**
+(`~/Library/Application Support/Claude/claude_desktop_config.json` on macOS,
+`%APPDATA%\Claude\claude_desktop_config.json` on Windows):
 
-The bundled seed manifest sets `seed_is_latest_claim=false`.
+```json
+{
+  "mcpServers": {
+    "academyinfo": {
+      "command": "node",
+      "args": ["/absolute/path/to/academyinfo-mcp/dist/src/index.js"]
+    }
+  }
+}
+```
 
-## Non-Bundled Employment Data
+**Cursor** (`.cursor/mcp.json`) uses the same `command`/`args` shape. No API key or env
+variable is required — the server defaults to the bundled seed database.
 
-Dataset `15139279` is employment data. It is non-bundled and deferred to the
-v0.3 backlog only.
+## Example output
 
-No raw, normalized, seed, sample, fixture, SQLite, CSV, JSON, or derived data
-from `15139279` may be included in npm package artifacts.
+A comparison returns per-indicator values with full provenance (source, license, year,
+unit, warnings). Verified sample (본교 기준):
 
-`employment_rate` is enabled by default only when sourced from bundled dataset
-`15118998`. Dataset `15139279` is deferred to the v0.3 backlog for granular,
-per-department, or health-insurance-linked employment statistics.
+| indicator | 전남대(본교) | 부산대(본교) |
+|---|---|---|
+| 신입생 경쟁률 | 7.4:1 | 9.0:1 |
+| 취업률 | 57.6% | 57.5% |
+| 평균 등록금 | 4,222 천원 | 4,514 천원 |
 
-## MCP Tools
+Ambiguous names are **not guessed** — a school with multiple campuses (e.g. 전남대학교 has
+본교 and 제2캠퍼스) returns candidates so you can pick one. Include campus text such as
+`본교` to disambiguate.
 
-v0.1 exposes read-only tools for local data access:
+## MCP tools (read-only)
 
-- `list_sources`
-- `list_indicators`
-- `search_university`
-- `get_university_metrics`
-- `compare_universities`
-- `explain_indicator`
-- `validate_source_coverage`
+`list_sources` · `list_indicators` · `search_university` · `get_university_metrics` ·
+`compare_universities` · `explain_indicator` · `validate_source_coverage`
 
-Every MCP response includes status, tool, query, source or sources, data,
-warnings, and generated_at. Source objects include dataset_id, dataset_name,
-provider, source_url, license, derived_database, bundled, source_column,
-year/base_year, and unit when applicable.
+Every response includes `status`, `tool`, `query`, `source(s)`, `data`, `warnings`, and
+`generated_at`. Source objects carry `dataset_id`, `provider`, `source_url`, `license`,
+`derived_database`, `bundled`, `source_column`, `year/base_year`, and `unit`.
 
-Ambiguous university names are not guessed. Include campus text such as `본교`
-when a school has multiple campus rows.
+## Data source & license
 
-## Package Safety
+- **Data**: data.go.kr dataset `15118998`, provider 교육부, licensed under
+  **공공누리 제1유형 (KOGL Type 1, attribution required)**. The bundled database is a
+  normalized derivative; attribution must be preserved when redistributing. See
+  `DATA_LICENSE.md` and `NOTICE.md`.
+- **Code**: MIT (`LICENSE`). The source-code license and the bundled-data license are
+  separate.
+- **Not bundled**: dataset `15139279` (granular / per-department / health-insurance-linked
+  employment statistics) is deferred to the v0.3 backlog and is never included in package
+  data artifacts.
 
-Package contents are controlled by the `package.json` `files` allowlist.
-Release checks reject package artifacts containing:
+## Roadmap
 
-- `15139279` data artifacts
-- `data/raw`
-- `data/external`
-- `.env`
-- raw `.xlsx` files
-- raw `.csv` files
-- service key values
-- credentials or private local paths
+- **v0.2**: closed-school zero-value warnings · more KCUE disclosure datasets with a shared
+  institution identity resolver · richer comparison output.
+- **v0.3**: optional OpenAPI bridge (live/fresher data via a reserved service key) ·
+  granular employment statistics from `15139279`.
 
-Documentation text may mention `15139279` policy. The package gate rejects
-`15139279` data artifacts, not policy documentation.
+See `docs/ROADMAP.md` and `docs/RELEASE_CHECKLIST.md`.
 
-## Local Checks
-
-Run the release gates from the repository root:
+## Development
 
 ```bash
 npm run build
 npm run test
-npm run doctor
+npm run doctor          # confirms no API key is required
 npm run package:check
-npm run prepublishOnly
-npm pack --dry-run --json
+npm pack --dry-run
 ```
 
-`doctor` reports that API keys are not required for v0.1 and must not print
-secret values.
+The stdio server never writes logs to stdout (that would corrupt JSON-RPC); logs go to
+stderr. Package contents are controlled by the `package.json` `files` allowlist and reject
+raw data, `.env`, secrets, and `15139279` data artifacts.
