@@ -6,6 +6,8 @@ import { fileURLToPath } from "node:url"
 import { describe, expect, it } from "vitest"
 import { z } from "zod"
 
+import { isForbiddenArtifactPath } from "../scripts/package-check-scan.ts"
+
 const projectRoot = fileURLToPath(new URL("..", import.meta.url))
 
 const expectedPackageFiles = [
@@ -74,6 +76,7 @@ function isForbidden15139279DataArtifactPath(packPath: string): boolean {
 describe("license and package safety gate", () => {
   it("has required license files and documents bundled/non-bundled policy", async () => {
     const requiredFiles = [
+      "LICENSE",
       "DATA_LICENSE.md",
       "NOTICE.md",
       "data/seed/LICENSE.15118998.md",
@@ -123,5 +126,12 @@ describe("license and package safety gate", () => {
     expect(packPaths.some((packPath) => packPath.split("/").includes(".env"))).toBe(false)
     expect(packPaths.some((packPath) => packPath.endsWith(".xlsx"))).toBe(false)
     expect(packPaths.some((packPath) => packPath.endsWith(".csv"))).toBe(false)
+  })
+
+  it("treats local review and runtime artifacts as forbidden package paths", () => {
+    expect(isForbiddenArtifactPath(".insane-review/report.json")).toBe(true)
+    expect(isForbiddenArtifactPath("data/raw/15118998/대학주요정보.xlsx")).toBe(true)
+    expect(isForbiddenArtifactPath("data/external/15139279/sample.json")).toBe(true)
+    expect(isForbiddenArtifactPath("docs/15139279-backlog-note.md")).toBe(false)
   })
 })

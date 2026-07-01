@@ -12,8 +12,11 @@ const packageJsonSchema = z
   .object({
     dependencies: z.record(z.string(), z.string()).optional(),
     devDependencies: z.record(z.string(), z.string()).optional(),
+    engines: z.object({ node: z.string() }).optional(),
     files: z.array(z.string()).optional(),
+    license: z.string().optional(),
     scripts: z.record(z.string(), z.string()).optional(),
+    version: z.string().optional(),
   })
   .passthrough()
 
@@ -93,10 +96,13 @@ describe("Phase 1 scaffold", () => {
     }
 
     expect(packageJson.files).toEqual([...expectedPackageFiles])
-    expect(packageJson.dependencies?.["@modelcontextprotocol/sdk"]).toEqual(expect.any(String))
-    expect(packageJson.dependencies?.["better-sqlite3"]).toEqual(expect.any(String))
-    expect(packageJson.dependencies?.pino).toEqual(expect.any(String))
-    expect(packageJson.dependencies?.zod).toEqual(expect.any(String))
+    expect(packageJson.version).toBe("0.1.0")
+    expect(packageJson.license).toBe("MIT")
+    expect(packageJson.engines?.node).toBe(">=24.15.0")
+    expect(packageJson.dependencies?.["@modelcontextprotocol/sdk"]).toMatch(/^\^\d+\.\d+\.\d+$/u)
+    expect(packageJson.dependencies?.["better-sqlite3"]).toBeUndefined()
+    expect(packageJson.dependencies?.pino).toMatch(/^\^\d+\.\d+\.\d+$/u)
+    expect(packageJson.dependencies?.zod).toMatch(/^\^\d+\.\d+\.\d+$/u)
     expect(packageJson.devDependencies?.typescript).toEqual(expect.any(String))
     expect(packageJson.devDependencies?.vitest).toEqual(expect.any(String))
     expect(packageJson.devDependencies?.["@types/node"]).toEqual(expect.any(String))

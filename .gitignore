@@ -18,6 +18,7 @@ data/external/**
 # lazycodex / ultrawork runtime state (not source; loop logs may be large)
 .omo/
 .ultrawork/
+.insane-review/
 
 # OS
 .DS_Store

@@ -26,3 +26,4 @@ export const countRowSchema = z.object({
 })
 
 export const singleCountRowSchema = z.object({ count: z.number() })
+export const rawRowJsonSchema = z.object({ row_json: z.string() })

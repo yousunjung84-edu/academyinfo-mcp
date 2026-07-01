@@ -34,6 +34,10 @@ bundled seed sets `seed_is_latest_claim=false` — it is a point-in-time snapsho
 feed. A few closed / no-data institutions carry a literal `0` in the source; treat `0` as
 "possibly closed / no data", not necessarily a real `0%`.
 
+## Requirements
+
+Requires Node >= 24.15; uses the built-in `node:sqlite` release-candidate API.
+
 ## Quickstart
 
 The server currently runs from source (an npm package is planned). It serves the bundled
@@ -87,6 +91,15 @@ Ambiguous names are **not guessed** — a school with multiple campuses (e.g. �
 Every response includes `status`, `tool`, `query`, `source(s)`, `data`, `warnings`, and
 `generated_at`. Source objects carry `dataset_id`, `provider`, `source_url`, `license`,
 `derived_database`, `bundled`, `source_column`, `year/base_year`, and `unit`.
+For blank source cells such as source `-` markers, metric tools return
+`data.missing_metrics[]` with `reason: "blank_in_source"` instead of inventing values.
+
+## Data refresh policy
+
+The bundled seed is refreshed manually for tagged releases after the `15118998` source
+file, header snapshot, checksum ledger, and package dry-run pass review. v0.1 data is a
+point-in-time snapshot, not a live feed; use the manifest fields `source_downloaded_at`,
+`seed_built_at`, and `seed_is_latest_claim=false` when judging freshness.
 
 ## Data source & license
 

@@ -1,7 +1,11 @@
 {
   "name": "academyinfo-mcp",
-  "version": "0.0.0",
+  "version": "0.1.0",
+  "license": "MIT",
   "type": "module",
+  "engines": {
+    "node": ">=24.15.0"
+  },
   "files": [
     "dist/**",
     "data/seed/academyinfo_15118998.sqlite",
@@ -21,14 +25,13 @@
     "prepublishOnly": "npm run build && npm run package:check"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "*",
-    "better-sqlite3": "*",
-    "pino": "*",
-    "zod": "*"
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "pino": "^10.3.1",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@types/node": "*",
-    "typescript": "*",
-    "vitest": "*"
+    "@types/node": "^26.0.1",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.9"
   }
 }

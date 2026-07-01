@@ -135,3 +135,13 @@ export function indicatorByName(
 ): IndicatorDefinition | undefined {
   return defaultIndicators.find((indicator) => indicator.indicator === indicatorName)
 }
+
+export function invalidIndicatorNames(
+  indicatorNames: readonly string[] | undefined,
+): readonly string[] {
+  if (indicatorNames === undefined || indicatorNames.length === 0) {
+    return []
+  }
+
+  return indicatorNames.filter((indicatorName) => indicatorByName(indicatorName.trim()) === undefined)
+}

@@ -14,13 +14,32 @@ export const REQUIRED_PACKAGE_FILES = [
 ] as const
 
 export const IMPLICIT_NPM_FILES = ["package.json", "README.md", "LICENSE"] as const
-export const REQUIRED_LICENSE_FILES = ["DATA_LICENSE.md", "NOTICE.md", "data/seed/LICENSE.15118998.md"] as const
+export const REQUIRED_LICENSE_FILES = [
+  "LICENSE",
+  "DATA_LICENSE.md",
+  "NOTICE.md",
+  "data/seed/LICENSE.15118998.md",
+] as const
 export const REQUIRED_SEED_PACKAGE_FILES = [
   "data/seed/academyinfo_15118998.sqlite",
   "data/seed/academyinfo_15118998.manifest.json",
   "data/seed/LICENSE.15118998.md",
 ] as const
-export const TEXT_FILE_EXTENSIONS = [".cjs", ".cts", ".js", ".json", ".jsonl", ".md", ".mjs", ".mts", ".ts", ".txt", ".yaml", ".yml"] as const
+export const TEXT_FILE_EXTENSIONS = [
+  ".cjs",
+  ".cts",
+  ".js",
+  ".json",
+  ".jsonl",
+  ".map",
+  ".md",
+  ".mjs",
+  ".mts",
+  ".ts",
+  ".txt",
+  ".yaml",
+  ".yml",
+] as const
 
 export type Failure = {
   readonly code: string

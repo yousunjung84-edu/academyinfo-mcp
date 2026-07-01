@@ -33,6 +33,7 @@ export function isForbiddenArtifactPath(path: string): boolean {
   const normalizedPath = normalizePath(path)
   return (
     is15139279DataArtifactPath(normalizedPath) ||
+    normalizedPath.includes(".insane-review/") ||
     normalizedPath.includes("data/raw/") ||
     normalizedPath.includes("data/external/") ||
     normalizedPath.split("/").includes(".env") ||
@@ -47,6 +48,7 @@ function shouldSkipDirectory(name: string): boolean {
     name.startsWith("node_modules.") ||
     name === "dist" ||
     name === ".git" ||
+    name === ".insane-review" ||
     name === ".omo" ||
     name === ".ultrawork"
   )
@@ -54,6 +56,16 @@ function shouldSkipDirectory(name: string): boolean {
 
 function isTextFile(path: string): boolean {
   return TEXT_FILE_EXTENSIONS.some((extension) => path.toLowerCase().endsWith(extension))
+}
+
+function shouldScanRegardlessOfSize(path: string): boolean {
+  const normalizedPath = path.toLowerCase()
+  return (
+    normalizedPath.endsWith(".map") ||
+    normalizedPath.endsWith(".json") ||
+    normalizedPath.endsWith(".md") ||
+    normalizedPath.endsWith(".txt")
+  )
 }
 
 function collectFirstPartyFiles(directory: string): readonly string[] {
@@ -97,7 +109,7 @@ export function scanFirstPartyFiles(failures: Failure[]): void {
       continue
     }
 
-    if (lstatSync(filePath).size > 1_000_000) {
+    if (lstatSync(filePath).size > 1_000_000 && !shouldScanRegardlessOfSize(filePath)) {
       continue
     }
 

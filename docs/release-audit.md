@@ -1,37 +1,43 @@
 # Release Audit
 
-Audit date: 2026-07-01
+Audit date: 2026-07-02
 
-Scope: private GitHub push readiness for `academyinfo-mcp` v0.1 after the final five-indicator `15118998` seed audit.
+Scope: pre-public hardening review for `academyinfo-mcp` v0.1 after the GPT-5.5 Pro review fixes. This audit supports private `origin/main` push only. It does not approve `npm publish` and does not approve making the repository public.
 
-Recommendation: `GO-WITH-WARNINGS` for private GitHub push only.
+Recommendation: `GO-WITH-WARNINGS` for private GitHub push.
 
-This audit does not approve making the repository public and does not approve `npm publish`.
+## Current Package State
 
-## Evidence Summary
+| Item | Result |
+| --- | --- |
+| Package version | `0.1.0`, aligned with `src/server.ts` |
+| Code license | `MIT` in `package.json`; code license remains separate from bundled data license |
+| Runtime | `node:sqlite` retained; no `better-sqlite3` dependency or type shim |
+| Node engine | `>=24.15.0` because v0.1 uses the built-in `node:sqlite` release-candidate API |
+| Runtime mode | file-first, no API key required |
+| OpenAPI | not implemented in v0.1 |
+| Bundled data | only normalized derivative seed for dataset `15118998` |
+| Non-bundled data | dataset `15139279` remains v0.3/local-ingest backlog only |
 
-| Gate | Result | Evidence |
+## Fix Verification Matrix
+
+| Gate | Status | Evidence |
 | --- | --- | --- |
-| Git status shown | PASS | `git status --short --branch` returned `## main...origin/main` before audit edits. |
-| Release audit recommendation | PASS | This document records `GO-WITH-WARNINGS` for private GitHub push preparation. |
-| Seed DB has nonzero observations for all five defaults | PASS | `competition_rate=443`, `fill_rate=488`, `employment_rate=488`, `scholarship_per_student=443`, `avg_tuition=488`. |
-| `list_indicators` returns five defaults | PASS | CLI invocation of `handleListIndicators({})` returned five indicators and `default_indicator_count=5`. |
-| `employment_rate` source is `15118998` | PASS | `handleExplainIndicator({indicator:"employment_rate"})` returned `dataset_id=15118998`. |
-| No default indicator points to `15139279` | PASS | DB `indicators` rows all use `source_dataset_id=15118998`; package dry-run had no `15139279` paths. |
-| Stale claim scan | PASS | No stale default-state, default-count, or wrong-source claims found. README/AGENTS source-scope hits are guardrail text, not stale claims. |
-| `package.json` version reviewed | WARNING | Version is `0.0.0`; blocker for public/npm release, acceptable for private GitHub push preparation. |
-| `npm run build` | PASS | Exit code `0`. |
-| `npm run test` | PASS | 5 test files and 16 tests passed. |
-| `npm run doctor` | PASS | `status: ok`; `api_key_required: false`; service keys unset. |
-| `npm run package:check` | PASS | `package_check: ok`; required seed artifacts present. |
-| `npm run prepublishOnly` | PASS | Exit code `0`; ran build and package check. |
-| `npm pack --dry-run --json` checked | PASS | `entryCount=120`, package size `152496`, unpacked size `1094511`. |
-| Required seed files included in dry-run | PASS | SQLite DB, manifest, and `LICENSE.15118998.md` all present. |
-| Forbidden package artifacts excluded | PASS | No dry-run paths matched `data/raw`, `data/external`, `15139279`, raw `.xlsx`, raw `.csv`, `.env`, service keys, credentials, local absolute paths, local user names, or `.omo/ulw-loop`. |
-| Staged forbidden artifact policy | PASS | No staging was performed. Candidate staging is listed below and excludes forbidden artifacts. |
-| Commit/push/publish safety | PASS | No commit, no push, and no publish were run during this audit. |
+| Invalid indicators fail closed | PASS | `get_university_metrics` and `compare_universities` return `status: invalid_request`, `data.error`, and `invalid_indicators` for unknown indicator names. |
+| Empty compare input fails closed | PASS | `compare_universities` returns `status: invalid_request` when `university_names` is empty or absent. |
+| Ambiguous responses include `data.error` | PASS | `search_university` ambiguous results include `data.error.code=ambiguous` with candidates and count metadata. |
+| Search truncation exposes totals | PASS | Broad search returns `returned_count`, `total_matched`, and `truncated` instead of reporting only the sliced count. |
+| Blank source values are surfaced | PASS | Metrics responses expose `missing_metrics[]` with `reason: blank_in_source`, `value: null`, source `raw_value`, and `source_column`. |
+| Package metadata | PASS | `package.json` now has `version=0.1.0`, `license=MIT`, `engines.node=>=24.15.0`, caret-pinned runtime deps, and no `better-sqlite3`. |
+| Package license gate | PASS | `scripts/package-check-config.ts` enforces `LICENSE`, `DATA_LICENSE.md`, `NOTICE.md`, and `data/seed/LICENSE.15118998.md`. |
+| Package scan hardening | PASS | Text `.map`, `.json`, `.md`, and `.txt` files are scanned regardless of size; `.insane-review/` is ignored locally and forbidden if presented as a package path. |
+| README | PASS | README states Node requirement, `node:sqlite`, no API key, point-in-time data refresh policy, and `missing_metrics` behavior. |
 
-## Five-Indicator Observation Counts
+## External Verification Already Recorded
+
+The GPT-5.5 Pro pre-public review states that git-history secret scan and DB re-query were verified externally before this fix pass. This repository-side audit records that external verification as supporting evidence, not as a substitute for the local package gate below.
+
+## Five-Indicator Seed Counts
 
 Observed via read-only `node:sqlite` query against `data/seed/academyinfo_15118998.sqlite`.
 
@@ -45,130 +51,33 @@ Observed via read-only `node:sqlite` query against `data/seed/academyinfo_151189
 
 Raw rows in seed DB: 488.
 
-## `list_indicators` Result
+## Required Serial Gate
 
-`handleListIndicators({})` returned these default indicators:
+Commands run serially before push:
 
-- `competition_rate`
-- `fill_rate`
-- `employment_rate`
-- `scholarship_per_student`
-- `avg_tuition`
+| Command | Result |
+| --- | --- |
+| `npm run build` | PASS |
+| `npm run test` | PASS, 5 test files and 19 tests |
+| `npm run doctor` | PASS, `status: ok` and `api_key_required: false` |
+| `npm run package:check` | PASS, `package_check: ok` |
+| `npm run prepublishOnly` | PASS; no publish was run |
+| `npm pack --dry-run` | PASS |
+| `npm pack --dry-run --json` | PASS, 128 files |
 
-All five returned `dataset_id=15118998`, `enabled=true`, and verified source columns.
-
-`handleExplainIndicator({indicator:"employment_rate"})` returned `dataset_id=15118998` with source column `취업률\n(2025,%)`.
-
-## Stale-Claim Scan
-
-Files checked:
-
-- `README.md`
-- `AGENTS.md`
-- `docs/release-audit.md`
-- `docs/indicator-dictionary.md`
-
-Claim families checked:
-
-- disabled-default wording for a currently enabled default indicator
-- wrong-source wording that assigns a default indicator to the non-bundled employment dataset
-- four-indicator wording for a five-indicator default set
-- source-scope wording that overstates the verified source header
-
-Result: no stale claims found.
-
-Notes:
-
-- `README.md` and `AGENTS.md` contain guardrail text about source-scope limits. This is not a stale claim.
-- `docs/indicator-dictionary.md` was added so the scanned documentation set has an explicit current indicator dictionary.
-
-## Package Dry-Run Summary
-
-`npm pack --dry-run --json` summary:
-
-- package: `academyinfo-mcp@0.0.0`
-- `entryCount`: 120
-- `size`: 152496
-- `unpackedSize`: 1094511
-
-Required files present:
+Dry-run package includes the three required seed artifacts:
 
 - `data/seed/academyinfo_15118998.sqlite`
 - `data/seed/academyinfo_15118998.manifest.json`
 - `data/seed/LICENSE.15118998.md`
 
-Forbidden dry-run hits: 0.
+Forbidden dry-run matches: 0 for `data/raw`, `data/external`, `15139279` data artifacts, raw spreadsheets, raw CSV files, `.env`, credentials, service keys, local paths, local user names, `.omo`, `.ultrawork`, `.insane-review`, and `node_modules`.
 
-Excluded by observed dry-run:
-
-- `data/raw`
-- `data/external`
-- `15139279` data artifacts
-- raw `*.xlsx`
-- raw `*.csv`
-- `.env`
-- service keys
-- credentials
-- local absolute paths
-- local user names
-- `.omo/ulw-loop`
-
-## Command Results
-
-Commands run and passed:
-
-- `npm run build`
-- `npm run test`
-- `npm run lint`
-- `npm run doctor`
-- `npm run package:check`
-- `npm run prepublishOnly`
-- `npm pack --dry-run --json`
-
-The SQLite-backed commands emitted Node's experimental `node:sqlite` warning. This is acceptable for private GitHub push preparation but remains a public/npm release risk.
-
-Verification note: one `npm test` invocation failed while build/package commands were running concurrently and rebuilding `dist`. A subsequent standalone `npm test` invocation passed with 5 test files and 16 tests. Run test gates serially during release checks.
-
-## Safe Commit Message Proposal
-
-Recommended message:
-
-```text
-docs: refresh private release audit for five-indicator seed
-```
-
-This message fits the current repository history style and describes a private-push preparation change without claiming public release.
-
-## Files That Should Be Staged
-
-Stage exactly:
-
-- `docs/release-audit.md`
-- `docs/indicator-dictionary.md`
-- `STALE_MOVED.md` deletion
-
-## Files That Must Not Be Staged
-
-Do not stage:
-
-- `.omo/ulw-loop/**`
-- `data/raw/**`
-- `data/external/**`
-- `*.xlsx`
-- `*.csv`
-- `.env`
-- service keys
-- credentials
-- `node_modules/**`
-- `node_modules.broken-*`
-- `15139279` data artifacts
-- local machine handoff files
+Additional MCP stdio surface check: PASS. The direct MCP harness returned `invalid_request` for `indicators:["not_real"]`, ambiguous search counts with `returned_count=20`, `total_matched=482`, `truncated=true`, and `missing_metrics[0].reason=blank_in_source` for a source `-` marker.
 
 ## Remaining Risks
 
-- `package.json` version is `0.0.0`; this blocks public/npm release unless explicitly changed and approved.
-- `node:sqlite` is experimental in the observed Node runtime; public release needs explicit acceptance or a driver decision.
-- The recommendation is only for private GitHub push preparation.
-- Public repository conversion and `npm publish` remain out of scope and require separate approval.
-- Release verification commands should be run serially; concurrent rebuilds can interfere with stdio MCP tests.
-- No commit, push, or publish has been performed by this audit.
+- The project intentionally keeps `node:sqlite`; Node documents this as a release-candidate API. v0.1 requires Node `>=24.15.0`.
+- The local development machine may emit Node/npm engine or `node:sqlite` warnings if it runs below the documented release floor; public release verification should run on Node `>=24.15.0`.
+- The bundled seed is a point-in-time snapshot and does not claim to be latest. Refresh requires source-file, checksum, manifest, DB, and package dry-run review.
+- Public repository conversion and `npm publish` remain out of scope for this audit.

@@ -1,6 +1,6 @@
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js"
 
-import { commonWarnings, defaultIndicatorSources } from "./catalog.js"
+import { commonWarnings, defaultIndicatorSources, invalidIndicatorNames } from "./catalog.js"
 import {
   comparisonForQuery,
   metricsForInstitution,
@@ -15,6 +15,20 @@ import type {
   SearchUniversityInput,
 } from "./tool-schemas.js"
 import { compareMetricContracts, toolResponse } from "./tool-response.js"
+
+function invalidIndicatorErrorData(
+  invalidIndicators: readonly string[],
+  extraData: Record<string, unknown>,
+): Record<string, unknown> {
+  return repositoryErrorData(
+    "invalid_request",
+    "One or more requested indicators are not defined in the v0.1 file-first indicator catalog.",
+    {
+      invalid_indicators: invalidIndicators,
+      ...extraData,
+    },
+  )
+}
 
 export function handleSearchUniversity(query: SearchUniversityInput): CallToolResult {
   const searchQuery = query.query?.trim() ?? ""
@@ -57,20 +71,50 @@ export function handleSearchUniversity(query: SearchUniversityInput): CallToolRe
     })
   }
 
-  const candidates = result.value.map(candidateForInstitution)
-  const status = result.value.length === 1 ? "ok" : "ambiguous"
+  const candidates = result.value.matches.map(candidateForInstitution)
+  const status = result.value.matches.length === 1 ? "ok" : "ambiguous"
+  const countData = {
+    matched_count: result.value.totalMatched,
+    returned_count: candidates.length,
+    total_matched: result.value.totalMatched,
+    truncated: result.value.truncated,
+  } as const
+  const data = status === "ok"
+    ? { candidates, ...countData }
+    : repositoryErrorData("ambiguous", "University query is ambiguous; no single institution is guessed.", {
+        candidates,
+        ...countData,
+      })
 
   return toolResponse({
     tool: "search_university",
     query: { ...query },
     status,
-    data: { candidates, matched_count: candidates.length },
+    data,
     warnings: commonWarnings(["Ambiguous or missing matches are not guessed."]),
   })
 }
 
 export function handleGetUniversityMetrics(query: GetUniversityMetricsInput): CallToolResult {
   const universityName = query.university_name?.trim() ?? ""
+  const invalidIndicators = invalidIndicatorNames(query.indicators)
+
+  if (invalidIndicators.length > 0) {
+    return toolResponse({
+      tool: "get_university_metrics",
+      query: { ...query },
+      status: "invalid_request",
+      data: invalidIndicatorErrorData(invalidIndicators, {
+        university_name: universityName.length === 0 ? "NotProvided" : universityName,
+        metrics: [],
+        missing_metrics: [],
+        metric_contracts: compareMetricContracts(),
+      }),
+      warnings: commonWarnings(["Metric lookup failed closed."]),
+      sources: defaultIndicatorSources,
+    })
+  }
+
   const institutionResult = resolveSingleInstitution(universityName)
 
   if (!institutionResult.ok) {
@@ -86,6 +130,7 @@ export function handleGetUniversityMetrics(query: GetUniversityMetricsInput): Ca
         {
           university_name: universityName.length === 0 ? "NotProvided" : universityName,
           metrics: [],
+          missing_metrics: [],
           metric_contracts: compareMetricContracts(),
           ...institutionResult.data,
         },
@@ -102,7 +147,14 @@ export function handleGetUniversityMetrics(query: GetUniversityMetricsInput): Ca
       tool: "get_university_metrics",
       query: { ...query },
       status: metricsResult.code,
-      data: metricsResult.data,
+      data: {
+        university_name: institutionResult.value.school_name,
+        campus_name: institutionResult.value.campus_name,
+        metrics: [],
+        missing_metrics: [],
+        metric_contracts: compareMetricContracts(),
+        ...metricsResult.data,
+      },
       warnings: commonWarnings(["Metric lookup failed closed."]),
       sources: defaultIndicatorSources,
     })
@@ -115,7 +167,8 @@ export function handleGetUniversityMetrics(query: GetUniversityMetricsInput): Ca
     data: {
       university_name: institutionResult.value.school_name,
       campus_name: institutionResult.value.campus_name,
-      metrics: metricsResult.value,
+      metrics: metricsResult.value.metrics,
+      missing_metrics: metricsResult.value.missingMetrics,
       metric_contracts: compareMetricContracts(),
     },
     warnings: commonWarnings(["Metric values are returned from the bundled seed DB."]),
@@ -126,6 +179,43 @@ export function handleGetUniversityMetrics(query: GetUniversityMetricsInput): Ca
 export function handleCompareUniversities(query: CompareUniversitiesInput): CallToolResult {
   const names = query.university_names ?? []
   const comparisons: Comparison[] = []
+  const invalidIndicators = invalidIndicatorNames(query.indicators)
+
+  if (invalidIndicators.length > 0) {
+    return toolResponse({
+      tool: "compare_universities",
+      query: { ...query },
+      status: "invalid_request",
+      data: invalidIndicatorErrorData(invalidIndicators, {
+        university_names: names,
+        comparisons,
+        metric_contracts: compareMetricContracts(),
+      }),
+      warnings: commonWarnings(["Comparison requests fail closed when an indicator is unknown."]),
+      sources: defaultIndicatorSources,
+    })
+  }
+
+  if (names.length === 0) {
+    const data = repositoryErrorData(
+      "invalid_request",
+      "At least one university name is required for comparison.",
+      {
+        university_names: names,
+        comparisons,
+        metric_contracts: compareMetricContracts(),
+      },
+    )
+
+    return toolResponse({
+      tool: "compare_universities",
+      query: { ...query },
+      status: "invalid_request",
+      data,
+      warnings: commonWarnings(["Comparison requests fail closed when no university names are provided."]),
+      sources: defaultIndicatorSources,
+    })
+  }
 
   for (const universityName of names) {
     const comparisonResult = comparisonForQuery(universityName, query.indicators)

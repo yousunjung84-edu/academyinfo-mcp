@@ -4,7 +4,7 @@ export type RepositoryResult<T> =
   | { readonly ok: true; readonly value: T }
   | {
       readonly ok: false
-      readonly code: "missing_db" | "not_found" | "ambiguous"
+      readonly code: "missing_db" | "not_found" | "ambiguous" | "invalid_request"
       readonly data: Record<string, unknown>
     }
 
@@ -31,6 +31,25 @@ export type MetricValue = {
   readonly warnings: readonly string[]
 }
 
+export type MissingMetric = {
+  readonly indicator: string
+  readonly reason: "blank_in_source"
+  readonly value: null
+  readonly raw_value: string
+  readonly source_column: string
+}
+
+export type MetricLookup = {
+  readonly metrics: readonly MetricValue[]
+  readonly missingMetrics: readonly MissingMetric[]
+}
+
+export type InstitutionSearchResult = {
+  readonly matches: readonly Institution[]
+  readonly totalMatched: number
+  readonly truncated: boolean
+}
+
 export type Comparison = {
   readonly university_name: string
   readonly campus_name: string
@@ -39,4 +58,5 @@ export type Comparison = {
   readonly establishment_type: string
   readonly region_name: string
   readonly metrics: readonly MetricValue[]
+  readonly missing_metrics: readonly MissingMetric[]
 }
