@@ -1,0 +1,25 @@
+{
+  "dataset_id": "15118998",
+  "dataset_name": "교육부_대학알리미_대학주요정보_학생_교원_연구_재정_교육여건",
+  "provider": "교육부",
+  "source_url": "https://www.data.go.kr/data/15118998/fileData.do",
+  "license": "KOGL-1 / 공공누리 제1유형(출처표시)",
+  "official_license_label": "공공누리: 출처표시 (제1유형)",
+  "derived_database": true,
+  "bundled": true,
+  "source_file_name": "NotVerified",
+  "source_file_downloaded_at": "NotVerified",
+  "source_file_modified_or_observed_at": "NotVerified",
+  "source_page_observed_at": "2026-07-01",
+  "source_file_checksum_sha256": "NotVerified",
+  "header_snapshot_checksum_sha256": "NotVerified",
+  "seed_db_checksum_sha256": "49862b04a75c65de214bbfcea8a7c8212a03f294a971999a7d5999d6a935efd2",
+  "seed_is_latest_claim": false,
+  "source_column_verified": false,
+  "seed_content_status": "metadata_only_no_observations",
+  "warnings": [
+    "This package-safety seed artifact contains attribution and license metadata only.",
+    "No public-data rows, source columns, units, or indicator values are inferred in this artifact.",
+    "The ingestion phase must replace this with a normalized derivative seed DB before value-serving release gates."
+  ]
+}

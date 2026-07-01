@@ -1,0 +1,23 @@
+# Dependencies / build
+node_modules/
+node_modules.broken-*/
+dist/
+
+# Secrets
+.env
+.env.*
+!.env.example
+
+# Raw / external data — never redistribute
+data/raw/**
+data/external/**
+*.xlsx
+*.csv
+*.sqlite-journal
+
+# lazycodex / ultrawork runtime state (not source; loop logs may be large)
+.omo/
+.ultrawork/
+
+# OS
+.DS_Store
