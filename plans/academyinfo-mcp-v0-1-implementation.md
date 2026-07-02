@@ -32,7 +32,7 @@ This ticket may modify only this plan file.
 - MCP SDK: stable `@modelcontextprotocol/sdk` stdio server API.
 - Validation: `zod`.
 - Database: SQLite with `better-sqlite3` as the v0.1 implementation target. If `better-sqlite3` cannot satisfy the supported runtime, mark the release path `NO-GO` and return to scope decision; do not let the executor silently choose another driver.
-- Driver decision note: if `better-sqlite3` fails on target environments, compare `better-sqlite3`, `node:sqlite`, `sql.js`, and `duckdb`; mark release `NO-GO`; wait for maintainer decision before changing drivers.
+- Driver decision note: if `better-sqlite3` fails on target environments, compare maintained SQLite driver alternatives; mark release `NO-GO`; wait for maintainer decision before changing drivers.
 - Tests: `vitest`.
 - Logging: `pino` configured for stderr only in stdio MCP runtime.
 - Package manager/package target: npm package with `package.json` `files` allowlist.
@@ -182,7 +182,7 @@ Acceptance criteria:
 Failure recovery:
 
 - Remove or replace any dependency that forces keys, OpenAPI, stdout logging, or package inclusion outside the allowlist.
-- If `better-sqlite3` cannot be installed on target platforms, document the blocker, compare `better-sqlite3`, `node:sqlite`, `sql.js`, and `duckdb`, mark the implementation gate `NO-GO`, and request an explicit maintainer decision before any SQLite driver change.
+- If `better-sqlite3` cannot be installed on target platforms, document the blocker, compare maintained SQLite driver alternatives, mark the implementation gate `NO-GO`, and request an explicit maintainer decision before any SQLite driver change.
 
 ## Phase 2: License Gate
 

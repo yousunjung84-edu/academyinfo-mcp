@@ -1,4 +1,5 @@
-import { readdir, readFile } from "node:fs/promises"
+import { mkdtemp, readdir, readFile, rm } from "node:fs/promises"
+import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
 import { describe, expect, it } from "vitest"
@@ -292,6 +293,33 @@ describe("MCP response contract", () => {
         ]),
       )
     })
+  }, 20_000)
+
+  it("loads the bundled seed when the MCP server is launched from another cwd", async () => {
+    const externalCwd = await mkdtemp(join(tmpdir(), "academyinfo-mcp-cwd-"))
+
+    try {
+      await withMcpServer(
+        reservedKeyOverrides("", ""),
+        async (harness) => {
+          const result = await harness.callTool("validate_source_coverage", {})
+          const response = responseSchema.parse(result.structuredContent)
+          const data = z
+            .object({
+              raw_rows: z.literal(488),
+              observations: z.literal(2350),
+            })
+            .parse(response.data)
+
+          expect(response.status).toBe("ok")
+          expect(data.raw_rows).toBe(488)
+          expect(data.observations).toBe(2350)
+        },
+        { cwd: externalCwd },
+      )
+    } finally {
+      await rm(externalCwd, { recursive: true, force: true })
+    }
   }, 20_000)
 
   it("does not use console logging in stdio MCP runtime source files", async () => {

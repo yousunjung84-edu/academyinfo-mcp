@@ -3,8 +3,11 @@
   "version": "0.1.0",
   "license": "MIT",
   "type": "module",
+  "bin": {
+    "academyinfo-mcp": "dist/src/index.js"
+  },
   "engines": {
-    "node": ">=24.15.0"
+    "node": ">=20.0.0"
   },
   "files": [
     "dist/**",
@@ -17,7 +20,7 @@
     "DATA_LICENSE.md"
   ],
   "scripts": {
-    "build": "node node_modules/typescript/bin/tsc -p tsconfig.json",
+    "build": "node node_modules/typescript/bin/tsc -p tsconfig.json && node dist/scripts/make-bin-executable.js",
     "test": "node node_modules/vitest/vitest.mjs run",
     "lint": "node node_modules/typescript/bin/tsc -p tsconfig.json --noEmit",
     "doctor": "node scripts/doctor.ts",
@@ -26,10 +29,12 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
+    "better-sqlite3": "^11.10.0",
     "pino": "^10.3.1",
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^26.0.1",
     "typescript": "^6.0.3",
     "vitest": "^4.1.9"

@@ -36,7 +36,9 @@ feed. A few closed / no-data institutions carry a literal `0` in the source; tre
 
 ## Requirements
 
-Requires Node >= 24.15; uses the built-in `node:sqlite` release-candidate API.
+Requires Node >= 20. Uses `better-sqlite3` (a native module; prebuilt binaries are
+provided for macOS/Windows/Linux on x64/arm64, so `npm install` needs no compiler on
+common platforms).
 
 ## Quickstart
 
@@ -50,9 +52,22 @@ npm install
 npm run build
 ```
 
-Then point your MCP client at the built server. **Claude Desktop**
+For the package command, point your MCP client at the npm bin. **Claude Desktop**
 (`~/Library/Application Support/Claude/claude_desktop_config.json` on macOS,
 `%APPDATA%\Claude\claude_desktop_config.json` on Windows):
+
+```json
+{
+  "mcpServers": {
+    "academyinfo": {
+      "command": "npx",
+      "args": ["-y", "academyinfo-mcp"]
+    }
+  }
+}
+```
+
+For a local source checkout, point your MCP client at the built server:
 
 ```json
 {

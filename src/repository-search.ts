@@ -1,12 +1,11 @@
-import type { DatabaseSync } from "node:sqlite"
-
 import { openDatabase } from "./repository-db.js"
 import { institutionRowSchema } from "./repository-schemas.js"
+import type { SqliteDatabase } from "./repository-db.js"
 import type { Institution, InstitutionSearchResult, RepositoryResult } from "./repository-types.js"
 
 const maxSearchResults = 20
 
-function allInstitutions(db: DatabaseSync): readonly Institution[] {
+function allInstitutions(db: SqliteDatabase): readonly Institution[] {
   return db
     .prepare("SELECT * FROM institutions ORDER BY school_name, campus_name")
     .all()

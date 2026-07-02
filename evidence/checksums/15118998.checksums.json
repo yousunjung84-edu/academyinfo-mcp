@@ -2,9 +2,9 @@
   "dataset_id": "15118998",
   "source_file_name": "대학주요정보.xlsx",
   "source_file_checksum_sha256": "53f7e7fbb446206a47fab1adc622d551ba88ba7f3c25ae0cdc8e41cddc637621",
-  "header_snapshot_checksum_sha256": "04bac231b938087ea4e7c66a0bbb8f5f3af42f2adf024a9c4186f3cfe1fb1f92",
-  "seed_db_checksum_sha256": "4dfd5d582a2168bf346a65a1c8faf988566db36473b0da5fcecca23148a1b409",
-  "manifest_checksum_sha256": "5956143a20386c1460d8fca9966eba40d266454e5c634403937500a42d7f94cc",
+  "header_snapshot_checksum_sha256": "9327383d74cc5d0ce90069974fd42b1736481d739366e20526fb1bc55c88f117",
+  "seed_db_checksum_sha256": "5030949cef62c46a235ee8047f184328e32512f8c1cbcd08cffc9904e3038bae",
+  "manifest_checksum_sha256": "841d7e342deaf0d4bef01b7c235474c36576849b463146bdf41e38d3debefcfe",
   "indicator_dictionary_checksum_sha256": "bb3d5fe3bdabeee7fa514290bb8cf8977e16a269c0d42712789022a42110f004",
-  "observed_at": "2026-07-01T14:55:44.647Z"
+  "observed_at": "2026-07-02T08:56:58.201Z"
 }

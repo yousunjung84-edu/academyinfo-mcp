@@ -1,9 +1,11 @@
 import { existsSync } from "node:fs"
 import { dirname, join, resolve } from "node:path"
-import { DatabaseSync } from "node:sqlite"
 import { fileURLToPath } from "node:url"
+import Database from "better-sqlite3"
 
 import type { RepositoryResult } from "./repository-types.js"
+
+export type SqliteDatabase = Database.Database
 
 function findProjectRoot(startDirectory: string): string {
   let current = resolve(startDirectory)
@@ -38,7 +40,7 @@ function sqlitePath(path: string): string {
     : resolved
 }
 
-export function openDatabase(): RepositoryResult<DatabaseSync> {
+export function openDatabase(): RepositoryResult<SqliteDatabase> {
   const path = configuredDbPath()
 
   if (!existsSync(path)) {
@@ -55,5 +57,5 @@ export function openDatabase(): RepositoryResult<DatabaseSync> {
     }
   }
 
-  return { ok: true, value: new DatabaseSync(sqlitePath(path), { readOnly: true }) }
+  return { ok: true, value: new Database(sqlitePath(path), { readonly: true, fileMustExist: true }) }
 }

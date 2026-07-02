@@ -1,6 +1,6 @@
-import type { DatabaseSync } from "node:sqlite"
+import type Database from "better-sqlite3"
 
-export function createSchema(db: DatabaseSync): void {
+export function createSchema(db: Database.Database): void {
   db.exec(`
     PRAGMA journal_mode = DELETE;
     PRAGMA foreign_keys = ON;

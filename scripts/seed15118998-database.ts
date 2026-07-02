@@ -1,7 +1,7 @@
 import { copyFileSync, mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { DatabaseSync } from "node:sqlite"
+import Database from "better-sqlite3"
 
 import {
   datasetId,
@@ -59,7 +59,7 @@ export function buildSeedDatabase(
   ensureParent(seedDbPath)
   const tempDirectory = mkdtempSync(join(tmpdir(), "academyinfo-15118998-"))
   const tempSeedDbPath = join(tempDirectory, "academyinfo_15118998.sqlite")
-  const db = new DatabaseSync(sqlitePath(tempSeedDbPath))
+  const db = new Database(sqlitePath(tempSeedDbPath))
   const counts = Object.fromEntries(indicatorSpecs.map((spec) => [spec.indicator_id, 0]))
 
   try {
@@ -92,7 +92,7 @@ export function buildSeedDatabase(
 }
 
 function insertSourceFile(
-  db: DatabaseSync,
+  db: Database.Database,
   sourceChecksum: string,
   headerSnapshotChecksum: string,
 ): number {
@@ -119,7 +119,7 @@ function insertSourceFile(
 
 type InsertStatements = ReturnType<typeof prepareInsertStatements>
 
-function prepareInsertStatements(db: DatabaseSync) {
+function prepareInsertStatements(db: Database.Database) {
   const institutionInsert = db.prepare(
     `INSERT INTO institutions (
       school_name, campus_name, school_kind, school_type, establishment_type, region_name

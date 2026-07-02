@@ -1,4 +1,5 @@
 import { execFileSync, spawn, type ChildProcessWithoutNullStreams } from "node:child_process"
+import { join } from "node:path"
 import { fileURLToPath } from "node:url"
 import { z } from "zod"
 
@@ -32,6 +33,10 @@ const callToolResultSchema = z
   .passthrough()
 
 type JsonRpcResponse = z.infer<typeof jsonRpcResponseSchema>
+type StdioMcpHarnessOptions = {
+  readonly cwd?: string
+  readonly entryPoint?: string
+}
 type ResponseHandler = {
   readonly resolve: (response: JsonRpcResponse) => void
   readonly reject: (error: Error) => void
@@ -57,9 +62,11 @@ export class StdioMcpHarness {
   private nextId = 1
   private stdoutBuffer = ""
 
-  constructor(envOverrides: Record<string, string>) {
-    this.child = spawn(process.execPath, ["dist/src/index.js"], {
-      cwd: projectRoot,
+  constructor(envOverrides: Record<string, string>, options: StdioMcpHarnessOptions = {}) {
+    const entryPoint = options.entryPoint ?? join(projectRoot, "dist", "src", "index.js")
+
+    this.child = spawn(process.execPath, [entryPoint], {
+      cwd: options.cwd ?? projectRoot,
       env: testEnvironment(envOverrides),
       stdio: ["pipe", "pipe", "pipe"],
     })
@@ -197,8 +204,9 @@ export class StdioMcpHarness {
 export async function withMcpServer<T>(
   envOverrides: Record<string, string>,
   callback: (harness: StdioMcpHarness) => Promise<T>,
+  options: StdioMcpHarnessOptions = {},
 ): Promise<T> {
-  const harness = new StdioMcpHarness(envOverrides)
+  const harness = new StdioMcpHarness(envOverrides, options)
   await harness.initialize()
 
   try {

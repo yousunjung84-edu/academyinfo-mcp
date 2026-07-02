@@ -5,8 +5,8 @@ Current state: v0.1 public-transition candidate. `docs/release-audit.md` recomme
 ## Completed pre-public gates
 
 - [x] Package version set to `0.1.0`.
-- [x] Runtime decision made: keep built-in `node:sqlite`.
-- [x] Node engine set to `>=24.15.0`.
+- [x] Runtime decision made: use `better-sqlite3`.
+- [x] Node engine set to `>=20.0.0`.
 - [x] Code license set to `MIT`.
 - [x] Code license and bundled data license documented separately.
 - [x] Runtime and dev dependencies use explicit semver ranges with caret notation.
@@ -36,7 +36,7 @@ Current state: v0.1 public-transition candidate. `docs/release-audit.md` recomme
 
 - [ ] Keep the data refresh SOP current: download source XLSX, rerun evidence lock, rebuild seed, update manifest and checksum, rerun package audit.
 - [ ] Verify header-change detection on every refresh.
-- [ ] Track `node:sqlite` stabilization and maintain the Node version requirement.
+- [ ] Track `better-sqlite3` prebuilt binary coverage and maintain the Node version requirement.
 - [ ] Keep KOGL-1 attribution intact.
 - [ ] Burn down v0.2 backlog items separately.
 - [ ] Keep v0.3 OpenAPI and `15139279` granular employment work outside v0.1.

@@ -1,5 +1,3 @@
-import type { DatabaseSync } from "node:sqlite"
-
 import {
   bundledSource,
   defaultIndicators,
@@ -10,6 +8,7 @@ import {
 } from "./catalog.js"
 import { openDatabase } from "./repository-db.js"
 import { metricRowSchema, rawRowJsonSchema } from "./repository-schemas.js"
+import type { SqliteDatabase } from "./repository-db.js"
 import type { Institution, MetricLookup, MetricValue, MissingMetric, RepositoryResult } from "./repository-types.js"
 
 const rawSchoolNameColumn = "학교명"
@@ -129,7 +128,7 @@ function metricValueFromRow(row: ReturnType<typeof metricRowSchema.parse>): Metr
 }
 
 function missingMetricsForInstitution(
-  db: DatabaseSync,
+  db: SqliteDatabase,
   institution: Institution,
   requested: readonly string[],
   returnedIndicators: ReadonlySet<string>,
@@ -176,7 +175,7 @@ function missingMetricsFromRawRow(
 }
 
 function rawRowForInstitution(
-  db: DatabaseSync,
+  db: SqliteDatabase,
   institution: Institution,
 ): Record<string, unknown> | null {
   const rows = db.prepare("SELECT row_json FROM raw_rows").all()

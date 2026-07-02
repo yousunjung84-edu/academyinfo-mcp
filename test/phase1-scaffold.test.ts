@@ -10,6 +10,7 @@ const projectRoot = fileURLToPath(new URL("..", import.meta.url))
 
 const packageJsonSchema = z
   .object({
+    bin: z.record(z.string(), z.string()).optional(),
     dependencies: z.record(z.string(), z.string()).optional(),
     devDependencies: z.record(z.string(), z.string()).optional(),
     engines: z.object({ node: z.string() }).optional(),
@@ -96,16 +97,26 @@ describe("Phase 1 scaffold", () => {
     }
 
     expect(packageJson.files).toEqual([...expectedPackageFiles])
+    expect(packageJson.bin).toEqual({ "academyinfo-mcp": "dist/src/index.js" })
     expect(packageJson.version).toBe("0.1.0")
     expect(packageJson.license).toBe("MIT")
-    expect(packageJson.engines?.node).toBe(">=24.15.0")
+    expect(packageJson.engines?.node).toBe(">=20.0.0")
     expect(packageJson.dependencies?.["@modelcontextprotocol/sdk"]).toMatch(/^\^\d+\.\d+\.\d+$/u)
-    expect(packageJson.dependencies?.["better-sqlite3"]).toBeUndefined()
+    expect(packageJson.dependencies?.["better-sqlite3"]).toMatch(/^\^11\.\d+\.\d+$/u)
     expect(packageJson.dependencies?.pino).toMatch(/^\^\d+\.\d+\.\d+$/u)
     expect(packageJson.dependencies?.zod).toMatch(/^\^\d+\.\d+\.\d+$/u)
+    expect(packageJson.devDependencies?.["@types/better-sqlite3"]).toMatch(/^\^\d+\.\d+\.\d+$/u)
     expect(packageJson.devDependencies?.typescript).toEqual(expect.any(String))
     expect(packageJson.devDependencies?.vitest).toEqual(expect.any(String))
     expect(packageJson.devDependencies?.["@types/node"]).toEqual(expect.any(String))
+  })
+
+  it("declares an npx-capable bin entry with a preserved shebang", async () => {
+    const sourceIndex = await readFile(join(projectRoot, "src", "index.ts"), "utf8")
+    const distIndex = await readFile(join(projectRoot, "dist", "src", "index.js"), "utf8")
+
+    expect(sourceIndex.startsWith("#!/usr/bin/env node\n")).toBe(true)
+    expect(distIndex.startsWith("#!/usr/bin/env node\n")).toBe(true)
   })
 
   it("uses test/ consistently without creating tests/", () => {
