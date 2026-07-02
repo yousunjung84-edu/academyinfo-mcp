@@ -100,7 +100,7 @@ describe("Phase 1 scaffold", () => {
     expect(packageJson.bin).toEqual({ "academyinfo-mcp": "dist/src/index.js" })
     expect(packageJson.version).toBe("0.1.0")
     expect(packageJson.license).toBe("MIT")
-    expect(packageJson.engines?.node).toBe(">=20.0.0")
+    expect(packageJson.engines?.node).toBe(">=22.0.0")
     expect(packageJson.dependencies?.["@modelcontextprotocol/sdk"]).toMatch(/^\^\d+\.\d+\.\d+$/u)
     expect(packageJson.dependencies?.["better-sqlite3"]).toMatch(/^\^11\.\d+\.\d+$/u)
     expect(packageJson.dependencies?.pino).toMatch(/^\^\d+\.\d+\.\d+$/u)
@@ -117,6 +117,15 @@ describe("Phase 1 scaffold", () => {
 
     expect(sourceIndex.startsWith("#!/usr/bin/env node\n")).toBe(true)
     expect(distIndex.startsWith("#!/usr/bin/env node\n")).toBe(true)
+  })
+
+  it("documents from-source use as current and npx use as post-publish planned", async () => {
+    const readme = await readFile(join(projectRoot, "README.md"), "utf8")
+
+    expect(readme).toContain("Requires Node >= 22 (LTS). Node 20 is EOL, best-effort only.")
+    expect(readme).toContain("For the current from-source checkout, point your MCP client at the built server.")
+    expect(readme).toContain("After npm publish (planned), the package command will be:")
+    expect(readme).toContain("Do not use the `npx -y academyinfo-mcp` form until the package has been published to npm.")
   })
 
   it("uses test/ consistently without creating tests/", () => {

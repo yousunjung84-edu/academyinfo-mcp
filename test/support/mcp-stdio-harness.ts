@@ -216,9 +216,9 @@ export async function withMcpServer<T>(
   }
 }
 
-export function runDoctor(envOverrides: Record<string, string>): string {
-  return execFileSync(process.execPath, ["scripts/doctor.ts"], {
-    cwd: projectRoot,
+export function runDoctor(envOverrides: Record<string, string>, cwd = projectRoot): string {
+  return execFileSync(process.execPath, [join(projectRoot, "scripts", "doctor.ts")], {
+    cwd,
     env: testEnvironment(envOverrides),
     encoding: "utf8",
     stdio: ["ignore", "pipe", "pipe"],

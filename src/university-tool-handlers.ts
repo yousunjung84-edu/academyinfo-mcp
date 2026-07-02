@@ -45,9 +45,12 @@ export function handleSearchUniversity(query: SearchUniversityInput): CallToolRe
         },
         candidates: [],
         matched_count: 0,
+        returned_count: 0,
+        total_matched: 0,
+        truncated: false,
       },
       warnings: commonWarnings([
-        "No institution index is available in the metadata-only seed artifact.",
+        "Empty queries are not guessed.",
         "Ambiguous or missing matches are not guessed.",
       ]),
     })

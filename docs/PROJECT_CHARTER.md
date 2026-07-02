@@ -120,7 +120,7 @@ All attribution must remain neutral and source-based.
 - Bundled data attribution for `15118998` is recorded in `DATA_LICENSE.md`, `NOTICE.md`, and `data/seed/LICENSE.15118998.md`.
 - `15118998` source headers, source columns, units, and per-indicator years were verified for the five bundled default indicators.
 - Runtime dependency versions use explicit semver ranges with caret notation.
-- v0.1 uses `better-sqlite3` and declares `engines.node >=20.0.0` so common Node LTS installations can run the package.
+- v0.1 uses `better-sqlite3` and declares `engines.node >=22.0.0` because Node 20 is EOL as of July 2026.
 
 ## Options
 

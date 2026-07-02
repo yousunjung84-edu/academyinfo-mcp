@@ -36,9 +36,9 @@ feed. A few closed / no-data institutions carry a literal `0` in the source; tre
 
 ## Requirements
 
-Requires Node >= 20. Uses `better-sqlite3` (a native module; prebuilt binaries are
-provided for macOS/Windows/Linux on x64/arm64, so `npm install` needs no compiler on
-common platforms).
+Requires Node >= 22 (LTS). Node 20 is EOL, best-effort only. Uses `better-sqlite3`
+(a native module; prebuilt binaries are provided for macOS/Windows/Linux on x64/arm64,
+so `npm install` needs no compiler on common platforms).
 
 ## Quickstart
 
@@ -52,9 +52,22 @@ npm install
 npm run build
 ```
 
-For the package command, point your MCP client at the npm bin. **Claude Desktop**
-(`~/Library/Application Support/Claude/claude_desktop_config.json` on macOS,
-`%APPDATA%\Claude\claude_desktop_config.json` on Windows):
+For the current from-source checkout, point your MCP client at the built server.
+**Claude Desktop** (`~/Library/Application Support/Claude/claude_desktop_config.json` on
+macOS, `%APPDATA%\Claude\claude_desktop_config.json` on Windows):
+
+```json
+{
+  "mcpServers": {
+    "academyinfo": {
+      "command": "node",
+      "args": ["/absolute/path/to/academyinfo-mcp/dist/src/index.js"]
+    }
+  }
+}
+```
+
+After npm publish (planned), the package command will be:
 
 ```json
 {
@@ -67,18 +80,7 @@ For the package command, point your MCP client at the npm bin. **Claude Desktop*
 }
 ```
 
-For a local source checkout, point your MCP client at the built server:
-
-```json
-{
-  "mcpServers": {
-    "academyinfo": {
-      "command": "node",
-      "args": ["/absolute/path/to/academyinfo-mcp/dist/src/index.js"]
-    }
-  }
-}
-```
+Do not use the `npx -y academyinfo-mcp` form until the package has been published to npm.
 
 **Cursor** (`.cursor/mcp.json`) uses the same `command`/`args` shape. No API key or env
 variable is required — the server defaults to the bundled seed database.

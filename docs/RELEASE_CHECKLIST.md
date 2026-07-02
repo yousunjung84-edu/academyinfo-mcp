@@ -6,7 +6,7 @@ Current state: v0.1 public-transition candidate. `docs/release-audit.md` recomme
 
 - [x] Package version set to `0.1.0`.
 - [x] Runtime decision made: use `better-sqlite3`.
-- [x] Node engine set to `>=20.0.0`.
+- [x] Node engine set to `>=22.0.0`.
 - [x] Code license set to `MIT`.
 - [x] Code license and bundled data license documented separately.
 - [x] Runtime and dev dependencies use explicit semver ranges with caret notation.

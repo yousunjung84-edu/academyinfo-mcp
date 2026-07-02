@@ -139,11 +139,20 @@ describe("MCP response contract", () => {
         .object({
           error: errorSchema.extend({ code: z.literal("ambiguous") }),
           candidates: z.array(z.unknown()),
+          returned_count: z.literal(0),
+          total_matched: z.literal(0),
+          truncated: z.literal(false),
         })
         .parse(ambiguousResponse.data)
 
       expect(ambiguousResponse.status).toBe("ambiguous")
       expect(ambiguousData.candidates).toHaveLength(0)
+      expect(ambiguousResponse.warnings).toContain("Empty queries are not guessed.")
+      expect(
+        ambiguousResponse.warnings.some(
+          (warning) => warning.includes("metadata-only") && warning.includes("seed artifact"),
+        ),
+      ).toBe(false)
 
       const multiCampusResult = await harness.callTool("search_university", {
         query: "가톨릭대학교",

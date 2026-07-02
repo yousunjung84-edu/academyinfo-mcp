@@ -15,7 +15,7 @@ This audit supports switching the GitHub repository from private to public after
 | Package version | `0.1.0`, aligned with `src/server.ts` |
 | Code license | `MIT` in `package.json`; code license remains separate from bundled data license |
 | Runtime | `better-sqlite3`; no release-candidate built-in SQLite runtime |
-| Node engine | `>=20.0.0` for common Node LTS installations |
+| Node engine | `>=22.0.0`; Node 20 is EOL and best-effort only |
 | Dependencies | Explicit semver ranges using caret notation for runtime and dev dependencies |
 | Runtime mode | File-first, no API key required |
 | OpenAPI | Not implemented in v0.1 |
@@ -42,12 +42,12 @@ This audit supports switching the GitHub repository from private to public after
 | Ambiguous responses include `data.error` | PASS | `search_university` ambiguous results include `data.error.code=ambiguous` with candidates and count metadata. |
 | Search truncation exposes totals | PASS | Broad search returns `returned_count`, `total_matched`, and `truncated` instead of reporting only the sliced count. |
 | Blank source values are surfaced | PASS | Metrics responses expose `missing_metrics[]` with `reason: blank_in_source`, `value: null`, source `raw_value`, and `source_column`. |
-| Package metadata | PASS | `package.json` has `version=0.1.0`, `license=MIT`, `engines.node >=20.0.0`, explicit caret semver ranges, `better-sqlite3`, and the `academyinfo-mcp` bin. |
+| Package metadata | PASS | `package.json` has `version=0.1.0`, `license=MIT`, `engines.node >=22.0.0`, explicit caret semver ranges, `better-sqlite3`, and the `academyinfo-mcp` bin. |
 | Package-relative seed resolution | PASS | MCP stdio test launches `dist/src/index.js` from an external cwd and `validate_source_coverage` returns 488 raw rows and 2350 observations. |
 | Installed package bin smoke | PASS | A packed tarball installed into a temporary project creates `.bin/academyinfo-mcp.cmd`; launching that bin returns `compare_universities` status `ok` for two universities and `invalid_request` for an invalid indicator. |
 | Package license gate | PASS | `scripts/package-check-config.ts` enforces `LICENSE`, `DATA_LICENSE.md`, `NOTICE.md`, and `data/seed/LICENSE.15118998.md`. |
 | Package scan hardening | PASS | Text `.map`, `.json`, `.md`, and `.txt` files are scanned regardless of size; local review artifacts and sensitive package paths (`.env`, `.env.*`, `.npmrc`, `.pem`, `service-account.json`) are forbidden. |
-| README | PASS | README states Node requirement, `better-sqlite3`, no API key, point-in-time data refresh policy, npx-style client config, and `missing_metrics` behavior. |
+| README | PASS | README states Node requirement, `better-sqlite3`, no API key, point-in-time data refresh policy, current from-source use, planned post-publish npx config, and `missing_metrics` behavior. |
 
 ## Five-Indicator Seed Counts
 
@@ -90,6 +90,8 @@ Dry-run package must exclude `data/raw`, `data/external`, `15139279` data artifa
 ## Remaining Risks
 
 - `npm publish` remains on hold until an independent clean-environment install, MCP client smoke test, and npm account/package-name checks pass.
+- `npm publish` requires a multi-platform smoke matrix before approval: Node 22 and Node 24 across macOS, Windows, and Linux.
+- Linux package/install coverage is not yet verified in this audit and must be disclosed as an npm-publish gap.
 - `better-sqlite3` is a native module. Common macOS/Windows/Linux x64/arm64 platforms use prebuilt binaries, but unsupported Node/platform combinations may require a compiler.
 - Windows cannot represent Unix executable bits on the generated JS file; the build includes a chmod helper for Unix/macOS build hosts, and Windows installs expose runnable `.cmd`/`.ps1` npm bin shims.
 - The bundled seed is a point-in-time snapshot and does not claim to be latest. Refresh requires source-file, checksum, manifest, DB, and package dry-run review.

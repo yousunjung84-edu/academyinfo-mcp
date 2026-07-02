@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto"
-import { readFile } from "node:fs/promises"
+import { mkdtemp, readFile, rm } from "node:fs/promises"
+import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
 import { describe, expect, it } from "vitest"
@@ -202,4 +203,19 @@ describe("v0.1 no-API-key policy", () => {
     expect(packOutput).not.toContain(dataGoKrSentinel)
     expect(packOutput).not.toContain(academyinfoSentinel)
   }, 20_000)
+
+  it("resolves doctor seed artifacts from the package root when launched elsewhere", async () => {
+    const externalCwd = await mkdtemp(join(tmpdir(), "academyinfo-doctor-cwd-"))
+
+    try {
+      const doctorOutput = runDoctor(reservedKeyOverrides("", ""), externalCwd)
+
+      expect(doctorOutput).toContain("data/seed/academyinfo_15118998.sqlite: present")
+      expect(doctorOutput).toContain("data/seed/academyinfo_15118998.manifest.json: present")
+      expect(doctorOutput).toContain("data/seed/LICENSE.15118998.md: present")
+      expect(doctorOutput).toContain("status: ok")
+    } finally {
+      await rm(externalCwd, { recursive: true, force: true })
+    }
+  })
 })

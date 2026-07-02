@@ -1,5 +1,6 @@
 import { existsSync } from "node:fs"
-import { join } from "node:path"
+import { dirname, join, resolve } from "node:path"
+import { fileURLToPath } from "node:url"
 
 const RESERVED_SERVICE_KEYS = [
   "DATA_GO_KR_SERVICE_KEY",
@@ -15,13 +16,31 @@ const REQUIRED_SEED_ARTIFACTS = [
 type ServiceKeyName = (typeof RESERVED_SERVICE_KEYS)[number]
 type ServiceKeyStatus = "set" | "unset"
 
+function findProjectRoot(startDirectory: string): string {
+  let current = resolve(startDirectory)
+
+  while (!existsSync(join(current, "package.json"))) {
+    const parent = dirname(current)
+
+    if (parent === current) {
+      throw new Error("Could not locate project root package.json.")
+    }
+
+    current = parent
+  }
+
+  return current
+}
+
+const projectRoot = findProjectRoot(dirname(fileURLToPath(import.meta.url)))
+
 function serviceKeyStatus(env: NodeJS.ProcessEnv, name: ServiceKeyName): ServiceKeyStatus {
   const value = env[name]
   return typeof value === "string" && value.length > 0 ? "set" : "unset"
 }
 
 function seedArtifactStatus(relativePath: string): "present" | "pending" {
-  return existsSync(join(process.cwd(), relativePath)) ? "present" : "pending"
+  return existsSync(join(projectRoot, relativePath)) ? "present" : "pending"
 }
 
 function main(): void {
