@@ -6,7 +6,7 @@ import {
   sourceForIndicator,
   type IndicatorDefinition,
 } from "./catalog.js"
-import { openDatabase } from "./repository-db.js"
+import { openDatabase, repositoryDatabaseError } from "./repository-db.js"
 import { metricRowSchema, rawRowJsonSchema } from "./repository-schemas.js"
 import type { SqliteDatabase } from "./repository-db.js"
 import type { Institution, MetricLookup, MetricValue, MissingMetric, RepositoryResult } from "./repository-types.js"
@@ -102,6 +102,8 @@ export function metricsForInstitution(
         ),
       },
     }
+  } catch (error) {
+    return repositoryDatabaseError(error)
   } finally {
     dbResult.value.close()
   }

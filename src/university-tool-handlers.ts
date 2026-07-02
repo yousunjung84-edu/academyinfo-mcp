@@ -232,10 +232,12 @@ export function handleCompareUniversities(query: CompareUniversitiesInput): Call
           comparisonResult.code,
           comparisonResult.code === "not_found"
             ? "No local institution matched one of the comparison queries."
-            : "One of the comparison queries is ambiguous; include campus name when needed.",
+            : comparisonResult.code === "database_error"
+              ? "Local database could not be read."
+              : "One of the comparison queries is ambiguous; include campus name when needed.",
           {
             university_name: universityName,
-            comparisons,
+            comparisons: [],
             metric_contracts: compareMetricContracts(),
             ...comparisonResult.data,
           },

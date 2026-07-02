@@ -50,7 +50,7 @@ export function toolResponse(input: ToolResponseInput): CallToolResult {
       ? {
           error: {
             code: "missing_db",
-            message: "Configured database file was not found.",
+            message: "Local database file was not found.",
             configured_database: "missing",
           },
         }
@@ -59,7 +59,7 @@ export function toolResponse(input: ToolResponseInput): CallToolResult {
     databaseStatus.kind === "missing"
       ? [
           ...input.warnings,
-          "ACADEMYINFO_DB_PATH is configured but the database file was not found; the path is omitted from this response.",
+          "Local database file was not found; the path is omitted from this response.",
         ]
       : input.warnings
   const response: Record<string, unknown> = {

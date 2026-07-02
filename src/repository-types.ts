@@ -4,7 +4,7 @@ export type RepositoryResult<T> =
   | { readonly ok: true; readonly value: T }
   | {
       readonly ok: false
-      readonly code: "missing_db" | "not_found" | "ambiguous" | "invalid_request"
+      readonly code: "missing_db" | "database_error" | "not_found" | "ambiguous" | "invalid_request"
       readonly data: Record<string, unknown>
     }
 

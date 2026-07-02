@@ -43,7 +43,7 @@ type ResponseHandler = {
   readonly timeout: NodeJS.Timeout
 }
 
-export function testEnvironment(overrides: Record<string, string>): Record<string, string> {
+export function testEnvironment(overrides: Record<string, string | undefined>): Record<string, string> {
   const env: Record<string, string> = {}
 
   for (const [key, value] of Object.entries(process.env)) {
@@ -52,7 +52,15 @@ export function testEnvironment(overrides: Record<string, string>): Record<strin
     }
   }
 
-  return { ...env, ...overrides }
+  for (const [key, value] of Object.entries(overrides)) {
+    if (value === undefined) {
+      delete env[key]
+    } else {
+      env[key] = value
+    }
+  }
+
+  return env
 }
 
 export class StdioMcpHarness {
@@ -62,7 +70,7 @@ export class StdioMcpHarness {
   private nextId = 1
   private stdoutBuffer = ""
 
-  constructor(envOverrides: Record<string, string>, options: StdioMcpHarnessOptions = {}) {
+  constructor(envOverrides: Record<string, string | undefined>, options: StdioMcpHarnessOptions = {}) {
     const entryPoint = options.entryPoint ?? join(projectRoot, "dist", "src", "index.js")
 
     this.child = spawn(process.execPath, [entryPoint], {
@@ -202,7 +210,7 @@ export class StdioMcpHarness {
 }
 
 export async function withMcpServer<T>(
-  envOverrides: Record<string, string>,
+  envOverrides: Record<string, string | undefined>,
   callback: (harness: StdioMcpHarness) => Promise<T>,
   options: StdioMcpHarnessOptions = {},
 ): Promise<T> {
@@ -216,7 +224,7 @@ export async function withMcpServer<T>(
   }
 }
 
-export function runDoctor(envOverrides: Record<string, string>, cwd = projectRoot): string {
+export function runDoctor(envOverrides: Record<string, string | undefined>, cwd = projectRoot): string {
   return execFileSync(process.execPath, [join(projectRoot, "scripts", "doctor.ts")], {
     cwd,
     env: testEnvironment(envOverrides),

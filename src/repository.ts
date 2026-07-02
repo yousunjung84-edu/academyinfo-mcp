@@ -1,4 +1,4 @@
-import { openDatabase } from "./repository-db.js"
+import { openDatabase, repositoryDatabaseError } from "./repository-db.js"
 import { countRowSchema, singleCountRowSchema } from "./repository-schemas.js"
 import { metricsForInstitution } from "./repository-metrics.js"
 import { resolveSingleInstitution, searchInstitutions } from "./repository-search.js"
@@ -64,6 +64,8 @@ export function sourceCoverageCounts(): RepositoryResult<Record<string, unknown>
         ),
       },
     }
+  } catch (error) {
+    return repositoryDatabaseError(error)
   } finally {
     dbResult.value.close()
   }

@@ -1,4 +1,4 @@
-import { openDatabase } from "./repository-db.js"
+import { openDatabase, repositoryDatabaseError } from "./repository-db.js"
 import { institutionRowSchema } from "./repository-schemas.js"
 import type { SqliteDatabase } from "./repository-db.js"
 import type { Institution, InstitutionSearchResult, RepositoryResult } from "./repository-types.js"
@@ -70,6 +70,8 @@ export function searchInstitutions(query: string): RepositoryResult<InstitutionS
         truncated: allMatches.length > matches.length,
       },
     }
+  } catch (error) {
+    return repositoryDatabaseError(error)
   } finally {
     dbResult.value.close()
   }

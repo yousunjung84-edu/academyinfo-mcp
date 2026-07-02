@@ -2,7 +2,7 @@
 
 Audit date: 2026-07-02
 
-Scope: public-transition audit for `academyinfo-mcp` v0.1 after the GPT-5.5 Pro pre-public review fixes and follow-up documentation cleanup.
+Scope: public-transition audit for `academyinfo-mcp` v0.1 after the GPT-5.5 Pro pre-public review fixes, follow-up documentation cleanup, and error-path hardening review.
 
 Recommendation: `GitHub public GO`; `npm publish HOLD`.
 
@@ -42,6 +42,9 @@ This audit supports switching the GitHub repository from private to public after
 | Ambiguous responses include `data.error` | PASS | `search_university` ambiguous results include `data.error.code=ambiguous` with candidates and count metadata. |
 | Search truncation exposes totals | PASS | Broad search returns `returned_count`, `total_matched`, and `truncated` instead of reporting only the sliced count. |
 | Blank source values are surfaced | PASS | Metrics responses expose `missing_metrics[]` with `reason: blank_in_source`, `value: null`, source `raw_value`, and `source_column`. |
+| DB errors stay in the MCP contract | PASS | Corrupt configured SQLite input returns `status: database_error` with `data.error` and the normal response envelope; local paths and stack details are omitted. |
+| Missing bundled seed fails closed | PASS | Metadata tools no longer report healthy metadata when the bundled seed file is absent; missing seed state maps to `missing_db`. |
+| Compare errors avoid partial data | PASS | `compare_universities` returns empty `comparisons` when any requested university is not found or ambiguous. |
 | Package metadata | PASS | `package.json` has `version=0.1.0`, `license=MIT`, `engines.node >=22.0.0`, explicit caret semver ranges, `better-sqlite3`, and the `academyinfo-mcp` bin. |
 | Package-relative seed resolution | PASS | MCP stdio test launches `dist/src/index.js` from an external cwd and `validate_source_coverage` returns 488 raw rows and 2350 observations. |
 | Installed package bin smoke | PASS | A packed tarball installed into a temporary project creates `.bin/academyinfo-mcp.cmd`; launching that bin returns `compare_universities` status `ok` for two universities and `invalid_request` for an invalid indicator. |
@@ -71,11 +74,11 @@ Commands run before this audit update:
 | --- | --- |
 | `npm install` | PASS under Node `v22.23.1`; production dependencies installed with 0 vulnerabilities |
 | `npm run build` | PASS; TypeScript compile plus generated bin chmod helper |
-| `npm run test` | PASS, 5 test files and 22 tests |
+| `npm run test` | PASS, 7 test files and 30 tests |
 | `npm run doctor` | PASS, `status: ok` |
 | `npm run package:check` | PASS, `package_check: ok` |
 | `npm run prepublishOnly` | PASS |
-| `npm pack --dry-run --json` | PASS, 132 files; required seed artifacts present; forbidden artifacts absent |
+| `npm pack --dry-run --json` | PASS, 136 files; required seed artifacts present; forbidden artifacts absent |
 | `npm audit --omit=dev --audit-level=high` | PASS, 0 vulnerabilities |
 | Stale runtime-reference scan | PASS, 0 hits for removed runtime terms and the old engine floor |
 
