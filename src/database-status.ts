@@ -18,7 +18,8 @@ export function getDatabaseStatus(
   const configuredPath = env["ACADEMYINFO_DB_PATH"]?.trim()
 
   if (configuredPath === undefined || configuredPath.length === 0) {
-    return existsSync(options.bundledSeedPath ?? bundledSeedDatabasePath())
+    const seedPath = bundledSeedPath(options)
+    return seedPath !== undefined && existsSync(seedPath)
       ? { kind: "bundled_seed" }
       : { kind: "missing" }
   }
@@ -28,4 +29,16 @@ export function getDatabaseStatus(
   }
 
   return { kind: "missing" }
+}
+
+function bundledSeedPath(options: DatabaseStatusOptions): string | undefined {
+  if (options.bundledSeedPath !== undefined) {
+    return options.bundledSeedPath
+  }
+
+  try {
+    return bundledSeedDatabasePath()
+  } catch {
+    return undefined
+  }
 }

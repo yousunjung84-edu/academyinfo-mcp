@@ -1,4 +1,4 @@
-import { cp, mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises"
+import { cp, mkdir, mkdtemp, rm, symlink, unlink, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
@@ -15,13 +15,21 @@ const errorSchema = z.object({
   message: z.string(),
 })
 
-async function createRuntimeWithoutBundledSeed(): Promise<string> {
+type RuntimeWithoutBundledSeedOptions = {
+  readonly includePackageJson: boolean
+}
+
+async function createRuntimeWithoutBundledSeed(
+  options: RuntimeWithoutBundledSeedOptions,
+): Promise<string> {
   const runtimeRoot = await mkdtemp(join(tmpdir(), "academyinfo-mcp-missing-seed-"))
   await mkdir(join(runtimeRoot, "dist"), { recursive: true })
   await cp(join(projectRoot, "dist", "src"), join(runtimeRoot, "dist", "src"), {
     recursive: true,
   })
-  await writeFile(join(runtimeRoot, "package.json"), JSON.stringify({ type: "module" }))
+  if (options.includePackageJson) {
+    await writeFile(join(runtimeRoot, "package.json"), JSON.stringify({ type: "module" }))
+  }
   await symlink(
     join(projectRoot, "node_modules"),
     join(runtimeRoot, "node_modules"),
@@ -64,12 +72,63 @@ describe("error-path hardening", () => {
   }, 20_000)
 
   it("reports missing_db from catalog tools when the bundled seed is absent and no DB path is configured", async () => {
-    const runtimeRoot = await createRuntimeWithoutBundledSeed()
+    const runtimeRoot = await createRuntimeWithoutBundledSeed({ includePackageJson: true })
 
     try {
       await withMcpServer(
         { ...reservedKeyOverrides("", ""), ACADEMYINFO_DB_PATH: undefined },
         async (harness) => {
+          for (const tool of ["list_sources", "list_indicators"] as const) {
+            const result = await harness.callTool(tool, {})
+            const response = responseSchema.parse(result.structuredContent)
+            const data = z
+              .object({
+                error: z.object({
+                  code: z.literal("missing_db"),
+                  configured_database: z.literal("missing"),
+                }),
+              })
+              .parse(response.data)
+
+            expect(response.status).toBe("missing_db")
+            expect(data.error.configured_database).toBe("missing")
+          }
+
+          const explainResult = await harness.callTool("explain_indicator", {
+            indicator: "competition_rate",
+          })
+          const explainResponse = responseSchema.parse(explainResult.structuredContent)
+          const explainData = z
+            .object({
+              error: z.object({
+                code: z.literal("missing_db"),
+                configured_database: z.literal("missing"),
+              }),
+            })
+            .parse(explainResponse.data)
+
+          expect(explainResponse.status).toBe("missing_db")
+          expect(explainData.error.configured_database).toBe("missing")
+        },
+        {
+          cwd: runtimeRoot,
+          entryPoint: join(runtimeRoot, "dist", "src", "index.js"),
+        },
+      )
+    } finally {
+      await rm(runtimeRoot, { recursive: true, force: true })
+    }
+  }, 20_000)
+
+  it("reports missing_db from catalog tools when the bundled seed path cannot be resolved", async () => {
+    const runtimeRoot = await createRuntimeWithoutBundledSeed({ includePackageJson: true })
+
+    try {
+      await withMcpServer(
+        { ...reservedKeyOverrides("", ""), ACADEMYINFO_DB_PATH: undefined },
+        async (harness) => {
+          await unlink(join(runtimeRoot, "package.json"))
+
           for (const tool of ["list_sources", "list_indicators"] as const) {
             const result = await harness.callTool(tool, {})
             const response = responseSchema.parse(result.structuredContent)
