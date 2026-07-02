@@ -94,7 +94,7 @@ unit, warnings). Verified sample (본교 기준):
 |---|---|---|
 | 신입생 경쟁률 | 7.4:1 | 9.0:1 |
 | 취업률 | 57.6% | 57.5% |
-| 평균 등록금 | 4,222 천원 | 4,514 천원 |
+| 평균 등록금 | 4,222.8 천원 | 4,514.5 천원 |
 
 Ambiguous names are **not guessed** — a school with multiple campuses (e.g. 전남대학교 has
 본교 and 제2캠퍼스) returns candidates so you can pick one. Include campus text such as
