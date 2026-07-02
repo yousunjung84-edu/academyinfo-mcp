@@ -1,0 +1,13 @@
+# Force LF for all text files on every platform.
+# The bin entry (src/index.ts -> dist/src/index.js) starts with a shebang; a CRLF
+# shebang (`#!/usr/bin/env node\r`) breaks execution on Linux/macOS, so line endings
+# must be LF regardless of the checkout OS (Windows would otherwise use CRLF).
+* text=auto eol=lf
+
+# Binary assets must never be normalized.
+*.sqlite binary
+*.tgz binary
+*.png binary
+*.jpg binary
+*.gif binary
+*.ico binary
