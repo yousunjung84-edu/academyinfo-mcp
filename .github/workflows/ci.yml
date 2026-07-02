@@ -1,0 +1,56 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: build & test (${{ matrix.os }}, node ${{ matrix.node }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        node: [22, 24]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+      - run: npm install
+      - run: npm run build
+      - run: npm test
+      - run: npm run package:check
+
+  smoke-install:
+    name: pack + clean install + bin smoke (${{ matrix.os }}, node ${{ matrix.node }})
+    needs: test
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        node: [22, 24]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+      - run: npm install
+      - run: npm run build
+      - name: pack, install into a clean dir, and smoke the installed bin
+        shell: bash
+        run: |
+          set -euo pipefail
+          TGZ="$(npm pack | tail -1)"
+          PKG="$GITHUB_WORKSPACE/$TGZ"
+          TMP="$(mktemp -d)"
+          cd "$TMP"
+          npm init -y >/dev/null
+          # Native better-sqlite3 install must succeed on this OS/Node (prebuilt or compiled).
+          npm install "$PKG"
+          BIN="$TMP/node_modules/academyinfo-mcp/dist/src/index.js"
+          node "$GITHUB_WORKSPACE/scripts/smoke-installed.mjs" "$BIN"
