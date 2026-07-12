@@ -1,0 +1,414 @@
+name: Protected actual Claude Desktop evidence ingest
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Exact public candidate SemVer exercised by the operator
+        required: true
+        type: string
+      source_commit:
+        description: Full candidate source commit joined by every receipt
+        required: true
+        type: string
+      receipt_commit:
+        description: Protected default-branch commit containing candidate, three public-lane, and operator-supplied actual-client receipts
+        required: true
+        type: string
+      package_integrity:
+        description: Exact sha512 registry integrity joined by every receipt
+        required: true
+        type: string
+      candidate_receipt_digest:
+        description: SHA-256 outer digest of immutable candidate.v1.json
+        required: true
+        type: string
+      candidate_predecessor_receipt_digest:
+        description: SHA-256 outer digest of the independently supplied candidate authorization predecessor
+        required: true
+        type: string
+      expected_previous_latest:
+        description: Exact previous latest SemVer independently joined to candidate and client receipts
+        required: true
+        type: string
+      macos_arm64_receipt_digest:
+        description: SHA-256 outer digest of public-install-macos-arm64.v1.json
+        required: true
+        type: string
+      windows_x64_receipt_digest:
+        description: SHA-256 outer digest of public-install-windows-x64.v1.json
+        required: true
+        type: string
+      ubuntu_glibc_x64_receipt_digest:
+        description: SHA-256 outer digest of public-install-ubuntu-glibc-x64.v1.json
+        required: true
+        type: string
+      generic_stdio_journey_digest:
+        description: SHA-256 of the macOS public lane's independently bound generic stdio journey
+        required: true
+        type: string
+      actual_claude_receipt_digest:
+        description: SHA-256 outer digest of operator-supplied claude-desktop-actual.v1.json
+        required: true
+        type: string
+      client_payload_digest:
+        description: SHA-256 of the pre-existing closed client join payload
+        required: true
+        type: string
+      administrator_attestation_digest:
+        description: SHA-256 of the separate administrator attestation bound to client_payload_digest
+        required: true
+        type: string
+      confirm_actual_not_simulated:
+        description: Type ingest-operator-supplied-actual-claude-desktop-evidence
+        required: true
+        type: string
+
+concurrency:
+  group: actual-claude-client-proof
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  ingest-actual-client-evidence:
+    name: Validate external actual Claude Desktop/macOS proof
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment: claude-desktop-client-proof
+    env:
+      PACKAGE_NAME: academyinfo-mcp
+      REPOSITORY_IDENTITY: ${{ github.repository }}
+      DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+      WORKFLOW_COMMIT: ${{ github.sha }}
+      RELEASE_ADMINISTRATOR: ${{ vars.ACADEMYINFO_RELEASE_ADMINISTRATOR }}
+      PUBLIC_INSTALL_VERIFIER_SHA256: ${{ vars.ACADEMYINFO_PUBLIC_INSTALL_VERIFIER_SHA256 }}
+      RELEASE_RECEIPT_VERIFIER_SHA256: ${{ vars.ACADEMYINFO_RELEASE_RECEIPT_VERIFIER_SHA256 }}
+      VERSION: ${{ inputs.version }}
+      SOURCE_COMMIT: ${{ inputs.source_commit }}
+      RECEIPT_COMMIT: ${{ inputs.receipt_commit }}
+      PACKAGE_INTEGRITY: ${{ inputs.package_integrity }}
+      CANDIDATE_RECEIPT_DIGEST: ${{ inputs.candidate_receipt_digest }}
+      CANDIDATE_PREDECESSOR_RECEIPT_DIGEST: ${{ inputs.candidate_predecessor_receipt_digest }}
+      EXPECTED_PREVIOUS_LATEST: ${{ inputs.expected_previous_latest }}
+      MACOS_RECEIPT_DIGEST: ${{ inputs.macos_arm64_receipt_digest }}
+      WINDOWS_RECEIPT_DIGEST: ${{ inputs.windows_x64_receipt_digest }}
+      UBUNTU_RECEIPT_DIGEST: ${{ inputs.ubuntu_glibc_x64_receipt_digest }}
+      GENERIC_STDIO_JOURNEY_DIGEST: ${{ inputs.generic_stdio_journey_digest }}
+      ACTUAL_CLAUDE_RECEIPT_DIGEST: ${{ inputs.actual_claude_receipt_digest }}
+      CLIENT_PAYLOAD_DIGEST: ${{ inputs.client_payload_digest }}
+      ADMINISTRATOR_ATTESTATION_DIGEST: ${{ inputs.administrator_attestation_digest }}
+      CONFIRM_ACTUAL_NOT_SIMULATED: ${{ inputs.confirm_actual_not_simulated }}
+    steps:
+      - name: Validate dispatch and protected configuration before checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          const semver = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/;
+          const digest = /^[a-f0-9]{64}$/;
+          if (process.env.REPOSITORY_IDENTITY !== "yousunjung84-edu/academyinfo-mcp") throw new Error("Exact repository identity required");
+          const branchSegments = process.env.DEFAULT_BRANCH.split("/");
+          if (!/^[A-Za-z0-9](?:[A-Za-z0-9._/-]{0,254})$/.test(process.env.DEFAULT_BRANCH) ||
+              process.env.DEFAULT_BRANCH.includes("..") || process.env.DEFAULT_BRANCH.includes("//") ||
+              branchSegments.some((segment) => segment.startsWith(".") || segment.endsWith(".") || segment.endsWith(".lock"))) {
+            throw new Error("Protected default branch is invalid");
+          }
+          if (process.env.CONFIRM_ACTUAL_NOT_SIMULATED !== "ingest-operator-supplied-actual-claude-desktop-evidence") {
+            throw new Error("Explicit actual-client evidence confirmation required");
+          }
+          if (!semver.test(process.env.VERSION)) throw new Error("Exact SemVer required");
+          for (const key of ["SOURCE_COMMIT", "RECEIPT_COMMIT", "WORKFLOW_COMMIT"]) {
+            if (!/^[a-f0-9]{40}$/.test(process.env[key])) throw new Error(`${key} must be a full commit`);
+          }
+          if (process.env.SOURCE_COMMIT === process.env.RECEIPT_COMMIT) {
+            throw new Error("Source and protected evidence commits must be separate immutable identities");
+          }
+          for (const key of [
+            "CANDIDATE_RECEIPT_DIGEST",
+            "CANDIDATE_PREDECESSOR_RECEIPT_DIGEST",
+            "MACOS_RECEIPT_DIGEST",
+            "WINDOWS_RECEIPT_DIGEST",
+            "UBUNTU_RECEIPT_DIGEST",
+            "GENERIC_STDIO_JOURNEY_DIGEST",
+            "ACTUAL_CLAUDE_RECEIPT_DIGEST",
+            "CLIENT_PAYLOAD_DIGEST",
+            "ADMINISTRATOR_ATTESTATION_DIGEST",
+            "PUBLIC_INSTALL_VERIFIER_SHA256",
+            "RELEASE_RECEIPT_VERIFIER_SHA256",
+          ]) {
+            if (!digest.test(process.env[key])) throw new Error(`${key} must be SHA-256`);
+          }
+          if (!semver.test(process.env.EXPECTED_PREVIOUS_LATEST)) throw new Error("Candidate-bound previous latest must be an exact SemVer");
+          if (!/^sha512-[A-Za-z0-9+/]+={0,2}$/.test(process.env.PACKAGE_INTEGRITY)) throw new Error("Exact sha512 package integrity required");
+          if (!/^[A-Za-z0-9](?:[A-Za-z0-9._@-]{0,127})$/.test(process.env.RELEASE_ADMINISTRATOR)) throw new Error("Protected release administrator identity required");
+          NODE
+
+      - name: Check out the immutable protected evidence commit
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          ref: ${{ env.RECEIPT_COMMIT }}
+          path: trusted-evidence
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Check out the immutable current workflow policy
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          ref: ${{ github.sha }}
+          path: trusted-policy
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Install exact Node 22
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: "22"
+
+      - name: Fail closed unless external actual-client and all public receipts are immutable inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(node -p 'process.versions.node.split(`.`)[0]')" = "22"
+          EXPECTED_ORIGIN="https://github.com/$REPOSITORY_IDENTITY"
+          for checkout in trusted-evidence trusted-policy; do
+            case "$(git -C "$checkout" remote get-url origin)" in
+              "$EXPECTED_ORIGIN"|"$EXPECTED_ORIGIN.git") ;;
+              *) echo "Trusted checkout origin mismatch: $checkout" >&2; exit 1 ;;
+            esac
+          done
+          git check-ref-format --branch "$DEFAULT_BRANCH"
+          test "$(git -C trusted-evidence rev-parse HEAD)" = "$RECEIPT_COMMIT"
+          test "$(git -C trusted-policy rev-parse HEAD)" = "$WORKFLOW_COMMIT"
+          git -C trusted-evidence fetch --no-tags origin "refs/heads/$DEFAULT_BRANCH:refs/remotes/origin/$DEFAULT_BRANCH"
+          git -C trusted-evidence merge-base --is-ancestor "$RECEIPT_COMMIT" "origin/$DEFAULT_BRANCH"
+          git -C trusted-evidence merge-base --is-ancestor "$SOURCE_COMMIT" "origin/$DEFAULT_BRANCH"
+          git -C trusted-policy fetch --no-tags origin "refs/heads/$DEFAULT_BRANCH:refs/remotes/protected/default"
+          test "$(git -C trusted-policy rev-parse refs/remotes/protected/default)" = "$WORKFLOW_COMMIT" || {
+            echo "Current client evidence policy is not the exact protected default-branch tip" >&2
+            exit 1
+          }
+          git -C trusted-policy merge-base --is-ancestor "$WORKFLOW_COMMIT" refs/remotes/protected/default
+          export PUBLIC_INSTALL_VERIFIER="$GITHUB_WORKSPACE/trusted-policy/scripts/public-installed-verify.mjs"
+          export RELEASE_RECEIPT_VERIFIER="$GITHUB_WORKSPACE/trusted-policy/scripts/release-receipt-verify.mjs"
+          node --input-type=module <<'NODE'
+          import { createHash } from "node:crypto";
+          import { lstatSync, readFileSync } from "node:fs";
+          for (const [pathKey, digestKey] of [
+            ["PUBLIC_INSTALL_VERIFIER", "PUBLIC_INSTALL_VERIFIER_SHA256"],
+            ["RELEASE_RECEIPT_VERIFIER", "RELEASE_RECEIPT_VERIFIER_SHA256"],
+          ]) {
+            const path = process.env[pathKey];
+            const stat = lstatSync(path);
+            if (!stat.isFile() || stat.isSymbolicLink()) throw new Error(`${pathKey} must be an immutable regular file`);
+            const actual = createHash("sha256").update(readFileSync(path)).digest("hex");
+            if (actual !== process.env[digestKey]) throw new Error(`${pathKey} protected byte digest mismatch`);
+          }
+          NODE
+          BASE="$GITHUB_WORKSPACE/trusted-evidence/evidence/releases/$VERSION"
+          test -f "$BASE/candidate.v1.json"
+          test -f "$BASE/public-install/public-install-macos-arm64.v1.json"
+          test -f "$BASE/public-install/public-install-windows-x64.v1.json"
+          test -f "$BASE/public-install/public-install-ubuntu-glibc-x64.v1.json"
+          test -f "$BASE/claude-desktop-actual.v1.json"
+          test -f "$BASE/client-evidence-payload.v1.json"
+          test -f "$BASE/client-administrator-attestation.v1.json"
+          for receipt in \
+            "$BASE/candidate.v1.json" \
+            "$BASE/public-install/public-install-macos-arm64.v1.json" \
+            "$BASE/public-install/public-install-windows-x64.v1.json" \
+            "$BASE/public-install/public-install-ubuntu-glibc-x64.v1.json" \
+            "$BASE/claude-desktop-actual.v1.json" \
+            "$BASE/client-evidence-payload.v1.json" \
+            "$BASE/client-administrator-attestation.v1.json"; do
+            test ! -L "$receipt"
+          done
+          node "$RELEASE_RECEIPT_VERIFIER" \
+            --receipt "$BASE/candidate.v1.json" \
+            --kind candidate \
+            --expected-digest "$CANDIDATE_RECEIPT_DIGEST" \
+            --expected-predecessor "$CANDIDATE_PREDECESSOR_RECEIPT_DIGEST" \
+            --source-commit "$SOURCE_COMMIT" \
+            --package-name "$PACKAGE_NAME" \
+            --package-version "$VERSION" \
+            --package-integrity "$PACKAGE_INTEGRITY" \
+            --previous-latest "$EXPECTED_PREVIOUS_LATEST" \
+            --expected-approver "$RELEASE_ADMINISTRATOR"
+          CANDIDATE_RECEIPT="$BASE/candidate.v1.json" node --input-type=module <<'NODE'
+          import { readFileSync } from "node:fs";
+          const receipt = JSON.parse(readFileSync(process.env.CANDIDATE_RECEIPT, "utf8"));
+          const payload = receipt.evidence_payload_v1;
+          const candidatePredecessorReceiptDigest = payload?.predecessor_receipt_digests?.[0];
+          const candidatePreviousLatest = payload?.previous_latest_version;
+          if (payload?.transition !== "candidate" ||
+              payload.package_name !== process.env.PACKAGE_NAME ||
+              payload.package_version !== process.env.VERSION ||
+              payload.package_integrity !== process.env.PACKAGE_INTEGRITY ||
+              payload.source_commit !== process.env.SOURCE_COMMIT ||
+              candidatePreviousLatest !== process.env.EXPECTED_PREVIOUS_LATEST ||
+              candidatePredecessorReceiptDigest !== process.env.CANDIDATE_PREDECESSOR_RECEIPT_DIGEST ||
+              payload.predecessor_receipt_digests.length !== 1) {
+            throw new Error("Candidate receipt identity/integrity join failed");
+          }
+          NODE
+
+      - name: Hash actual artifacts and consume pre-existing administrator authorization
+        id: client
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE="$GITHUB_WORKSPACE/trusted-evidence/evidence/releases/$VERSION"
+          OUTPUT="$RUNNER_TEMP/client-proof"
+          mkdir -p "$OUTPUT"
+          export PUBLIC_INSTALL_VERIFIER="$GITHUB_WORKSPACE/trusted-policy/scripts/public-installed-verify.mjs"
+          export RELEASE_RECEIPT_VERIFIER="$GITHUB_WORKSPACE/trusted-policy/scripts/release-receipt-verify.mjs"
+          node --input-type=module <<'NODE'
+          import { createHash } from "node:crypto";
+          import { lstatSync, readFileSync } from "node:fs";
+          for (const [pathKey, digestKey] of [
+            ["PUBLIC_INSTALL_VERIFIER", "PUBLIC_INSTALL_VERIFIER_SHA256"],
+            ["RELEASE_RECEIPT_VERIFIER", "RELEASE_RECEIPT_VERIFIER_SHA256"],
+          ]) {
+            const path = process.env[pathKey];
+            const stat = lstatSync(path);
+            if (!stat.isFile() || stat.isSymbolicLink()) throw new Error(`${pathKey} must be an immutable regular file`);
+            const actual = createHash("sha256").update(readFileSync(path)).digest("hex");
+            if (actual !== process.env[digestKey]) throw new Error(`${pathKey} protected byte digest mismatch`);
+          }
+          NODE
+          BASE="$BASE" OUTPUT="$OUTPUT" node --input-type=module <<'NODE' >> "$GITHUB_OUTPUT"
+          import { createHash } from "node:crypto";
+          import { lstatSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+          import { pathToFileURL } from "node:url";
+          const {
+            canonicalizeJcs,
+            parseJsonStrict,
+            sha256Jcs,
+            validateActualClientReceipt,
+            validateLaneReceipt,
+          } = await import(pathToFileURL(process.env.PUBLIC_INSTALL_VERIFIER).href);
+
+          const digest = /^[a-f0-9]{64}$/;
+          const exactKeys = (value, keys) =>
+            value !== null && typeof value === "object" && !Array.isArray(value) &&
+            JSON.stringify(Object.keys(value).sort()) === JSON.stringify([...keys].sort());
+          const readReceipt = (path) => {
+            const stat = lstatSync(path);
+            if (!stat.isFile() || stat.isSymbolicLink()) throw new Error(`Immutable regular file required: ${path}`);
+            return parseJsonStrict(readFileSync(path, "utf8"));
+          };
+          const expected = {
+            version: process.env.VERSION,
+            sourceCommit: process.env.SOURCE_COMMIT,
+            candidateReceiptDigest: process.env.CANDIDATE_RECEIPT_DIGEST,
+            packageIntegrity: process.env.PACKAGE_INTEGRITY,
+            actualReceiptDigest: process.env.ACTUAL_CLAUDE_RECEIPT_DIGEST,
+          };
+          const actual = validateActualClientReceipt(readReceipt(`${process.env.BASE}/claude-desktop-actual.v1.json`), expected);
+          const artifactDirectory = `${process.env.BASE}/claude-desktop-actual-artifacts`;
+          const expectedArtifactFiles = actual.payload.evidence_artifact_digests.map(({ kind }) => `${kind}.evidence`);
+          if (JSON.stringify(readdirSync(artifactDirectory).sort()) !== JSON.stringify(expectedArtifactFiles)) {
+            throw new Error("Actual evidence artifact required set mismatch");
+          }
+          for (const artifact of actual.payload.evidence_artifact_digests) {
+            const path = `${artifactDirectory}/${artifact.kind}.evidence`;
+            const stat = lstatSync(path);
+            if (!stat.isFile() || stat.isSymbolicLink()) throw new Error(`Actual evidence artifact missing: ${artifact.kind}`);
+            const actualDigest = createHash("sha256").update(readFileSync(path)).digest("hex");
+            if (actualDigest !== artifact.digest) throw new Error(`Actual evidence artifact digest mismatch: ${artifact.kind}`);
+          }
+
+          const laneInputs = [
+            ["macos-arm64", process.env.MACOS_RECEIPT_DIGEST],
+            ["ubuntu-glibc-x64", process.env.UBUNTU_RECEIPT_DIGEST],
+            ["windows-x64", process.env.WINDOWS_RECEIPT_DIGEST],
+          ];
+          for (const [lane, expectedDigest] of laneInputs) {
+            const laneReceipt = readReceipt(`${process.env.BASE}/public-install/public-install-${lane}.v1.json`);
+            validateLaneReceipt(laneReceipt, expected, lane, expectedDigest);
+            if (lane === "macos-arm64" &&
+                laneReceipt.public_install_evidence_payload_v1.generic_stdio_journey_digest_v1 !==
+                  process.env.GENERIC_STDIO_JOURNEY_DIGEST) {
+              throw new Error("Generic stdio journey digest does not match independently bound macOS lane evidence");
+            }
+          }
+
+          const payload = readReceipt(`${process.env.BASE}/client-evidence-payload.v1.json`);
+          if (!exactKeys(payload, [
+            "schema_version", "transition", "package_name", "package_version", "package_integrity",
+            "previous_latest_version", "predecessor_receipt_digests", "evidence_digests", "run_id",
+            "source_commit", "policy_versions",
+          ]) || payload.schema_version !== "release-evidence-payload.v1" || payload.transition !== "client" ||
+              payload.package_name !== process.env.PACKAGE_NAME || payload.package_version !== process.env.VERSION ||
+              payload.package_integrity !== process.env.PACKAGE_INTEGRITY ||
+              payload.previous_latest_version !== process.env.EXPECTED_PREVIOUS_LATEST ||
+              payload.source_commit !== process.env.SOURCE_COMMIT ||
+              JSON.stringify(payload.predecessor_receipt_digests) !== JSON.stringify([process.env.CANDIDATE_RECEIPT_DIGEST])) {
+            throw new Error("Closed client payload identity/predecessor mismatch");
+          }
+          const requiredEvidence = [
+            { kind: "actual-claude-desktop", digest: process.env.ACTUAL_CLAUDE_RECEIPT_DIGEST },
+            { kind: "generic-stdio-journey", digest: process.env.GENERIC_STDIO_JOURNEY_DIGEST },
+            { kind: "public-install-macos-arm64", digest: process.env.MACOS_RECEIPT_DIGEST },
+            { kind: "public-install-ubuntu-glibc-x64", digest: process.env.UBUNTU_RECEIPT_DIGEST },
+            { kind: "public-install-windows-x64", digest: process.env.WINDOWS_RECEIPT_DIGEST },
+          ];
+          if (canonicalizeJcs(payload.evidence_digests) !== canonicalizeJcs(requiredEvidence) ||
+              sha256Jcs(payload) !== process.env.CLIENT_PAYLOAD_DIGEST) {
+            throw new Error("Client payload required evidence set or digest mismatch");
+          }
+
+          const approval = readReceipt(`${process.env.BASE}/client-administrator-attestation.v1.json`);
+          if (!exactKeys(approval, ["role", "identity", "approved_at", "decision", "evidence_payload_digest_v1", "attestation_digest"]) ||
+              approval.role !== "administrator" || approval.identity !== process.env.RELEASE_ADMINISTRATOR ||
+              approval.decision !== "client" ||
+              approval.evidence_payload_digest_v1 !== process.env.CLIENT_PAYLOAD_DIGEST ||
+              !digest.test(approval.attestation_digest) || approval.attestation_digest !== process.env.ADMINISTRATOR_ATTESTATION_DIGEST) {
+            throw new Error("Separate administrator attestation is missing or unbound");
+          }
+          const { attestation_digest: attestationDigest, ...attestationProjection } = approval;
+          if (sha256Jcs(attestationProjection) !== attestationDigest) throw new Error("Administrator attestation forgery");
+
+          const receiptProjection = {
+            receipt_schema_version: "client-receipt.v1",
+            evidence_payload_v1: payload,
+            evidence_payload_digest_v1: process.env.CLIENT_PAYLOAD_DIGEST,
+            approval,
+          };
+          const receiptDigest = sha256Jcs(receiptProjection);
+          const outputPath = `${process.env.OUTPUT}/claude-desktop.v1.json`;
+          writeFileSync(outputPath, `${canonicalizeJcs({ ...receiptProjection, receipt_digest_v1: receiptDigest })}\n`, { mode: 0o600 });
+          writeFileSync(`${outputPath}.sha256`, `${receiptDigest}  claude-desktop.v1.json\n`, { mode: 0o600 });
+          process.stdout.write(`receipt_digest=${receiptDigest}\nartifact_path=${process.env.OUTPUT}\n`);
+          NODE
+          node "$RELEASE_RECEIPT_VERIFIER" \
+            --receipt "$OUTPUT/claude-desktop.v1.json" \
+            --kind client \
+            --expected-digest "$(node -e 'const fs=require("fs");const r=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));process.stdout.write(r.receipt_digest_v1)' "$OUTPUT/claude-desktop.v1.json")" \
+            --expected-predecessor "$CANDIDATE_RECEIPT_DIGEST" \
+            --source-commit "$SOURCE_COMMIT" \
+            --package-name "$PACKAGE_NAME" \
+            --package-version "$VERSION" \
+            --package-integrity "$PACKAGE_INTEGRITY" \
+            --previous-latest "$EXPECTED_PREVIOUS_LATEST" \
+            --expected-approver "$RELEASE_ADMINISTRATOR"
+
+      - name: Upload immutable client proof receipt for separate protected persistence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: actual-claude-client-proof-${{ env.VERSION }}-${{ steps.client.outputs.receipt_digest }}
+          path: ${{ steps.client.outputs.artifact_path }}
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: State evidence and promotion boundary
+        shell: bash
+        run: |
+          {
+            echo "### Protected actual-client evidence ingest"
+            echo "Validated an operator-supplied immutable actual Claude Desktop/macOS receipt; no client was fabricated or simulated by this workflow."
+            echo "Client receipt digest: \`${{ steps.client.outputs.receipt_digest }}\`."
+            echo "This read-only workflow did not install from npm, publish, move a dist-tag, or promote."
+            echo "An administrator must persist this exact receipt at \`evidence/releases/$VERSION/claude-desktop.v1.json\` before the separate promotion gate can consume it."
+          } >> "$GITHUB_STEP_SUMMARY"

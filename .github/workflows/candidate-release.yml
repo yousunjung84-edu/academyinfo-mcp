@@ -1,0 +1,760 @@
+name: Protected candidate release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Exact administrator-selected unused SemVer (never a tag name)
+        required: true
+        type: string
+      source_commit:
+        description: Full approved tagged source commit
+        required: true
+        type: string
+      source_tag:
+        description: Approved immutable git tag that resolves to source_commit
+        required: true
+        type: string
+      receipt_commit:
+        description: Protected default-branch commit containing candidate-authorization.v1.json
+        required: true
+        type: string
+      authorization_receipt_digest:
+        description: SHA-256 digest of the immutable candidate authorization receipt
+        required: true
+        type: string
+      authorization_context_digest:
+        description: SHA-256 of the closed candidate authorization event/source context
+        required: true
+        type: string
+      expected_previous_latest:
+        description: Exact version currently on latest, recorded by the authorization receipt
+        required: true
+        type: string
+      confirm_candidate_only:
+        description: Type publish-to-candidate-not-latest
+        required: true
+        type: string
+
+concurrency:
+  group: academyinfo-mcp-registry-mutation
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  PACKAGE_NAME: academyinfo-mcp
+  VERSION: ${{ inputs.version }}
+  SOURCE_COMMIT: ${{ inputs.source_commit }}
+  SOURCE_TAG: ${{ inputs.source_tag }}
+  RECEIPT_COMMIT: ${{ inputs.receipt_commit }}
+  POLICY_COMMIT: ${{ github.sha }}
+  AUTHORIZATION_RECEIPT_DIGEST: ${{ inputs.authorization_receipt_digest }}
+  AUTHORIZATION_CONTEXT_DIGEST: ${{ inputs.authorization_context_digest }}
+  EXPECTED_PREVIOUS_LATEST: ${{ inputs.expected_previous_latest }}
+  CONFIRM_CANDIDATE_ONLY: ${{ inputs.confirm_candidate_only }}
+  REPOSITORY: ${{ github.repository }}
+  TRUSTED_ORIGIN: https://github.com/${{ github.repository }}
+  DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+  RECEIPT_VERIFIER_SHA256: ${{ vars.ACADEMYINFO_RELEASE_RECEIPT_VERIFIER_SHA256 }}
+  RELEASE_ADMINISTRATOR: ${{ vars.ACADEMYINFO_RELEASE_ADMINISTRATOR }}
+  NPM_CONFIG_REGISTRY: https://registry.npmjs.org/
+
+jobs:
+  verify-build:
+    name: Verify and pack candidate without publication authority (Node 22)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    outputs:
+      artifact_name: ${{ steps.package.outputs.artifact_name }}
+      tarball_sha256: ${{ steps.package.outputs.tarball_sha256 }}
+      package_integrity: ${{ steps.package.outputs.package_integrity }}
+    steps:
+      - name: Validate dispatch and protected configuration before checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$CONFIRM_CANDIDATE_ONLY" = "publish-to-candidate-not-latest"
+          node --input-type=module <<'NODE'
+          const semver = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/;
+          const digest = /^[a-f0-9]{64}$/;
+          if (!semver.test(process.env.VERSION) || /latest|candidate/i.test(process.env.VERSION)) throw new Error("An exact SemVer is required");
+          if (!/^[a-f0-9]{40}$/.test(process.env.SOURCE_COMMIT)) throw new Error("A full lowercase source commit is required");
+          if (!/^[a-f0-9]{40}$/.test(process.env.RECEIPT_COMMIT)) throw new Error("A full lowercase protected receipt commit is required");
+          if (!/^[a-f0-9]{40}$/.test(process.env.POLICY_COMMIT)) throw new Error("A full lowercase current policy commit is required");
+          if (process.env.SOURCE_COMMIT === process.env.RECEIPT_COMMIT) throw new Error("Source and protected receipt commits must be separate immutable identities");
+          if (!digest.test(process.env.AUTHORIZATION_RECEIPT_DIGEST)) throw new Error("An authorization receipt SHA-256 is required");
+          if (!digest.test(process.env.AUTHORIZATION_CONTEXT_DIGEST)) throw new Error("An authorization context SHA-256 is required");
+          if (!digest.test(process.env.RECEIPT_VERIFIER_SHA256)) throw new Error("A protected verifier SHA-256 is required");
+          if (!semver.test(process.env.EXPECTED_PREVIOUS_LATEST)) throw new Error("The authorization-bound previous latest SemVer is required");
+          if (!/^[A-Za-z0-9](?:[A-Za-z0-9._@-]{0,127})$/.test(process.env.RELEASE_ADMINISTRATOR)) throw new Error("A protected release administrator identity is required");
+          if (!/^[A-Za-z0-9][A-Za-z0-9._/-]*$/.test(process.env.SOURCE_TAG) || process.env.SOURCE_TAG.includes("..")) throw new Error("Invalid source tag");
+          if (process.env.REPOSITORY !== "yousunjung84-edu/academyinfo-mcp") throw new Error("Unexpected repository identity");
+          if (!/^[A-Za-z0-9](?:[A-Za-z0-9._/-]{0,254})$/.test(process.env.DEFAULT_BRANCH) ||
+              process.env.DEFAULT_BRANCH.includes("..") || process.env.DEFAULT_BRANCH.includes("//") ||
+              process.env.DEFAULT_BRANCH.endsWith("/") || process.env.DEFAULT_BRANCH.endsWith(".")) {
+            throw new Error("Invalid default branch");
+          }
+          if (process.env.TRUSTED_ORIGIN !== `https://github.com/${process.env.REPOSITORY}`) throw new Error("Unexpected trusted HTTPS origin");
+          NODE
+          git check-ref-format --branch "$DEFAULT_BRANCH"
+
+      - name: Check out protected receipt history
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          repository: ${{ env.REPOSITORY }}
+          ref: ${{ env.RECEIPT_COMMIT }}
+          path: trusted-receipts
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Check out current workflow policy separately
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          repository: ${{ env.REPOSITORY }}
+          ref: ${{ env.POLICY_COMMIT }}
+          path: trusted-policy
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Check out the exact candidate source separately
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          repository: ${{ env.REPOSITORY }}
+          ref: ${{ env.SOURCE_COMMIT }}
+          path: candidate-source
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Install exact Node 22 without publication credentials
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: candidate-source/package-lock.json
+          registry-url: https://registry.npmjs.org/
+
+      - name: Validate protected history, verifier bytes, authorization, tag, backend, and dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(node -p 'process.versions.node.split(`.`)[0]')" = "22"
+          test "$(git -C trusted-receipts rev-parse HEAD)" = "$RECEIPT_COMMIT"
+          case "$(git -C trusted-receipts remote get-url origin)" in
+            "$TRUSTED_ORIGIN"|"$TRUSTED_ORIGIN.git") ;;
+            *) echo "Trusted receipt checkout origin mismatch" >&2; exit 1 ;;
+          esac
+          git -C trusted-receipts fetch --no-tags origin "refs/heads/$DEFAULT_BRANCH:refs/remotes/origin/$DEFAULT_BRANCH"
+          git -C trusted-receipts merge-base --is-ancestor "$RECEIPT_COMMIT" "origin/$DEFAULT_BRANCH" || {
+            echo "Receipt commit is not immutable protected default-branch history" >&2
+            exit 1
+          }
+          test "$(git -C trusted-policy rev-parse HEAD)" = "$POLICY_COMMIT"
+          case "$(git -C trusted-policy remote get-url origin)" in
+            "$TRUSTED_ORIGIN"|"$TRUSTED_ORIGIN.git") ;;
+            *) echo "Current policy checkout origin mismatch" >&2; exit 1 ;;
+          esac
+          git -C trusted-policy fetch --no-tags origin "refs/heads/$DEFAULT_BRANCH:refs/remotes/origin/$DEFAULT_BRANCH"
+          test "$(git -C trusted-policy rev-parse "origin/$DEFAULT_BRANCH")" = "$POLICY_COMMIT" || {
+            echo "Current workflow policy is not the exact protected default-branch tip" >&2
+            exit 1
+          }
+          git -C trusted-policy merge-base --is-ancestor "$POLICY_COMMIT" "origin/$DEFAULT_BRANCH" || {
+            echo "Current workflow policy is not protected default-branch history" >&2
+            exit 1
+          }
+          test "$(git -C candidate-source rev-parse HEAD)" = "$SOURCE_COMMIT"
+          case "$(git -C candidate-source remote get-url origin)" in
+            "$TRUSTED_ORIGIN"|"$TRUSTED_ORIGIN.git") ;;
+            *) echo "Candidate source checkout origin mismatch" >&2; exit 1 ;;
+          esac
+          git -C candidate-source fetch --no-tags origin "refs/heads/$DEFAULT_BRANCH:refs/remotes/origin/$DEFAULT_BRANCH"
+          git -C candidate-source merge-base --is-ancestor "$SOURCE_COMMIT" "origin/$DEFAULT_BRANCH" || {
+            echo "Source commit is not immutable protected default-branch history" >&2
+            exit 1
+          }
+          VERIFIER="$GITHUB_WORKSPACE/trusted-policy/scripts/release-receipt-verify.mjs"
+          AUTH_RECEIPT="$GITHUB_WORKSPACE/trusted-receipts/evidence/releases/$VERSION/candidate-authorization.v1.json"
+          test -f "$VERIFIER" && test ! -L "$VERIFIER"
+          test -f "$AUTH_RECEIPT" && test ! -L "$AUTH_RECEIPT"
+          VERIFIER="$VERIFIER" node --input-type=module <<'NODE'
+          import { createHash } from "node:crypto";
+          import { readFileSync } from "node:fs";
+          const actual = createHash("sha256").update(readFileSync(process.env.VERIFIER)).digest("hex");
+          if (actual !== process.env.RECEIPT_VERIFIER_SHA256) throw new Error("Protected receipt verifier byte digest mismatch");
+          NODE
+          node "$VERIFIER" \
+            --receipt "$AUTH_RECEIPT" \
+            --kind candidate-authorization \
+            --expected-digest "$AUTHORIZATION_RECEIPT_DIGEST" \
+            --expected-authorization-context-digest "$AUTHORIZATION_CONTEXT_DIGEST" \
+            --source-commit "$SOURCE_COMMIT" \
+            --package-name "$PACKAGE_NAME" \
+            --package-version "$VERSION" \
+            --expected-approver "$RELEASE_ADMINISTRATOR" \
+            --previous-latest "$EXPECTED_PREVIOUS_LATEST"
+          test "$(git -C candidate-source rev-parse "refs/tags/$SOURCE_TAG^{commit}")" = "$SOURCE_COMMIT"
+          PACKAGE_JSON="$GITHUB_WORKSPACE/candidate-source/package.json" \
+          PACKAGE_LOCK="$GITHUB_WORKSPACE/candidate-source/package-lock.json" \
+          node --input-type=module <<'NODE'
+          import { readFileSync } from "node:fs";
+          const pkg = JSON.parse(readFileSync(process.env.PACKAGE_JSON, "utf8"));
+          const lock = JSON.parse(readFileSync(process.env.PACKAGE_LOCK, "utf8"));
+          if (pkg.name !== process.env.PACKAGE_NAME || pkg.version !== process.env.VERSION || pkg.engines?.node !== ">=22 <23") {
+            throw new Error("Package identity/version/Node contract does not match authorization");
+          }
+          if (lock.name !== pkg.name || lock.version !== pkg.version || lock.packages?.[""]?.name !== pkg.name || lock.packages?.[""]?.version !== pkg.version) {
+            throw new Error("Dependency lock identity does not match the authorized package");
+          }
+          const backends = ["better-sqlite3", "sql.js"].filter((name) => Object.hasOwn(pkg.dependencies ?? {}, name));
+          if (backends.length !== 1 || !Object.hasOwn(lock.packages?.[""]?.dependencies ?? {}, backends[0])) {
+            throw new Error("Exactly one lock-bound receipt-approved backend must ship");
+          }
+          NODE
+
+      - name: Run candidate-controlled lifecycle and package gates without any token or OIDC
+        working-directory: candidate-source
+        shell: bash
+        env:
+          NPM_CONFIG_PROVENANCE: "false"
+        run: |
+          set -euo pipefail
+          npm ci
+          npm run build
+          npm test
+          npm run package:check
+          npm audit --omit=dev
+
+      - name: Pack exact verified tarball and trusted handoff
+        id: package
+        shell: bash
+        run: |
+          set -euo pipefail
+          HANDOFF="$RUNNER_TEMP/candidate-handoff"
+          mkdir -p "$HANDOFF"
+          PACK_RESULT="$(cd candidate-source && npm pack --ignore-scripts --json --pack-destination "$HANDOFF")"
+          TARBALL_NAME="$(PACK_RESULT="$PACK_RESULT" node --input-type=module -e 'const value = JSON.parse(process.env.PACK_RESULT); if (value.length !== 1 || typeof value[0]?.filename !== "string" || value[0].name !== process.env.PACKAGE_NAME || value[0].version !== process.env.VERSION) throw new Error("Exactly one authorized package tarball required"); process.stdout.write(value[0].filename)')"
+          TARBALL="$HANDOFF/$TARBALL_NAME"
+          test -f "$TARBALL" && test ! -L "$TARBALL"
+          TARBALL="$TARBALL" node --input-type=module <<'NODE' > "$HANDOFF/package-digests.env"
+          import { createHash } from "node:crypto";
+          import { readFileSync } from "node:fs";
+          const bytes = readFileSync(process.env.TARBALL);
+          process.stdout.write(`TARBALL_SHA256=${createHash("sha256").update(bytes).digest("hex")}\n`);
+          process.stdout.write(`PACKAGE_INTEGRITY=sha512-${createHash("sha512").update(bytes).digest("base64")}\n`);
+          NODE
+          source "$HANDOFF/package-digests.env"
+          AUTH_RECEIPT="$GITHUB_WORKSPACE/trusted-receipts/evidence/releases/$VERSION/candidate-authorization.v1.json"
+          HANDOFF_PATH="$HANDOFF/handoff.v1.json" \
+          AUTH_RECEIPT="$AUTH_RECEIPT" \
+          TARBALL_NAME="$TARBALL_NAME" \
+          TARBALL_SHA256="$TARBALL_SHA256" \
+          PACKAGE_INTEGRITY="$PACKAGE_INTEGRITY" \
+          node --input-type=module <<'NODE'
+          import { readFileSync, writeFileSync } from "node:fs";
+          const authorization = JSON.parse(readFileSync(process.env.AUTH_RECEIPT, "utf8"));
+          const payload = authorization.release_transition_evidence_payload_v1;
+          const handoff = {
+            schema_version: "candidate-package-handoff.v1",
+            package_name: process.env.PACKAGE_NAME,
+            package_version: process.env.VERSION,
+            source_commit: process.env.SOURCE_COMMIT,
+            source_tag: process.env.SOURCE_TAG,
+            tarball_filename: process.env.TARBALL_NAME,
+            tarball_sha256: process.env.TARBALL_SHA256,
+            package_integrity: process.env.PACKAGE_INTEGRITY,
+            receipt_commit: process.env.RECEIPT_COMMIT,
+            policy_commit: process.env.POLICY_COMMIT,
+            receipt_verifier_sha256: process.env.RECEIPT_VERIFIER_SHA256,
+            authorization_receipt_digest: process.env.AUTHORIZATION_RECEIPT_DIGEST,
+            authorization_context_digest: process.env.AUTHORIZATION_CONTEXT_DIGEST,
+            previous_latest_version: process.env.EXPECTED_PREVIOUS_LATEST,
+            authorization_evidence: {
+              event_id: payload.event_id,
+              prior_transition_digest: payload.prior_transition_digest,
+              first_seen_at: payload.first_seen_at,
+              deadline_at: payload.deadline_at,
+              source_sha256: payload.source_sha256,
+              release_data_digest_v1: payload.release_data_digest_v1,
+              policy_versions: payload.policy_versions,
+            },
+          };
+          writeFileSync(process.env.HANDOFF_PATH, `${JSON.stringify(handoff)}\n`, { mode: 0o644 });
+          NODE
+          cp trusted-policy/scripts/release-receipt-verify.mjs "$HANDOFF/release-receipt-verify.mjs"
+          chmod 0644 "$HANDOFF/release-receipt-verify.mjs"
+          cp "$AUTH_RECEIPT" "$HANDOFF/candidate-authorization.v1.json"
+          chmod 0644 "$HANDOFF/candidate-authorization.v1.json"
+          rm "$HANDOFF/package-digests.env"
+          printf 'artifact_name=candidate-package-%s\n' "$TARBALL_SHA256" >> "$GITHUB_OUTPUT"
+          printf 'tarball_sha256=%s\n' "$TARBALL_SHA256" >> "$GITHUB_OUTPUT"
+          printf 'package_integrity=%s\n' "$PACKAGE_INTEGRITY" >> "$GITHUB_OUTPUT"
+
+      - name: Upload only the digest-named verified publication handoff
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: ${{ steps.package.outputs.artifact_name }}
+          path: ${{ runner.temp }}/candidate-handoff
+          if-no-files-found: error
+          retention-days: 7
+
+  publish-candidate:
+    name: Publish verified tarball only to candidate
+    needs: verify-build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: npm-candidate
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      HANDOFF_ARTIFACT_NAME: ${{ needs.verify-build.outputs.artifact_name }}
+      EXPECTED_TARBALL_SHA256: ${{ needs.verify-build.outputs.tarball_sha256 }}
+      EXPECTED_PACKAGE_INTEGRITY: ${{ needs.verify-build.outputs.package_integrity }}
+      NPM_CONFIG_PROVENANCE: "true"
+      NPM_CONFIG_IGNORE_SCRIPTS: "true"
+    steps:
+      - name: Download only the verified digest-named handoff
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: ${{ env.HANDOFF_ARTIFACT_NAME }}
+          path: ${{ runner.temp }}/candidate-handoff
+
+      - name: Install exact Node 22 without dependency cache
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: "22"
+          registry-url: https://registry.npmjs.org/
+
+      - name: Revalidate trusted metadata and exact tarball without package execution
+        id: handoff
+        shell: bash
+        run: |
+          set -euo pipefail
+          HANDOFF_ROOT="$RUNNER_TEMP/candidate-handoff"
+          test "$HANDOFF_ARTIFACT_NAME" = "candidate-package-$EXPECTED_TARBALL_SHA256"
+          HANDOFF="$HANDOFF_ROOT/handoff.v1.json"
+          VERIFIER="$HANDOFF_ROOT/release-receipt-verify.mjs"
+          AUTH_RECEIPT="$HANDOFF_ROOT/candidate-authorization.v1.json"
+          test -f "$HANDOFF" && test ! -L "$HANDOFF"
+          test -f "$VERIFIER" && test ! -L "$VERIFIER"
+          test -f "$AUTH_RECEIPT" && test ! -L "$AUTH_RECEIPT"
+          HANDOFF="$HANDOFF" VERIFIER="$VERIFIER" AUTH_RECEIPT="$AUTH_RECEIPT" node --input-type=module <<'NODE' >> "$GITHUB_OUTPUT"
+          import { createHash } from "node:crypto";
+          import { execFileSync } from "node:child_process";
+          import { pathToFileURL } from "node:url";
+          import { lstatSync, readFileSync, readdirSync } from "node:fs";
+          const digest = /^[a-f0-9]{64}$/;
+          const handoff = JSON.parse(readFileSync(process.env.HANDOFF, "utf8"));
+          const exactKeys = (value, keys) => JSON.stringify(Object.keys(value).sort()) === JSON.stringify([...keys].sort());
+          if (!exactKeys(handoff, [
+            "schema_version", "package_name", "package_version", "source_commit", "source_tag", "tarball_filename",
+            "tarball_sha256", "package_integrity", "receipt_commit", "policy_commit", "receipt_verifier_sha256",
+            "authorization_receipt_digest", "authorization_context_digest", "previous_latest_version", "authorization_evidence",
+          ])) throw new Error("Handoff fields are not closed");
+          if (handoff.schema_version !== "candidate-package-handoff.v1" || handoff.package_name !== process.env.PACKAGE_NAME ||
+              handoff.package_version !== process.env.VERSION || handoff.source_commit !== process.env.SOURCE_COMMIT ||
+              handoff.source_tag !== process.env.SOURCE_TAG || handoff.receipt_commit !== process.env.RECEIPT_COMMIT ||
+              handoff.policy_commit !== process.env.POLICY_COMMIT ||
+              handoff.authorization_receipt_digest !== process.env.AUTHORIZATION_RECEIPT_DIGEST ||
+              handoff.authorization_context_digest !== process.env.AUTHORIZATION_CONTEXT_DIGEST ||
+              handoff.previous_latest_version !== process.env.EXPECTED_PREVIOUS_LATEST ||
+              handoff.receipt_verifier_sha256 !== process.env.RECEIPT_VERIFIER_SHA256 ||
+              handoff.tarball_sha256 !== process.env.EXPECTED_TARBALL_SHA256 ||
+              handoff.package_integrity !== process.env.EXPECTED_PACKAGE_INTEGRITY) {
+            throw new Error("Handoff identity does not match protected inputs and verified job outputs");
+          }
+          if (!/^[A-Za-z0-9._-]+\.tgz$/.test(handoff.tarball_filename) || !digest.test(handoff.tarball_sha256) ||
+              !/^sha512-(?:[A-Za-z0-9+/]{4}){21}[A-Za-z0-9+/]{2}==$/.test(handoff.package_integrity)) {
+            throw new Error("Handoff tarball identity is invalid");
+          }
+          const files = readdirSync(process.env.RUNNER_TEMP + "/candidate-handoff").sort();
+          const expectedFiles = ["candidate-authorization.v1.json", "handoff.v1.json", "release-receipt-verify.mjs", handoff.tarball_filename].sort();
+          if (JSON.stringify(files) !== JSON.stringify(expectedFiles)) throw new Error("Unexpected artifact contents");
+          const tarball = process.env.RUNNER_TEMP + "/candidate-handoff/" + handoff.tarball_filename;
+          if (!lstatSync(tarball).isFile() || lstatSync(tarball).isSymbolicLink()) throw new Error("Tarball must be a regular file");
+          const bytes = readFileSync(tarball);
+          if (createHash("sha256").update(bytes).digest("hex") !== handoff.tarball_sha256 ||
+              `sha512-${createHash("sha512").update(bytes).digest("base64")}` !== handoff.package_integrity) {
+            throw new Error("Downloaded tarball digest mismatch");
+          }
+          if (createHash("sha256").update(readFileSync(process.env.VERIFIER)).digest("hex") !== process.env.RECEIPT_VERIFIER_SHA256) {
+            throw new Error("Downloaded trusted verifier byte digest mismatch");
+          }
+          const { parseJsonStrict, verifyReceipt } = await import(pathToFileURL(process.env.VERIFIER));
+          const packedPackage = parseJsonStrict(execFileSync("tar", ["-xOf", tarball, "package/package.json"], {
+            encoding: "utf8",
+            maxBuffer: 1024 * 1024,
+          }));
+          const packedBackends = ["better-sqlite3", "sql.js"].filter((name) => Object.hasOwn(packedPackage.dependencies ?? {}, name));
+          if (packedPackage.name !== process.env.PACKAGE_NAME || packedPackage.version !== process.env.VERSION ||
+              packedPackage.engines?.node !== ">=22 <23" || packedBackends.length !== 1) {
+            throw new Error("Downloaded tarball package identity/backend mismatch");
+          }
+          const authorization = parseJsonStrict(readFileSync(process.env.AUTH_RECEIPT, "utf8"));
+          verifyReceipt(authorization, {
+            kind: "candidate-authorization",
+            expectedDigest: process.env.AUTHORIZATION_RECEIPT_DIGEST,
+            authorizationContextDigest: process.env.AUTHORIZATION_CONTEXT_DIGEST,
+            sourceCommit: process.env.SOURCE_COMMIT,
+            packageName: process.env.PACKAGE_NAME,
+            packageVersion: process.env.VERSION,
+            expectedApprover: process.env.RELEASE_ADMINISTRATOR,
+            previousLatest: process.env.EXPECTED_PREVIOUS_LATEST,
+          });
+          const evidence = handoff.authorization_evidence;
+          const authorizationPayload = authorization.release_transition_evidence_payload_v1;
+          const expectedEvidence = {
+            event_id: authorizationPayload.event_id,
+            prior_transition_digest: authorizationPayload.prior_transition_digest,
+            first_seen_at: authorizationPayload.first_seen_at,
+            deadline_at: authorizationPayload.deadline_at,
+            source_sha256: authorizationPayload.source_sha256,
+            release_data_digest_v1: authorizationPayload.release_data_digest_v1,
+            policy_versions: authorizationPayload.policy_versions,
+          };
+          if (JSON.stringify(evidence) !== JSON.stringify(expectedEvidence)) {
+            throw new Error("Handoff authorization evidence does not match the independently verified receipt");
+          }
+          if (!exactKeys(evidence, ["event_id", "prior_transition_digest", "first_seen_at", "deadline_at", "source_sha256", "release_data_digest_v1", "policy_versions"]) ||
+              !digest.test(evidence.release_data_digest_v1) || !Array.isArray(evidence.policy_versions) || evidence.policy_versions.length === 0) {
+            throw new Error("Authorization release-data/policy evidence is invalid");
+          }
+          const canonicalUtc = (value) => typeof value === "string" &&
+            /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(value) &&
+            Number.isFinite(Date.parse(value)) && new Date(Date.parse(value)).toISOString() === value;
+          const firstSeenMilliseconds = Date.parse(evidence.first_seen_at);
+          const deadlineMilliseconds = Date.parse(evidence.deadline_at);
+          const approvalMilliseconds = Date.parse(authorization.approval?.approved_at);
+          if (!canonicalUtc(evidence.first_seen_at) || !canonicalUtc(evidence.deadline_at) ||
+              !canonicalUtc(authorization.approval?.approved_at) ||
+              approvalMilliseconds < firstSeenMilliseconds || approvalMilliseconds > deadlineMilliseconds) {
+            throw new Error("Candidate authorization approval is outside the immutable authorization window");
+          }
+          const maximumClockSkewMilliseconds = 5 * 60 * 1000;
+          const trustedCurrentMilliseconds = Date.now();
+          for (const [name, milliseconds] of [
+            ["first seen", firstSeenMilliseconds],
+            ["candidate authorization approval", approvalMilliseconds],
+          ]) {
+            if (milliseconds > trustedCurrentMilliseconds + maximumClockSkewMilliseconds) {
+              throw new Error(`${name} time is too far in the future`);
+            }
+          }
+          if (trustedCurrentMilliseconds > deadlineMilliseconds + maximumClockSkewMilliseconds) {
+            throw new Error("Candidate authorization deadline has expired");
+          }
+          process.stdout.write(`deadline_at=${evidence.deadline_at}\n`);
+          process.stdout.write(`tarball_path=${tarball}\n`);
+          NODE
+
+      - name: Prove SemVer is unused and latest is authorization-bound
+        shell: bash
+        run: |
+          set -euo pipefail
+          CURRENT_LATEST="$(npm view "$PACKAGE_NAME" dist-tags.latest --json | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>process.stdout.write(JSON.parse(s)))')"
+          test "$CURRENT_LATEST" = "$EXPECTED_PREVIOUS_LATEST"
+          if npm view "$PACKAGE_NAME@$VERSION" version --json >/dev/null 2>&1; then
+            echo "Version already exists and must never be overwritten: $VERSION" >&2
+            exit 1
+          fi
+
+      - name: Publish the exact tarball to candidate with provenance and scripts disabled
+        shell: bash
+        env:
+          TARBALL: ${{ steps.handoff.outputs.tarball_path }}
+          DEADLINE_AT: ${{ steps.handoff.outputs.deadline_at }}
+        run: |
+          set -euo pipefail
+          test -f "$TARBALL" && test ! -L "$TARBALL"
+          POLICY_RECHECK="$RUNNER_TEMP/current-publication-policy"
+          POLICY_VERIFIER="$RUNNER_TEMP/current-release-receipt-verify.mjs"
+          HANDOFF_VERIFIER="$RUNNER_TEMP/candidate-handoff/release-receipt-verify.mjs"
+          test ! -e "$POLICY_RECHECK" && test ! -e "$POLICY_VERIFIER"
+          git init --quiet "$POLICY_RECHECK"
+          git -C "$POLICY_RECHECK" remote add origin "$TRUSTED_ORIGIN"
+          git -C "$POLICY_RECHECK" fetch --no-tags --depth=1 origin \
+            "refs/heads/$DEFAULT_BRANCH:refs/remotes/protected/default"
+          test "$(git -C "$POLICY_RECHECK" rev-parse refs/remotes/protected/default)" = "$POLICY_COMMIT" || {
+            echo "Publication policy is no longer the exact protected default-branch tip" >&2
+            exit 1
+          }
+          git -C "$POLICY_RECHECK" show \
+            "refs/remotes/protected/default:scripts/release-receipt-verify.mjs" > "$POLICY_VERIFIER"
+          POLICY_VERIFIER="$POLICY_VERIFIER" HANDOFF_VERIFIER="$HANDOFF_VERIFIER" \
+          node --input-type=module <<'NODE'
+          import { createHash } from "node:crypto";
+          import { lstatSync, readFileSync } from "node:fs";
+          const digest = (path) => {
+            const stat = lstatSync(path);
+            if (!stat.isFile() || stat.isSymbolicLink()) throw new Error("Publication verifier must be a regular file");
+            return createHash("sha256").update(readFileSync(path)).digest("hex");
+          };
+          const protectedDigest = digest(process.env.POLICY_VERIFIER);
+          if (protectedDigest !== process.env.RECEIPT_VERIFIER_SHA256 ||
+              digest(process.env.HANDOFF_VERIFIER) !== protectedDigest) {
+            throw new Error("Protected publication verifier byte digest mismatch");
+          }
+          NODE
+          DEADLINE_AT="$DEADLINE_AT" node --input-type=module -e '
+            const deadline = Date.parse(process.env.DEADLINE_AT);
+            if (!Number.isFinite(deadline) || Date.now() > deadline + 5 * 60 * 1000) {
+              throw new Error("Candidate authorization deadline expired immediately before publication");
+            }
+          '
+          npm publish "$TARBALL" --access public --tag candidate --provenance --ignore-scripts
+
+      - name: Verify registry post-state and emit unattested closed candidate evidence
+        id: evidence
+        shell: bash
+        env:
+          TARBALL: ${{ steps.handoff.outputs.tarball_path }}
+        run: |
+          set -euo pipefail
+          CANDIDATE="$(npm view "$PACKAGE_NAME" dist-tags.candidate --json | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>process.stdout.write(JSON.parse(s)))')"
+          LATEST="$(npm view "$PACKAGE_NAME" dist-tags.latest --json | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>process.stdout.write(JSON.parse(s)))')"
+          INTEGRITY="$(npm view "$PACKAGE_NAME@$VERSION" dist.integrity --json | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>process.stdout.write(JSON.parse(s)))')"
+          test "$CANDIDATE" = "$VERSION"
+          test "$LATEST" = "$EXPECTED_PREVIOUS_LATEST"
+          test "$INTEGRITY" = "$EXPECTED_PACKAGE_INTEGRITY"
+          EVIDENCE_ROOT="$RUNNER_TEMP/candidate-post-state-evidence"
+          mkdir -p "$EVIDENCE_ROOT"
+          PROVENANCE_AUDIT_ROOT="$RUNNER_TEMP/candidate-provenance-audit"
+          DIST_METADATA_RAW="$PROVENANCE_AUDIT_ROOT/registry-dist.raw.json"
+          PROVENANCE_AUDIT_RAW="$PROVENANCE_AUDIT_ROOT/npm-audit-signatures.raw.json"
+          test ! -e "$PROVENANCE_AUDIT_ROOT"
+          mkdir -p "$PROVENANCE_AUDIT_ROOT"
+          AUDIT_PACKAGE_JSON="$PROVENANCE_AUDIT_ROOT/package.json" node --input-type=module <<'NODE'
+          import { writeFileSync } from "node:fs";
+          const manifest = {
+            name: "candidate-provenance-audit",
+            version: "1.0.0",
+            private: true,
+            dependencies: { [process.env.PACKAGE_NAME]: process.env.VERSION },
+          };
+          writeFileSync(process.env.AUDIT_PACKAGE_JSON, `${JSON.stringify(manifest)}\n`, { mode: 0o600 });
+          NODE
+          npm view "$PACKAGE_NAME@$VERSION" dist --json > "$DIST_METADATA_RAW"
+          (
+            cd "$PROVENANCE_AUDIT_ROOT"
+            npm install --ignore-scripts --no-audit --no-fund
+            npm audit signatures --json --include-attestations > "$PROVENANCE_AUDIT_RAW"
+          )
+          PAYLOAD="$EVIDENCE_ROOT/candidate-evidence-payload.v1.json"
+          REGISTRY_PROOF="$EVIDENCE_ROOT/registry-post-state.v1.json"
+          PROVENANCE_PROOF="$EVIDENCE_ROOT/registry-provenance.v1.json"
+          HANDOFF="$RUNNER_TEMP/candidate-handoff/handoff.v1.json"
+          VERIFIER="$RUNNER_TEMP/candidate-handoff/release-receipt-verify.mjs"
+          PAYLOAD="$PAYLOAD" REGISTRY_PROOF="$REGISTRY_PROOF" PROVENANCE_PROOF="$PROVENANCE_PROOF" \
+          HANDOFF="$HANDOFF" DIST_METADATA_RAW="$DIST_METADATA_RAW" PROVENANCE_AUDIT_RAW="$PROVENANCE_AUDIT_RAW" \
+          REGISTRY_CANDIDATE="$CANDIDATE" REGISTRY_LATEST="$LATEST" REGISTRY_INTEGRITY="$INTEGRITY" \
+          node --input-type=module <<'NODE' > "$EVIDENCE_ROOT/candidate-evidence-payload.digest"
+          import { readFileSync, writeFileSync } from "node:fs";
+          import { pathToFileURL } from "node:url";
+          const verifier = process.env.RUNNER_TEMP + "/candidate-handoff/release-receipt-verify.mjs";
+          const { canonicalizeJcs, parseJsonStrict, sha256Jcs } = await import(pathToFileURL(verifier));
+          const handoff = parseJsonStrict(readFileSync(process.env.HANDOFF, "utf8"));
+          const registryDist = parseJsonStrict(readFileSync(process.env.DIST_METADATA_RAW, "utf8"));
+          const verificationReport = parseJsonStrict(readFileSync(process.env.PROVENANCE_AUDIT_RAW, "utf8"));
+          const isRecord = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
+          const exactKeys = (value, keys) => isRecord(value) &&
+            JSON.stringify(Object.keys(value).sort()) === JSON.stringify([...keys].sort());
+          const digest = /^[a-f0-9]{64}$/;
+          if (!exactKeys(verificationReport, ["invalid", "missing", "verified"]) ||
+              !Array.isArray(verificationReport.invalid) || verificationReport.invalid.length !== 0 ||
+              !Array.isArray(verificationReport.missing) || verificationReport.missing.length !== 0 ||
+              !Array.isArray(verificationReport.verified)) {
+            throw new Error("npm registry signature/provenance verification did not close successfully");
+          }
+          if (registryDist.integrity !== process.env.REGISTRY_INTEGRITY ||
+              !Array.isArray(registryDist.signatures) || registryDist.signatures.length === 0 ||
+              !isRecord(registryDist.attestations)) {
+            throw new Error("Registry signature/provenance metadata is missing or unrelated");
+          }
+          const signatures = registryDist.signatures;
+          if (!signatures.every((signature) =>
+            isRecord(signature) && typeof signature.keyid === "string" && signature.keyid.length > 0 &&
+            typeof signature.sig === "string" && signature.sig.length > 0
+          )) throw new Error("Registry signature evidence is malformed");
+          const signatureKeyids = signatures.map(({ keyid }) => keyid);
+          if (new Set(signatureKeyids).size !== signatureKeyids.length) {
+            throw new Error("Registry signature key identities are ambiguous");
+          }
+          const verifiedTargets = verificationReport.verified.filter((entry) =>
+            isRecord(entry) && entry.name === process.env.PACKAGE_NAME && entry.version === process.env.VERSION
+          );
+          if (verifiedTargets.length !== 1) throw new Error("Exact published package provenance was not verified");
+          const verifiedTarget = verifiedTargets[0];
+          const hasAttestationBundles = Array.isArray(verifiedTarget.attestationBundles)
+            ? verifiedTarget.attestationBundles.length > 0
+            : isRecord(verifiedTarget.attestationBundles) && Object.keys(verifiedTarget.attestationBundles).length > 0;
+          if (verifiedTarget.registry !== "https://registry.npmjs.org/" ||
+              verifiedTarget.location !== `node_modules/${process.env.PACKAGE_NAME}` ||
+              !isRecord(verifiedTarget.attestations) || Object.keys(verifiedTarget.attestations).length === 0 ||
+              !hasAttestationBundles ||
+              canonicalizeJcs(verifiedTarget.attestations) !== canonicalizeJcs(registryDist.attestations)) {
+            throw new Error("Verified npm provenance does not exactly join registry metadata");
+          }
+          const observedAt = new Date().toISOString();
+          const provenanceProof = {
+            schema_version: "candidate-registry-provenance-proof.v1",
+            registry: "https://registry.npmjs.org/",
+            package_name: process.env.PACKAGE_NAME,
+            package_version: process.env.VERSION,
+            package_integrity: process.env.REGISTRY_INTEGRITY,
+            signature_keyids: signatureKeyids,
+            registry_signatures_digest: sha256Jcs(signatures),
+            registry_attestations_digest: sha256Jcs(registryDist.attestations),
+            verified_attestation_bundles_digest: sha256Jcs(verifiedTarget.attestationBundles),
+            verification_report_digest: sha256Jcs(verificationReport),
+            verification: {
+              npm_audit_signatures: true,
+              registry_signatures: true,
+              provenance_attestations: true,
+            },
+            observed_at: observedAt,
+            sanitized: true,
+          };
+          const provenanceProofDigest = sha256Jcs(provenanceProof);
+          const registryProof = {
+            schema_version: "candidate-registry-post-state.v1",
+            registry: "https://registry.npmjs.org/",
+            package_name: process.env.PACKAGE_NAME,
+            package_version: process.env.VERSION,
+            package_integrity: process.env.REGISTRY_INTEGRITY,
+            candidate_version: process.env.REGISTRY_CANDIDATE,
+            latest_version: process.env.REGISTRY_LATEST,
+            previous_latest_version: process.env.EXPECTED_PREVIOUS_LATEST,
+            source_commit: process.env.SOURCE_COMMIT,
+            tarball_sha256: handoff.tarball_sha256,
+            authorization_receipt_digest: process.env.AUTHORIZATION_RECEIPT_DIGEST,
+            registry_provenance_digest: provenanceProofDigest,
+            observed_at: observedAt,
+            sanitized: true,
+          };
+          const registryProofDigest = sha256Jcs(registryProof);
+          const payload = {
+            schema_version: "release-evidence-payload.v1",
+            transition: "candidate",
+            package_name: process.env.PACKAGE_NAME,
+            package_version: process.env.VERSION,
+            package_integrity: process.env.REGISTRY_INTEGRITY,
+            previous_latest_version: process.env.EXPECTED_PREVIOUS_LATEST,
+            predecessor_receipt_digests: [process.env.AUTHORIZATION_RECEIPT_DIGEST],
+            evidence_digests: [
+              { kind: "authorization-receipt", digest: process.env.AUTHORIZATION_RECEIPT_DIGEST },
+              { kind: "registry-post-state", digest: registryProofDigest },
+              { kind: "release-data", digest: handoff.authorization_evidence.release_data_digest_v1 },
+              { kind: "source-tarball", digest: handoff.tarball_sha256 },
+            ],
+            run_id: `${process.env.GITHUB_RUN_ID}-${process.env.GITHUB_RUN_ATTEMPT}`,
+            source_commit: process.env.SOURCE_COMMIT,
+            policy_versions: handoff.authorization_evidence.policy_versions,
+          };
+          const payloadDigest = sha256Jcs(payload);
+          writeFileSync(process.env.PROVENANCE_PROOF, `${JSON.stringify(provenanceProof)}\n`, { mode: 0o644 });
+          writeFileSync(process.env.REGISTRY_PROOF, `${JSON.stringify(registryProof)}\n`, { mode: 0o644 });
+          writeFileSync(process.env.PAYLOAD, `${JSON.stringify(payload)}\n`, { mode: 0o644 });
+
+          const closedPayload = parseJsonStrict(readFileSync(process.env.PAYLOAD, "utf8"));
+          const closedProof = parseJsonStrict(readFileSync(process.env.REGISTRY_PROOF, "utf8"));
+          const closedProvenance = parseJsonStrict(readFileSync(process.env.PROVENANCE_PROOF, "utf8"));
+          if (!exactKeys(closedPayload, [
+            "schema_version", "transition", "package_name", "package_version", "package_integrity",
+            "previous_latest_version", "predecessor_receipt_digests", "evidence_digests", "run_id",
+            "source_commit", "policy_versions",
+          ]) || !exactKeys(closedProof, [
+            "schema_version", "registry", "package_name", "package_version", "package_integrity",
+            "candidate_version", "latest_version", "previous_latest_version", "source_commit",
+            "tarball_sha256", "authorization_receipt_digest", "registry_provenance_digest", "observed_at", "sanitized",
+          ]) || !exactKeys(closedProvenance, [
+            "schema_version", "registry", "package_name", "package_version", "package_integrity",
+            "signature_keyids", "registry_signatures_digest", "registry_attestations_digest",
+            "verified_attestation_bundles_digest", "verification_report_digest", "verification",
+            "observed_at", "sanitized",
+          ]) || !exactKeys(closedProvenance.verification, [
+            "npm_audit_signatures", "registry_signatures", "provenance_attestations",
+          ])) throw new Error("Post-state evidence fields are not closed");
+          if (closedProof.schema_version !== "candidate-registry-post-state.v1" ||
+              closedProof.registry !== "https://registry.npmjs.org/" || closedProof.sanitized !== true ||
+              closedProof.candidate_version !== process.env.VERSION ||
+              closedProof.latest_version !== process.env.EXPECTED_PREVIOUS_LATEST ||
+              closedProof.package_integrity !== process.env.REGISTRY_INTEGRITY ||
+              closedProof.authorization_receipt_digest !== process.env.AUTHORIZATION_RECEIPT_DIGEST ||
+              closedProof.registry_provenance_digest !== provenanceProofDigest ||
+              closedProvenance.schema_version !== "candidate-registry-provenance-proof.v1" ||
+              closedProvenance.registry !== "https://registry.npmjs.org/" ||
+              closedProvenance.package_name !== process.env.PACKAGE_NAME ||
+              closedProvenance.package_version !== process.env.VERSION ||
+              closedProvenance.package_integrity !== process.env.REGISTRY_INTEGRITY ||
+              closedProvenance.sanitized !== true ||
+              !digest.test(closedProvenance.registry_signatures_digest) ||
+              !digest.test(closedProvenance.registry_attestations_digest) ||
+              !digest.test(closedProvenance.verified_attestation_bundles_digest) ||
+              !digest.test(closedProvenance.verification_report_digest) ||
+              !Object.values(closedProvenance.verification).every((value) => value === true) ||
+              closedPayload.predecessor_receipt_digests[0] !== process.env.AUTHORIZATION_RECEIPT_DIGEST ||
+              sha256Jcs(closedProvenance) !== provenanceProofDigest ||
+              sha256Jcs(closedProof) !== registryProofDigest || sha256Jcs(closedPayload) !== payloadDigest) {
+            throw new Error("Post-state evidence identity or digest mismatch");
+          }
+          const serialized = `${JSON.stringify(closedProvenance)}${JSON.stringify(closedProof)}${JSON.stringify(closedPayload)}`;
+          if (/file:\/\/|[?&](?:key|token|signature|x-amz-)|\/(?:Users|home)\//i.test(serialized)) {
+            throw new Error("Post-state evidence is not sanitized");
+          }
+          process.stdout.write(`${payloadDigest}\n`);
+          NODE
+          EVIDENCE_DIGEST="$(tr -d '\r\n' < "$EVIDENCE_ROOT/candidate-evidence-payload.digest")"
+          test "${#EVIDENCE_DIGEST}" = 64
+          PAYLOAD_DIGEST="$EVIDENCE_DIGEST" PAYLOAD="$PAYLOAD" REGISTRY_PROOF="$REGISTRY_PROOF" \
+          PROVENANCE_PROOF="$PROVENANCE_PROOF" \
+          PROVENANCE_DIGEST_PATH="$EVIDENCE_ROOT/registry-provenance.digest" \
+          node --input-type=module <<'NODE' > "$EVIDENCE_ROOT/registry-post-state.digest"
+          import { readFileSync, writeFileSync } from "node:fs";
+          import { pathToFileURL } from "node:url";
+          const verifier = process.env.RUNNER_TEMP + "/candidate-handoff/release-receipt-verify.mjs";
+          const { parseJsonStrict, sha256Jcs } = await import(pathToFileURL(verifier));
+          const payload = parseJsonStrict(readFileSync(process.env.PAYLOAD, "utf8"));
+          const proof = parseJsonStrict(readFileSync(process.env.REGISTRY_PROOF, "utf8"));
+          const provenance = parseJsonStrict(readFileSync(process.env.PROVENANCE_PROOF, "utf8"));
+          const provenanceDigest = sha256Jcs(provenance);
+          if (proof.registry_provenance_digest !== provenanceDigest) {
+            throw new Error("Registry post-state provenance digest join mismatch");
+          }
+          writeFileSync(process.env.PROVENANCE_DIGEST_PATH, `${provenanceDigest}\n`, { mode: 0o644 });
+          if (sha256Jcs(payload) !== process.env.PAYLOAD_DIGEST) throw new Error("Candidate evidence payload digest mismatch");
+          process.stdout.write(`${sha256Jcs(proof)}\n`);
+          NODE
+          REGISTRY_PROOF_DIGEST="$(tr -d '\r\n' < "$EVIDENCE_ROOT/registry-post-state.digest")"
+          test "${#REGISTRY_PROOF_DIGEST}" = 64
+          PROVENANCE_PROOF_DIGEST="$(tr -d '\r\n' < "$EVIDENCE_ROOT/registry-provenance.digest")"
+          test "${#PROVENANCE_PROOF_DIGEST}" = 64
+          printf '%s  candidate-evidence-payload.v1.json\n' "$EVIDENCE_DIGEST" > "$PAYLOAD.sha256"
+          printf '%s  registry-post-state.v1.json\n' "$REGISTRY_PROOF_DIGEST" > "$REGISTRY_PROOF.sha256"
+          printf '%s  registry-provenance.v1.json\n' "$PROVENANCE_PROOF_DIGEST" > "$PROVENANCE_PROOF.sha256"
+          printf 'evidence_digest=%s\n' "$EVIDENCE_DIGEST" >> "$GITHUB_OUTPUT"
+          {
+            echo "### Candidate publication boundary"
+            echo "The exact verified tarball was published only to \`candidate\`; \`latest\` remains \`$LATEST\`."
+            echo "Unattested candidate evidence payload digest: \`$EVIDENCE_DIGEST\`."
+            echo "No administrator approval or final \`candidate.v1.json\` was created here."
+            echo "Public verification remains blocked until a separately attested and protected-persisted final \`candidate.v1.json\` exists."
+            echo "This is not release completion."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload unattested post-state evidence for separate administrator attestation and persistence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: candidate-post-state-evidence-${{ env.VERSION }}-${{ steps.evidence.outputs.evidence_digest }}
+          path: |
+            ${{ runner.temp }}/candidate-post-state-evidence/candidate-evidence-payload.v1.json
+            ${{ runner.temp }}/candidate-post-state-evidence/candidate-evidence-payload.v1.json.sha256
+            ${{ runner.temp }}/candidate-post-state-evidence/registry-post-state.v1.json
+            ${{ runner.temp }}/candidate-post-state-evidence/registry-provenance.v1.json
+            ${{ runner.temp }}/candidate-post-state-evidence/registry-provenance.v1.json.sha256
+            ${{ runner.temp }}/candidate-post-state-evidence/registry-post-state.v1.json.sha256
+          if-no-files-found: error
+          retention-days: 90

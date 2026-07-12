@@ -29,8 +29,39 @@ const missingMetricSchema = z.object({
   raw_value: z.string(),
   source_column: z.string(),
 })
+const prohibitedDataKey = /^(?:aggregate|best|loser|preference|rank|ranking|recommendation|recommended|score|weight|winner|worst)$/iu
+const prohibitedDataText = /(?:\b(?:aggregate|best|loser|prefer(?:ence|red)?|rank(?:ed|ing)?|recommend(?:ation|ed)?|scor(?:e|ed|ing)|weight(?:ed|ing)?|winner|worst)\b|가중치|선호|순위|점수|추천|최고|최저|승자|패자)/iu
+
+function expectFactualDataOnly(value: unknown): void {
+  const pending = [value]
+
+  while (pending.length > 0) {
+    const current = pending.pop()
+    if (typeof current === "string") {
+      expect(current).not.toMatch(prohibitedDataText)
+    } else if (Array.isArray(current)) {
+      pending.push(...current)
+    } else if (current !== null && typeof current === "object") {
+      for (const [key, child] of Object.entries(current)) {
+        expect(key).not.toMatch(prohibitedDataKey)
+        pending.push(child)
+      }
+    }
+  }
+}
 
 describe("MCP response contract", () => {
+  it.each(["ok", "invalid_request"] as const)(
+    "rejects aggregate object keys and prose sentinels in %s data envelopes",
+    (status) => {
+      const objectSentinel = { status, data: { aggregate: "factual sentinel" } }
+      const textSentinel = { status, data: { note: "aggregate comparison sentinel" } }
+
+      expect(() => expectFactualDataOnly(objectSentinel)).toThrow()
+      expect(() => expectFactualDataOnly(textSentinel)).toThrow()
+    },
+  )
+
   it("keeps default indicator and comparison responses within the verified v0.1 contract", async () => {
     await withMcpServer(reservedKeyOverrides("", ""), async (harness) => {
       const indicatorResult = await harness.callTool("list_indicators", {})
@@ -54,6 +85,7 @@ describe("MCP response contract", () => {
           }),
         ),
       )
+      expectFactualDataOnly(indicatorResponse.data)
 
       const compareResult = await harness.callTool("compare_universities", {
         university_names: ["test-a", "test-b"],
@@ -72,6 +104,7 @@ describe("MCP response contract", () => {
       expect(compareResponse.warnings.length).toBeGreaterThan(0)
       expect(compareData.comparisons).toHaveLength(0)
       expect(compareData.metric_contracts).toHaveLength(expectedDefaultIndicators.length)
+      expectFactualDataOnly(compareResponse.data)
 
       for (const metric of compareData.metric_contracts) {
         const expected = expectedByName.get(metric.indicator)
@@ -98,6 +131,7 @@ describe("MCP response contract", () => {
         .parse(metricsResponse.data)
 
       expect(metricsData.metrics).toHaveLength(0)
+      expectFactualDataOnly(metricsResponse.data)
       expect(metricsData.metric_contracts.map((metric) => metric.indicator)).toEqual(
         expectedDefaultIndicators.map((indicator) => indicator.indicator),
       )
@@ -120,6 +154,7 @@ describe("MCP response contract", () => {
           .parse(response.data)
 
         expect(response.status).toBe("missing_db")
+        expectFactualDataOnly(response.data)
         expect(JSON.stringify(response)).not.toContain("__missing__")
         expect(data.error.configured_database).toBe("missing")
       },
@@ -132,6 +167,7 @@ describe("MCP response contract", () => {
       const notFoundResponse = responseSchema.parse(notFoundResult.structuredContent)
 
       expect(notFoundResponse.status).toBe("not_found")
+      expectFactualDataOnly(notFoundResponse.data)
 
       const ambiguousResult = await harness.callTool("search_university", { query: "" })
       const ambiguousResponse = responseSchema.parse(ambiguousResult.structuredContent)
@@ -146,6 +182,7 @@ describe("MCP response contract", () => {
         .parse(ambiguousResponse.data)
 
       expect(ambiguousResponse.status).toBe("ambiguous")
+      expectFactualDataOnly(ambiguousResponse.data)
       expect(ambiguousData.candidates).toHaveLength(0)
       expect(ambiguousResponse.warnings).toContain("Empty queries are not guessed.")
       expect(
@@ -166,6 +203,7 @@ describe("MCP response contract", () => {
         .parse(multiCampusResponse.data)
 
       expect(multiCampusResponse.status).toBe("ambiguous")
+      expectFactualDataOnly(multiCampusResponse.data)
       expect(multiCampusData.candidates.length).toBeGreaterThan(1)
 
       const employmentResult = await harness.callTool("explain_indicator", {
@@ -183,6 +221,7 @@ describe("MCP response contract", () => {
       }
 
       expect(employmentResponse.status).toBe("ok")
+      expectFactualDataOnly(employmentResponse.data)
       expect(employmentData.indicator).toEqual(
         expect.objectContaining({
           indicator: "employment_rate",
@@ -222,6 +261,7 @@ describe("MCP response contract", () => {
         .parse(invalidMetricsResponse.data)
 
       expect(invalidMetricsResponse.status).toBe("invalid_request")
+      expectFactualDataOnly(invalidMetricsResponse.data)
       expect(invalidMetricsData.invalid_indicators).toEqual(["not_real"])
       expect(invalidMetricsData.metrics).toHaveLength(0)
 
@@ -239,6 +279,7 @@ describe("MCP response contract", () => {
         .parse(invalidCompareResponse.data)
 
       expect(invalidCompareResponse.status).toBe("invalid_request")
+      expectFactualDataOnly(invalidCompareResponse.data)
       expect(invalidCompareData.invalid_indicators).toEqual(["not_real"])
       expect(invalidCompareData.comparisons).toHaveLength(0)
 
@@ -254,6 +295,7 @@ describe("MCP response contract", () => {
         .parse(emptyCompareResponse.data)
 
       expect(emptyCompareResponse.status).toBe("invalid_request")
+      expectFactualDataOnly(emptyCompareResponse.data)
       expect(emptyCompareData.comparisons).toHaveLength(0)
     })
   }, 20_000)
@@ -273,6 +315,7 @@ describe("MCP response contract", () => {
         .parse(searchResponse.data)
 
       expect(searchResponse.status).toBe("ambiguous")
+      expectFactualDataOnly(searchResponse.data)
       expect(searchData.candidates).toHaveLength(searchData.returned_count)
 
       const metricsResult = await harness.callTool("get_university_metrics", {
@@ -287,6 +330,7 @@ describe("MCP response contract", () => {
         .parse(metricsResponse.data)
 
       expect(metricsResponse.status).toBe("ok")
+      expectFactualDataOnly(metricsResponse.data)
       expect(metricsData.metrics.map((metric) => metric.indicator)).not.toContain(
         "competition_rate",
       )
@@ -321,6 +365,7 @@ describe("MCP response contract", () => {
             .parse(response.data)
 
           expect(response.status).toBe("ok")
+          expectFactualDataOnly(response.data)
           expect(data.raw_rows).toBe(488)
           expect(data.observations).toBe(2350)
         },

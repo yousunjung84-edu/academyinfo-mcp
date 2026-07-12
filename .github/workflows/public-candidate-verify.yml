@@ -1,0 +1,315 @@
+name: Public candidate install verification
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Exact public candidate SemVer (never a tag or local path)
+        required: true
+        type: string
+      source_commit:
+        description: Full source commit recorded by candidate.v1.json
+        required: true
+        type: string
+      receipt_commit:
+        description: Protected default-branch commit containing the immutable candidate receipt
+        required: true
+        type: string
+      candidate_receipt_digest:
+        description: SHA-256 outer digest of immutable candidate.v1.json
+        required: true
+        type: string
+      authorization_receipt_digest:
+        description: Independently protected expected candidate-authorization predecessor SHA-256
+        required: true
+        type: string
+      confirm_public_read_only:
+        description: Type verify-public-candidate-without-promotion
+        required: true
+        type: string
+
+concurrency:
+  group: public-candidate-proof
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  PACKAGE_NAME: academyinfo-mcp
+  VERSION: ${{ inputs.version }}
+  SOURCE_COMMIT: ${{ inputs.source_commit }}
+  RECEIPT_COMMIT: ${{ inputs.receipt_commit }}
+  CURRENT_WORKFLOW_COMMIT: ${{ github.sha }}
+  REPOSITORY: ${{ github.repository }}
+  DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+  TRUSTED_ORIGIN: https://github.com/${{ github.repository }}
+  CANDIDATE_RECEIPT_DIGEST: ${{ inputs.candidate_receipt_digest }}
+  AUTHORIZATION_RECEIPT_DIGEST: ${{ inputs.authorization_receipt_digest }}
+  CONFIRM_PUBLIC_READ_ONLY: ${{ inputs.confirm_public_read_only }}
+  NPM_CONFIG_REGISTRY: https://registry.npmjs.org/
+
+jobs:
+  verify-public-candidate:
+    name: Node 22 ${{ matrix.lane }} exact public install
+    timeout-minutes: 20
+    runs-on: ${{ matrix.runner }}
+    environment: public-candidate-proof
+    env:
+      RELEASE_ADMINISTRATOR: ${{ vars.ACADEMYINFO_RELEASE_ADMINISTRATOR }}
+      PUBLIC_INSTALL_VERIFIER_SHA256: ${{ vars.ACADEMYINFO_PUBLIC_INSTALL_VERIFIER_SHA256 }}
+      RECEIPT_VERIFIER_SHA256: ${{ vars.ACADEMYINFO_RELEASE_RECEIPT_VERIFIER_SHA256 }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - lane: macos-arm64
+            runner: macos-14
+          - lane: windows-x64
+            runner: windows-2022
+          - lane: ubuntu-glibc-x64
+            runner: ubuntu-24.04
+    steps:
+      - name: Validate dispatch identity without registry mutation
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          if ($env:CONFIRM_PUBLIC_READ_ONLY -ne "verify-public-candidate-without-promotion") { throw "Explicit read-only confirmation missing" }
+          if ($env:VERSION -notmatch '^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$') { throw "Exact SemVer required" }
+          if ($env:SOURCE_COMMIT -notmatch '^[a-f0-9]{40}$') { throw "Full source commit required" }
+          if ($env:RECEIPT_COMMIT -notmatch '^[a-f0-9]{40}$') { throw "Protected receipt commit required" }
+          if ($env:CURRENT_WORKFLOW_COMMIT -notmatch '^[a-f0-9]{40}$') { throw "Current workflow commit required" }
+          if ($env:REPOSITORY -cne "yousunjung84-edu/academyinfo-mcp") { throw "Unexpected repository identity" }
+          if ($env:DEFAULT_BRANCH -notmatch '^[A-Za-z0-9][A-Za-z0-9._/-]{0,254}$' -or
+              $env:DEFAULT_BRANCH.Contains("..") -or $env:DEFAULT_BRANCH.Contains("//") -or
+              $env:DEFAULT_BRANCH.EndsWith("/") -or $env:DEFAULT_BRANCH.EndsWith(".")) {
+            throw "Invalid default branch"
+          }
+          if ($env:TRUSTED_ORIGIN -cne "https://github.com/$($env:REPOSITORY)") { throw "Unexpected trusted HTTPS origin" }
+          if ($env:PUBLIC_INSTALL_VERIFIER_SHA256 -notmatch '^[a-f0-9]{64}$') { throw "Protected public install verifier digest required" }
+          if ($env:RECEIPT_VERIFIER_SHA256 -notmatch '^[a-f0-9]{64}$') { throw "Protected receipt verifier digest required" }
+          if ($env:CANDIDATE_RECEIPT_DIGEST -notmatch '^[a-f0-9]{64}$') { throw "Candidate receipt digest required" }
+          if ($env:AUTHORIZATION_RECEIPT_DIGEST -notmatch '^[a-f0-9]{64}$') { throw "External candidate authorization predecessor digest required" }
+          if ($env:RELEASE_ADMINISTRATOR -notmatch '^[A-Za-z0-9][A-Za-z0-9._@-]{0,127}$') { throw "Protected release administrator identity required" }
+          git check-ref-format --branch $env:DEFAULT_BRANCH
+          if ($LASTEXITCODE -ne 0) { throw "Default branch is not a valid Git branch" }
+
+      - name: Check out immutable candidate evidence
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          repository: ${{ env.REPOSITORY }}
+          ref: ${{ env.RECEIPT_COMMIT }}
+          path: immutable-evidence
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Check out current trusted verifier policy separately
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          repository: ${{ env.REPOSITORY }}
+          ref: ${{ github.sha }}
+          path: trusted-policy
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Install exact Node 22 without dependency cache
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: "22"
+          registry-url: https://registry.npmjs.org/
+
+      - name: Validate trusted policy bytes, protected history, and candidate receipt before candidate code
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $evidence = Join-Path $env:GITHUB_WORKSPACE "immutable-evidence"
+          $policy = Join-Path $env:GITHUB_WORKSPACE "trusted-policy"
+          if ((git -C $evidence rev-parse HEAD) -ne $env:RECEIPT_COMMIT) { throw "Receipt commit checkout mismatch" }
+          $evidenceOrigin = git -C $evidence remote get-url origin
+          if ($evidenceOrigin -cne $env:TRUSTED_ORIGIN -and $evidenceOrigin -cne "$($env:TRUSTED_ORIGIN).git") { throw "Immutable evidence checkout origin mismatch" }
+          git -C $evidence fetch --no-tags origin "refs/heads/$($env:DEFAULT_BRANCH):refs/remotes/origin/$($env:DEFAULT_BRANCH)"
+          if ($LASTEXITCODE -ne 0) { throw "Protected default ref fetch failed for immutable evidence" }
+          git -C $evidence merge-base --is-ancestor $env:RECEIPT_COMMIT "origin/$($env:DEFAULT_BRANCH)"
+          if ($LASTEXITCODE -ne 0) { throw "Receipt commit is not protected default-branch history" }
+
+          if ((git -C $policy rev-parse HEAD) -ne $env:CURRENT_WORKFLOW_COMMIT) { throw "Trusted policy commit checkout mismatch" }
+          $policyOrigin = git -C $policy remote get-url origin
+          if ($policyOrigin -cne $env:TRUSTED_ORIGIN -and $policyOrigin -cne "$($env:TRUSTED_ORIGIN).git") { throw "Trusted policy checkout origin mismatch" }
+          git -C $policy fetch --no-tags origin "refs/heads/$($env:DEFAULT_BRANCH):refs/remotes/origin/$($env:DEFAULT_BRANCH)"
+          if ($LASTEXITCODE -ne 0) { throw "Protected default ref fetch failed for trusted policy" }
+          if ((git -C $policy rev-parse "origin/$($env:DEFAULT_BRANCH)") -ne $env:CURRENT_WORKFLOW_COMMIT) {
+            throw "Current workflow commit must equal the protected default-branch tip"
+          }
+          git -C $policy merge-base --is-ancestor $env:SOURCE_COMMIT "origin/$($env:DEFAULT_BRANCH)"
+          if ($LASTEXITCODE -ne 0) { throw "Source commit is not protected default-branch history" }
+
+          $verifier = Join-Path $policy "scripts/public-installed-verify.mjs"
+          $receiptVerifier = Join-Path $policy "scripts/release-receipt-verify.mjs"
+          $candidateReceipt = Join-Path $evidence "evidence/releases/$env:VERSION/candidate.v1.json"
+          foreach ($path in @($verifier, $receiptVerifier, $candidateReceipt)) {
+            if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { throw "Required protected verifier/receipt missing: $path" }
+            if ((Get-Item -LiteralPath $path).LinkType) { throw "Protected verifier/receipt must not be a link: $path" }
+          }
+          $actualVerifierSha256 = (Get-FileHash -LiteralPath $verifier -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($actualVerifierSha256 -ne $env:PUBLIC_INSTALL_VERIFIER_SHA256) { throw "Protected public install verifier byte digest mismatch" }
+          $actualReceiptVerifierSha256 = (Get-FileHash -LiteralPath $receiptVerifier -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($actualReceiptVerifierSha256 -ne $env:RECEIPT_VERIFIER_SHA256) { throw "Protected receipt verifier byte digest mismatch" }
+          $registryIntegrityJson = & npm view "${env:PACKAGE_NAME}@${env:VERSION}" dist.integrity --json
+          if ($LASTEXITCODE -ne 0) { throw "Exact registry integrity lookup failed" }
+          $candidateIntegrity = [string](ConvertFrom-Json -InputObject ($registryIntegrityJson -join "`n"))
+          if ($candidateIntegrity -notmatch '^sha512-(?:[A-Za-z0-9+/]{4}){21}[A-Za-z0-9+/]{2}==$') {
+            throw "Exact sha512 registry integrity is invalid"
+          }
+          & node $receiptVerifier `
+            --receipt $candidateReceipt `
+            --kind candidate `
+            --expected-digest $env:CANDIDATE_RECEIPT_DIGEST `
+            --expected-predecessor $env:AUTHORIZATION_RECEIPT_DIGEST `
+            --source-commit $env:SOURCE_COMMIT `
+            --package-name $env:PACKAGE_NAME `
+            --package-version $env:VERSION `
+            --package-integrity $candidateIntegrity `
+            --expected-approver $env:RELEASE_ADMINISTRATOR
+          if ($LASTEXITCODE -ne 0) { throw "Immutable candidate receipt verification failed" }
+          "CANDIDATE_PACKAGE_INTEGRITY=$candidateIntegrity" | Add-Content -LiteralPath $env:GITHUB_ENV -Encoding utf8NoBOM
+
+      - name: Create active traps, prove canary, and make checkout artifacts unreachable
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          if ((node -p "process.versions.node.split('.')[0]") -ne "22") { throw "Node 22 required" }
+          $root = Join-Path $env:RUNNER_TEMP ("academyinfo-public-" + [guid]::NewGuid().ToString("N"))
+          $home = Join-Path $root "home"
+          $cache = Join-Path $root "npm-cache"
+          $cwd = Join-Path $root "working-directory"
+          $configDirectory = Join-Path $root "npm-config"
+          $config = Join-Path $configDirectory "user.npmrc"
+          $traps = Join-Path $root "build-traps"
+          $output = Join-Path $root "receipts"
+          $verifier = Join-Path $root "public-installed-verify.mjs"
+          $trapLog = Join-Path $root "build-trap-fired.log"
+          $canary = Join-Path $root "build-trap-canary.json"
+          @($home, $cache, $cwd, $configDirectory, $traps, $output) | ForEach-Object { New-Item -ItemType Directory -Path $_ | Out-Null }
+          Copy-Item -LiteralPath (Join-Path $env:GITHUB_WORKSPACE "trusted-policy/scripts/public-installed-verify.mjs") -Destination $verifier
+          @(
+            "registry=https://registry.npmjs.org/",
+            "cache=$($cache.Replace('\', '/'))",
+            "audit=false",
+            "fund=false"
+          ) | Set-Content -LiteralPath $config -Encoding utf8NoBOM
+
+          $trapNames = @("python", "python3", "node-gyp", "cc", "c++", "gcc", "g++", "clang", "clang++", "cl")
+          $trapPaths = @{}
+          foreach ($name in $trapNames) {
+            if ($IsWindows) {
+              $path = Join-Path $traps ($name + ".cmd")
+              @("@echo off", "echo %~nx0>>`"%BUILD_TRAP_LOG%`"", "exit /b 86") | Set-Content -LiteralPath $path -Encoding ascii
+            } else {
+              $path = Join-Path $traps $name
+              @("#!/bin/sh", "printf '%s\n' `"`$0`" >> `"`$BUILD_TRAP_LOG`"", "exit 86") | Set-Content -LiteralPath $path -Encoding utf8NoBOM
+              & chmod +x $path
+            }
+            $trapPaths[$name] = $path
+          }
+          $env:BUILD_TRAP_LOG = $trapLog
+          if (Test-Path variable:PSNativeCommandUseErrorActionPreference) {
+            $PSNativeCommandUseErrorActionPreference = $false
+          }
+          foreach ($name in $trapNames) {
+            $trapPath = $trapPaths[$name]
+            & $trapPath --public-verifier-canary
+            if ($LASTEXITCODE -ne 86) { throw "Build trap canary failed for $name" }
+          }
+          $canaryDocument = [ordered]@{ passed = $true; exit_code = 86; traps = $trapNames }
+          $canaryDocument | ConvertTo-Json -Compress | Set-Content -LiteralPath $canary -Encoding utf8NoBOM
+          Remove-Item -LiteralPath $trapLog -Force
+
+          $pathSeparator = [IO.Path]::PathSeparator
+          @(
+            "VERIFIER_HOME=$home",
+            "VERIFIER_CWD=$cwd",
+            "VERIFIER_SCRIPT=$verifier",
+            "VERIFIER_OUTPUT=$output",
+            "NPM_CONFIG_CACHE=$cache",
+            "NPM_CONFIG_USERCONFIG=$config",
+            "NPM_CONFIG_REGISTRY=https://registry.npmjs.org/",
+            "BUILD_TRAP_DIR=$traps",
+            "BUILD_TRAP_LOG=$trapLog",
+            "BUILD_TRAP_CANARY=$canary",
+            "PYTHON=$($trapPaths['python'])",
+            "npm_config_python=$($trapPaths['python'])",
+            "npm_config_node_gyp=$($trapPaths['node-gyp'])",
+            "CC=$($trapPaths['cc'])",
+            "CXX=$($trapPaths['c++'])",
+            "PATH=$traps$pathSeparator$env:PATH"
+          ) | Add-Content -LiteralPath $env:GITHUB_ENV -Encoding utf8NoBOM
+
+          Set-Location $cwd
+          Get-ChildItem -LiteralPath $env:GITHUB_WORKSPACE -Force | Remove-Item -Recurse -Force
+          if ((Get-ChildItem -LiteralPath $env:GITHUB_WORKSPACE -Force | Measure-Object).Count -ne 0) { throw "Checkout contents remain reachable" }
+
+      - name: Verify exact public candidate and emit closed sanitized lane receipt
+        id: verify
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          Set-Location $env:VERIFIER_CWD
+          $receipt = Join-Path $env:VERIFIER_OUTPUT "public-install-${{ matrix.lane }}.v1.json"
+          $installLog = Join-Path $env:VERIFIER_OUTPUT "install-${{ matrix.lane }}.sanitized.log"
+          $digestLines = @(& node $env:VERIFIER_SCRIPT lane `
+            --version $env:VERSION `
+            --lane "${{ matrix.lane }}" `
+            --source-commit $env:SOURCE_COMMIT `
+            --candidate-receipt-digest $env:CANDIDATE_RECEIPT_DIGEST `
+            --receipt $receipt `
+            --install-log $installLog `
+            --run-id "${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.lane }}"
+          )
+          if ($LASTEXITCODE -ne 0) { throw "Public candidate verification failed" }
+          if ($digestLines.Count -ne 1 -or $digestLines[0] -notmatch '^[a-f0-9]{64}$') { throw "Verifier did not emit one receipt digest" }
+          $digest = [string]$digestLines[0]
+          $env:PUBLIC_LANE_RECEIPT = $receipt
+          $env:PUBLIC_LANE_DIGEST = $digest
+          $env:PUBLIC_LANE = "${{ matrix.lane }}"
+          @'
+          import { readFileSync } from "node:fs";
+          import { pathToFileURL } from "node:url";
+          const { validateLaneReceipt } = await import(pathToFileURL(process.env.VERIFIER_SCRIPT));
+          const receipt = JSON.parse(readFileSync(process.env.PUBLIC_LANE_RECEIPT, "utf8"));
+          if (receipt.public_install_evidence_payload_v1?.installed_identities?.[process.env.PACKAGE_NAME]?.registry_integrity !==
+              process.env.CANDIDATE_PACKAGE_INTEGRITY) {
+            throw new Error("Installed registry integrity is unrelated to candidate receipt");
+          }
+          validateLaneReceipt(receipt, {
+            version: process.env.VERSION,
+            sourceCommit: process.env.SOURCE_COMMIT,
+            candidateReceiptDigest: process.env.CANDIDATE_RECEIPT_DIGEST,
+            packageIntegrity: process.env.CANDIDATE_PACKAGE_INTEGRITY,
+          }, process.env.PUBLIC_LANE, process.env.PUBLIC_LANE_DIGEST);
+          '@ | node --input-type=module
+          if ($LASTEXITCODE -ne 0) { throw "Installed registry integrity does not match the candidate receipt" }
+          "receipt_digest=$digest" | Add-Content -LiteralPath $env:GITHUB_OUTPUT -Encoding utf8NoBOM
+          "receipt_path=$receipt" | Add-Content -LiteralPath $env:GITHUB_OUTPUT -Encoding utf8NoBOM
+          "install_log_path=$installLog" | Add-Content -LiteralPath $env:GITHUB_OUTPUT -Encoding utf8NoBOM
+
+      - name: Upload immutable sanitized public evidence only
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: public-install-${{ env.VERSION }}-${{ matrix.lane }}-${{ steps.verify.outputs.receipt_digest }}
+          path: |
+            ${{ steps.verify.outputs.receipt_path }}
+            ${{ steps.verify.outputs.receipt_path }}.sha256
+            ${{ steps.verify.outputs.install_log_path }}
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: State the external gate explicitly
+        shell: pwsh
+        run: |
+          @(
+            "### Read-only public candidate lane",
+            "Verified lane: `${{ matrix.lane }}`.",
+            "Receipt digest: `${{ steps.verify.outputs.receipt_digest }}`.",
+            "This workflow did not publish, move a dist-tag, promote, or exercise Claude Desktop.",
+            "All three immutable lane receipts and separately supplied actual Claude Desktop/macOS evidence remain prerequisites for protected client ingest."
+          ) | Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY -Encoding utf8NoBOM

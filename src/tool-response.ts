@@ -16,6 +16,7 @@ type ToolResponseInput = {
   readonly data: Record<string, unknown>
   readonly warnings: readonly string[]
   readonly sources?: readonly SourceMetadata[]
+  readonly databaseStatusMode?: "legacy_probe" | "caller_prevalidated"
 }
 
 export type MetricContract = {
@@ -43,25 +44,31 @@ export function compareMetricContracts(): readonly MetricContract[] {
 }
 
 export function toolResponse(input: ToolResponseInput): CallToolResult {
-  const databaseStatus = getDatabaseStatus()
-  const finalStatus = databaseStatus.kind === "missing" ? "missing_db" : input.status
-  const finalData =
-    databaseStatus.kind === "missing"
-      ? {
-          error: {
-            code: "missing_db",
-            message: "Local database file was not found.",
-            configured_database: "missing",
-          },
-        }
-      : input.data
-  const finalWarnings =
-    databaseStatus.kind === "missing"
-      ? [
-          ...input.warnings,
-          "Local database file was not found; the path is omitted from this response.",
-        ]
-      : input.warnings
+  let finalStatus = input.status
+  let finalData = input.data
+  let finalWarnings = input.warnings
+
+  if (input.databaseStatusMode !== "caller_prevalidated") {
+    const databaseStatus = getDatabaseStatus()
+    finalStatus = databaseStatus.kind === "missing" ? "missing_db" : input.status
+    finalData =
+      databaseStatus.kind === "missing"
+        ? {
+            error: {
+              code: "missing_db",
+              message: "Local database file was not found.",
+              configured_database: "missing",
+            },
+          }
+        : input.data
+    finalWarnings =
+      databaseStatus.kind === "missing"
+        ? [
+            ...input.warnings,
+            "Local database file was not found; the path is omitted from this response.",
+          ]
+        : input.warnings
+  }
   const response: Record<string, unknown> = {
     status: finalStatus,
     tool: input.tool,

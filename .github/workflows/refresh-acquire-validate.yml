@@ -1,0 +1,193 @@
+name: Refresh acquisition and validation
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 3 * * 1"
+
+concurrency:
+  group: refresh-acquire-validate
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  acquire-validate:
+    name: Read-only acquisition (Node 22)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      CANONICAL_SOURCE_PAGE: ${{ vars.ACADEMYINFO_15118998_CANONICAL_PAGE }}
+      SOURCE_POLICY_DIGEST: ${{ vars.ACADEMYINFO_REFRESH_POLICY_DIGEST }}
+      CANDIDATE_ROOT: ${{ runner.temp }}/refresh-candidate
+    steps:
+      # Pinned from the upstream v4 ref observed during workflow authoring.
+      - name: Check out the immutable triggering commit
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Install exact Node 22
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: "22"
+          cache: npm
+          registry-url: https://registry.npmjs.org/
+
+      - name: Bind the exact reviewed source page to the base policy
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(node -p 'process.versions.node.split(`.`)[0]')" = "22"
+          node --input-type=module <<'NODE'
+          import { createHash } from "node:crypto";
+          import { appendFileSync } from "node:fs";
+
+          const canonicalPage = process.env.CANONICAL_SOURCE_PAGE;
+          const policyDigest = process.env.SOURCE_POLICY_DIGEST;
+          const url = new URL(canonicalPage);
+          if (url.protocol !== "https:" || url.href !== canonicalPage ||
+              url.username || url.password || url.search || url.hash) {
+            throw new Error("Canonical source page must be an exact HTTPS URL without credentials, a query, or a fragment");
+          }
+          if (!/^[a-f0-9]{64}$/.test(policyDigest)) {
+            throw new Error("ACADEMYINFO_REFRESH_POLICY_DIGEST must be a lowercase SHA-256 digest");
+          }
+          const policyBindingJcs = JSON.stringify({
+            canonical_page_url: canonicalPage,
+            policy_digest: policyDigest,
+          });
+          const boundPolicyDigest = createHash("sha256").update(policyBindingJcs).digest("hex");
+          appendFileSync(process.env.GITHUB_ENV, `BOUND_SOURCE_POLICY_DIGEST=${boundPolicyDigest}\n`);
+          NODE
+
+      - name: Install the reviewed source tree
+        run: npm ci --ignore-scripts
+
+      - name: Require the bounded acquisition interface
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import { readFileSync } from "node:fs";
+          const pkg = JSON.parse(readFileSync("package.json", "utf8"));
+          for (const name of ["refresh:acquire-validate", "refresh:verify-artifact"]) {
+            if (typeof pkg.scripts?.[name] !== "string" || pkg.scripts[name].trim() === "") {
+              throw new Error(`Required fail-closed npm script is unavailable: ${name}`);
+            }
+          }
+          NODE
+
+      - name: Acquire, validate, and generate only sanitized candidates
+        id: acquisition
+        continue-on-error: true
+        env:
+          SOURCE_COMMIT: ${{ github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf "$CANDIDATE_ROOT"
+          mkdir -p "$CANDIDATE_ROOT"
+          npm run refresh:acquire-validate -- \
+            --canonical-page "$CANONICAL_SOURCE_PAGE" \
+            --source-commit "$SOURCE_COMMIT" \
+            --policy-digest "$BOUND_SOURCE_POLICY_DIGEST" \
+            --output "$CANDIDATE_ROOT"
+
+      - name: Independently enforce the sanitized artifact boundary
+        id: sanitize
+        if: always() && steps.acquisition.outcome != 'cancelled'
+        env:
+          SOURCE_COMMIT: ${{ github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run refresh:verify-artifact -- \
+            --artifact-root "$CANDIDATE_ROOT" \
+            --producer-workflow "Refresh acquisition and validation" \
+            --source-commit "$SOURCE_COMMIT" \
+            --policy-digest "$BOUND_SOURCE_POLICY_DIGEST" \
+            --mode acquisition
+          node --input-type=module <<'NODE'
+          import { lstatSync, readdirSync, readFileSync } from "node:fs";
+          import { join, relative, sep } from "node:path";
+
+          const root = process.env.CANDIDATE_ROOT;
+          const reportPath = join(root, "validation-report.v1.json");
+          const report = JSON.parse(readFileSync(reportPath, "utf8"));
+          const allowedExact = new Set([
+            "validation-report.v1.json",
+            "data/seed/academyinfo_15118998.sqlite",
+            "data/seed/academyinfo_15118998.manifest.json",
+            "data/seed/indicators.json",
+            "evidence/header-snapshots/15118998.headers.json",
+            "evidence/checksums/15118998.checksums.json",
+            "evidence/sample-rows/15118998.sample.json",
+          ]);
+          const auditPattern = /^evidence\/refresh\/15118998\.[a-f0-9]{12,64}\.audit\.json$/;
+          const forbiddenSuffix = /\.(?:xlsx?|xlsm|csv|zip|xml)$/i;
+          const files = [];
+          const walk = (dir) => {
+            for (const entry of readdirSync(dir)) {
+              const full = join(dir, entry);
+              const stat = lstatSync(full);
+              if (stat.isSymbolicLink()) throw new Error("Symlinks are forbidden in refresh artifacts");
+              if (stat.isDirectory()) walk(full);
+              else if (stat.isFile()) files.push(relative(root, full).split(sep).join("/"));
+              else throw new Error("Only regular files and directories are allowed");
+            }
+          };
+          walk(root);
+          for (const file of files) {
+            if (file.includes("..") || file.startsWith("/") || forbiddenSuffix.test(file)) {
+              throw new Error(`Forbidden artifact path: ${file}`);
+            }
+            if (!allowedExact.has(file) && !auditPattern.test(file)) {
+              throw new Error(`Unexpected artifact path: ${file}`);
+            }
+          }
+          if (report.producer_workflow !== "Refresh acquisition and validation" ||
+              report.source_commit !== process.env.SOURCE_COMMIT ||
+              report.canonical_page_url !== process.env.CANONICAL_SOURCE_PAGE ||
+              report.validation_policy_digest_v1 !== process.env.BOUND_SOURCE_POLICY_DIGEST ||
+              report.sanitized !== true ||
+              !["changed", "no_change", "failure"].includes(report.result)) {
+            throw new Error("Validation report identity or policy binding is invalid");
+          }
+          const serialized = JSON.stringify(report);
+          if (/15139279|file:\/\/|[?&](?:key|token|signature|x-amz-)[^" ]*|\/(?:Users|home)\//i.test(serialized)) {
+            throw new Error("Validation report contains prohibited dataset, query-secret, or private-path material");
+          }
+          if (report.result !== "changed" && files.some((path) => path !== "validation-report.v1.json")) {
+            throw new Error("Failure and no-change reports must not carry content-write candidates");
+          }
+          process.stdout.write(`result=${report.result}\n`);
+          NODE
+          node --input-type=module <<'NODE' >> "$GITHUB_OUTPUT"
+          import { readFileSync } from "node:fs";
+          const report = JSON.parse(readFileSync(`${process.env.CANDIDATE_ROOT}/validation-report.v1.json`, "utf8"));
+          process.stdout.write(`result=${report.result}\n`);
+          NODE
+
+      - name: Upload only the sanitized validation artifact
+        if: always() && steps.sanitize.outcome == 'success'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: refresh-candidate-${{ github.run_id }}
+          path: ${{ runner.temp }}/refresh-candidate
+          if-no-files-found: error
+          include-hidden-files: false
+          retention-days: 7
+          compression-level: 0
+
+      - name: Refuse acquisition failures
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "${{ steps.acquisition.outcome }}" = "success"
+          test "${{ steps.sanitize.outcome }}" = "success"
+          test "${{ steps.sanitize.outputs.result }}" != "failure"

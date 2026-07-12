@@ -31,9 +31,11 @@ const requiredScripts = [
 ] as const
 
 const expectedPackageFiles = [
-  "dist/**",
+  "dist/src/**",
+  "dist/scripts/doctor.js",
   "data/seed/academyinfo_15118998.sqlite",
   "data/seed/academyinfo_15118998.manifest.json",
+  "data/seed/indicators.json",
   "data/seed/LICENSE.15118998.md",
   "README.md",
   "LICENSE",
@@ -100,15 +102,15 @@ describe("Phase 1 scaffold", () => {
     expect(packageJson.bin).toEqual({ "academyinfo-mcp": "dist/src/index.js" })
     expect(packageJson.version).toBe("0.1.0")
     expect(packageJson.license).toBe("MIT")
-    expect(packageJson.engines?.node).toBe(">=22.0.0")
-    expect(packageJson.dependencies?.["@modelcontextprotocol/sdk"]).toMatch(/^\^\d+\.\d+\.\d+$/u)
-    expect(packageJson.dependencies?.["better-sqlite3"]).toMatch(/^\^11\.\d+\.\d+$/u)
-    expect(packageJson.dependencies?.pino).toMatch(/^\^\d+\.\d+\.\d+$/u)
-    expect(packageJson.dependencies?.zod).toMatch(/^\^\d+\.\d+\.\d+$/u)
-    expect(packageJson.devDependencies?.["@types/better-sqlite3"]).toMatch(/^\^\d+\.\d+\.\d+$/u)
-    expect(packageJson.devDependencies?.typescript).toEqual(expect.any(String))
-    expect(packageJson.devDependencies?.vitest).toEqual(expect.any(String))
-    expect(packageJson.devDependencies?.["@types/node"]).toEqual(expect.any(String))
+    expect(packageJson.engines?.node).toBe(">=22 <23")
+    expect(packageJson.dependencies?.["@modelcontextprotocol/sdk"]).toBe("1.29.0")
+    expect(packageJson.dependencies?.["better-sqlite3"]).toBe("11.10.0")
+    expect(packageJson.dependencies?.pino).toBe("10.3.1")
+    expect(packageJson.dependencies?.zod).toBe("4.4.3")
+    expect(packageJson.devDependencies?.["@types/better-sqlite3"]).toBe("7.6.13")
+    expect(packageJson.devDependencies?.typescript).toBe("6.0.3")
+    expect(packageJson.devDependencies?.vitest).toBe("4.1.9")
+    expect(packageJson.devDependencies?.["@types/node"]).toBe("22.20.1")
   })
 
   it("declares an npx-capable bin entry with a preserved shebang", async () => {
@@ -122,10 +124,10 @@ describe("Phase 1 scaffold", () => {
   it("documents from-source use as current and npx use as post-publish planned", async () => {
     const readme = await readFile(join(projectRoot, "README.md"), "utf8")
 
-    expect(readme).toContain("Requires Node >= 22 (LTS). Node 20 is EOL, best-effort only.")
-    expect(readme).toContain("For the current from-source checkout, point your MCP client at the built server.")
-    expect(readme).toContain("After npm publish (planned), the package command will be:")
-    expect(readme).toContain("Do not use the `npx -y academyinfo-mcp` form until the package has been published to npm.")
+    expect(readme).toContain("Use Node `>=22 <23`.")
+    expect(readme).toContain("The implemented local behavior can be exercised from a checkout:")
+    expect(readme).toContain("Only after an exact candidate version has actually been published")
+    expect(readme).toContain("Do not use an unversioned command")
   })
 
   it("uses test/ consistently without creating tests/", () => {

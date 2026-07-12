@@ -1,0 +1,659 @@
+name: Protected release promotion
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Exact candidate SemVer to promote
+        required: true
+        type: string
+      source_commit:
+        description: Candidate source commit recorded in both receipts
+        required: true
+        type: string
+      receipt_commit:
+        description: Protected default-branch commit containing immutable receipts
+        required: true
+        type: string
+      candidate_receipt_digest:
+        description: Immutable candidate.v1.json outer receipt digest
+        required: true
+        type: string
+      candidate_authorization_context_digest:
+        description: SHA-256 of the closed candidate authorization event/source context
+        required: true
+        type: string
+      client_receipt_digest:
+        description: Immutable claude-desktop.v1.json outer receipt digest
+        required: true
+        type: string
+      macos_arm64_receipt_digest:
+        description: Required macOS/arm64 public-lane receipt digest
+        required: true
+        type: string
+      windows_x64_receipt_digest:
+        description: Required Windows/x64 public-lane receipt digest
+        required: true
+        type: string
+      ubuntu_glibc_x64_receipt_digest:
+        description: Required Ubuntu glibc/x64 public-lane receipt digest
+        required: true
+        type: string
+      actual_claude_receipt_digest:
+        description: Required operator-supplied actual Claude Desktop receipt digest
+        required: true
+        type: string
+      generic_stdio_journey_digest:
+        description: Required generic stdio journey evidence receipt digest
+        required: true
+        type: string
+      freshness_transition_digest:
+        description: Verified open-incident CLIENT_VERIFIED predecessor receipt digest
+        required: true
+        type: string
+      promotion_authorization_digest:
+        description: Outer digest of the pre-existing administrator-approved promotion authorization
+        required: true
+        type: string
+      expected_previous_latest:
+        description: Receipt-recorded latest version before promotion
+        required: true
+        type: string
+      confirm_promote:
+        description: Type promote-receipt-bound-candidate
+        required: true
+        type: string
+
+concurrency:
+  group: academyinfo-mcp-registry-mutation
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  promote:
+    name: Join receipts and explicitly move latest (Node 22)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: npm-promotion
+    env:
+      RELEASE_ADMINISTRATOR: ${{ vars.ACADEMYINFO_RELEASE_ADMINISTRATOR }}
+      PACKAGE_NAME: academyinfo-mcp
+      VERSION: ${{ inputs.version }}
+      SOURCE_COMMIT: ${{ inputs.source_commit }}
+      RECEIPT_COMMIT: ${{ inputs.receipt_commit }}
+      CANDIDATE_RECEIPT_DIGEST: ${{ inputs.candidate_receipt_digest }}
+      CANDIDATE_AUTHORIZATION_CONTEXT_DIGEST: ${{ inputs.candidate_authorization_context_digest }}
+      CLIENT_RECEIPT_DIGEST: ${{ inputs.client_receipt_digest }}
+      MACOS_RECEIPT_DIGEST: ${{ inputs.macos_arm64_receipt_digest }}
+      WINDOWS_RECEIPT_DIGEST: ${{ inputs.windows_x64_receipt_digest }}
+      UBUNTU_RECEIPT_DIGEST: ${{ inputs.ubuntu_glibc_x64_receipt_digest }}
+      ACTUAL_CLAUDE_RECEIPT_DIGEST: ${{ inputs.actual_claude_receipt_digest }}
+      GENERIC_STDIO_JOURNEY_DIGEST: ${{ inputs.generic_stdio_journey_digest }}
+      FRESHNESS_TRANSITION_DIGEST: ${{ inputs.freshness_transition_digest }}
+      PROMOTION_AUTHORIZATION_DIGEST: ${{ inputs.promotion_authorization_digest }}
+      EXPECTED_PREVIOUS_LATEST: ${{ inputs.expected_previous_latest }}
+      CONFIRM_PROMOTE: ${{ inputs.confirm_promote }}
+      DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+      REPOSITORY: ${{ github.repository }}
+      TRUSTED_ORIGIN: https://github.com/${{ github.repository }}
+      TRUSTED_POLICY_COMMIT: ${{ github.sha }}
+      PUBLIC_INSTALL_VERIFIER_SHA256: ${{ vars.ACADEMYINFO_PUBLIC_INSTALL_VERIFIER_SHA256 }}
+      RELEASE_RECEIPT_VERIFIER_SHA256: ${{ vars.ACADEMYINFO_RELEASE_RECEIPT_VERIFIER_SHA256 }}
+      PUBLIC_INSTALL_VERIFIER: ${{ github.workspace }}/trusted-policy/scripts/public-installed-verify.mjs
+      RELEASE_RECEIPT_VERIFIER: ${{ github.workspace }}/trusted-policy/scripts/release-receipt-verify.mjs
+      NPM_CONFIG_REGISTRY: https://registry.npmjs.org/
+    steps:
+      - name: Validate dispatch and protected configuration before checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$CONFIRM_PROMOTE" = "promote-receipt-bound-candidate"
+          test "$VERSION" != "$EXPECTED_PREVIOUS_LATEST"
+          node --input-type=module <<'NODE'
+          const semver = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/;
+          const digest = /^[a-f0-9]{64}$/;
+          for (const key of ["VERSION", "EXPECTED_PREVIOUS_LATEST"]) if (!semver.test(process.env[key])) throw new Error(`${key} must be exact SemVer`);
+          for (const key of ["SOURCE_COMMIT", "RECEIPT_COMMIT", "TRUSTED_POLICY_COMMIT"]) if (!/^[a-f0-9]{40}$/.test(process.env[key])) throw new Error(`${key} must be a full commit`);
+          if (process.env.REPOSITORY !== "yousunjung84-edu/academyinfo-mcp") throw new Error("Unexpected GitHub repository");
+          if (!/^[A-Za-z0-9](?:[A-Za-z0-9._/-]{0,254})$/.test(process.env.DEFAULT_BRANCH) ||
+              process.env.DEFAULT_BRANCH.includes("..") || process.env.DEFAULT_BRANCH.includes("//") ||
+              process.env.DEFAULT_BRANCH.endsWith("/") || process.env.DEFAULT_BRANCH.endsWith(".")) {
+            throw new Error("DEFAULT_BRANCH is invalid");
+          }
+          if (process.env.TRUSTED_ORIGIN !== `https://github.com/${process.env.REPOSITORY}`) throw new Error("Unexpected trusted HTTPS origin");
+          for (const key of [
+            "CANDIDATE_RECEIPT_DIGEST", "CANDIDATE_AUTHORIZATION_CONTEXT_DIGEST", "CLIENT_RECEIPT_DIGEST",
+            "MACOS_RECEIPT_DIGEST", "WINDOWS_RECEIPT_DIGEST", "UBUNTU_RECEIPT_DIGEST",
+            "ACTUAL_CLAUDE_RECEIPT_DIGEST", "GENERIC_STDIO_JOURNEY_DIGEST", "FRESHNESS_TRANSITION_DIGEST",
+            "PROMOTION_AUTHORIZATION_DIGEST", "PUBLIC_INSTALL_VERIFIER_SHA256", "RELEASE_RECEIPT_VERIFIER_SHA256",
+          ]) if (!digest.test(process.env[key])) throw new Error(`${key} must be SHA-256`);
+          if (!/^[A-Za-z0-9](?:[A-Za-z0-9._@-]{0,127})$/.test(process.env.RELEASE_ADMINISTRATOR ?? "")) throw new Error("RELEASE_ADMINISTRATOR must be a protected safe identity");
+          NODE
+
+      - name: Check out the immutable protected receipt commit
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          ref: ${{ env.RECEIPT_COMMIT }}
+          path: trusted-receipts
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Check out trusted verifier policy separately
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          ref: ${{ github.sha }}
+          path: trusted-policy
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Install exact Node 22
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: "22"
+          registry-url: https://registry.npmjs.org/
+
+      - name: Validate repository origin and protected ancestry before consuming source or receipts
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(node -p 'process.versions.node.split(`.`)[0]')" = "22"
+          EXPECTED_ORIGIN="$TRUSTED_ORIGIN"
+          git check-ref-format --branch "$DEFAULT_BRANCH"
+          for checkout in trusted-receipts trusted-policy; do
+            case "$(git -C "$checkout" remote get-url origin)" in
+              "$EXPECTED_ORIGIN"|"$EXPECTED_ORIGIN.git") ;;
+              *) echo "Trusted checkout origin mismatch: $checkout" >&2; exit 1 ;;
+            esac
+          done
+          test "$(git -C trusted-receipts rev-parse HEAD)" = "$RECEIPT_COMMIT"
+          test "$(git -C trusted-policy rev-parse HEAD)" = "$TRUSTED_POLICY_COMMIT"
+          git -C trusted-policy fetch --no-tags "$EXPECTED_ORIGIN" \
+            "+refs/heads/$DEFAULT_BRANCH:refs/remotes/origin/$DEFAULT_BRANCH"
+          git -C trusted-policy merge-base --is-ancestor "$SOURCE_COMMIT" "refs/remotes/origin/$DEFAULT_BRANCH"
+          git -C trusted-policy merge-base --is-ancestor "$RECEIPT_COMMIT" "refs/remotes/origin/$DEFAULT_BRANCH"
+          test "$(git -C trusted-policy rev-parse "refs/remotes/origin/$DEFAULT_BRANCH")" = "$TRUSTED_POLICY_COMMIT"
+
+      - name: Verify trusted verifier bytes before execution or import
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f "$PUBLIC_INSTALL_VERIFIER" && test ! -L "$PUBLIC_INSTALL_VERIFIER"
+          test -f "$RELEASE_RECEIPT_VERIFIER" && test ! -L "$RELEASE_RECEIPT_VERIFIER"
+          node --input-type=module <<'NODE'
+          import { createHash } from "node:crypto";
+          import { readFileSync } from "node:fs";
+          for (const [pathKey, digestKey] of [
+            ["PUBLIC_INSTALL_VERIFIER", "PUBLIC_INSTALL_VERIFIER_SHA256"],
+            ["RELEASE_RECEIPT_VERIFIER", "RELEASE_RECEIPT_VERIFIER_SHA256"],
+          ]) {
+            const actual = createHash("sha256").update(readFileSync(process.env[pathKey])).digest("hex");
+            if (actual !== process.env[digestKey]) throw new Error(`${pathKey} protected byte SHA-256 mismatch`);
+          }
+          NODE
+
+      - name: Validate immutable candidate and actual-client receipt join
+        id: receipts
+        shell: bash
+        run: |
+          set -euo pipefail
+          RECEIPT_DIR="$GITHUB_WORKSPACE/trusted-receipts"
+          CANDIDATE_RECEIPT="$RECEIPT_DIR/evidence/releases/$VERSION/candidate.v1.json"
+          CANDIDATE_AUTHORIZATION="$RECEIPT_DIR/evidence/releases/$VERSION/candidate-authorization.v1.json"
+          CLIENT_RECEIPT="$RECEIPT_DIR/evidence/releases/$VERSION/claude-desktop.v1.json"
+          PROMOTION_AUTHORIZATION="$RECEIPT_DIR/evidence/releases/$VERSION/promotion-authorization.v1.json"
+          FRESHNESS_TRANSITION="$RECEIPT_DIR/evidence/releases/$VERSION/promotion-freshness-transition.v1.json"
+          test -f "$CANDIDATE_AUTHORIZATION"
+          test -f "$CANDIDATE_RECEIPT"
+          test -f "$CLIENT_RECEIPT"
+          test -f "$PROMOTION_AUTHORIZATION"
+          test -f "$FRESHNESS_TRANSITION"
+          test ! -L "$CANDIDATE_AUTHORIZATION"
+          test ! -L "$CANDIDATE_RECEIPT"
+          test ! -L "$CLIENT_RECEIPT"
+          test ! -L "$PROMOTION_AUTHORIZATION"
+          test ! -L "$FRESHNESS_TRANSITION"
+          CANDIDATE_BINDINGS="$RUNNER_TEMP/candidate-bindings"
+          CANDIDATE_RECEIPT="$CANDIDATE_RECEIPT" CANDIDATE_BINDINGS="$CANDIDATE_BINDINGS" node --input-type=module <<'NODE'
+          import { readFileSync, writeFileSync } from "node:fs";
+          import { pathToFileURL } from "node:url";
+          const { parseJsonStrict } = await import(pathToFileURL(process.env.PUBLIC_INSTALL_VERIFIER).href);
+          const { validReceiptIntegrity } = await import(pathToFileURL(process.env.RELEASE_RECEIPT_VERIFIER).href);
+          const receipt = parseJsonStrict(readFileSync(process.env.CANDIDATE_RECEIPT, "utf8"));
+          const predecessors = receipt.evidence_payload_v1?.predecessor_receipt_digests;
+          const integrity = receipt.evidence_payload_v1?.package_integrity;
+          if (!Array.isArray(predecessors) || predecessors.length !== 1 ||
+              !/^[a-f0-9]{64}$/.test(predecessors[0]) || !validReceiptIntegrity(integrity)) {
+            throw new Error("Candidate predecessor or exact sha512 integrity is invalid");
+          }
+          writeFileSync(process.env.CANDIDATE_BINDINGS, `${predecessors[0]}\n${integrity}\n`, { mode: 0o600 });
+          NODE
+          mapfile -t CANDIDATE_VALUES < "$CANDIDATE_BINDINGS"
+          test "${#CANDIDATE_VALUES[@]}" -eq 2
+          CANDIDATE_PREDECESSOR="${CANDIDATE_VALUES[0]}"
+          CANDIDATE_PACKAGE_INTEGRITY="${CANDIDATE_VALUES[1]}"
+          node "$RELEASE_RECEIPT_VERIFIER" \
+            --receipt "$CANDIDATE_RECEIPT" \
+            --kind candidate \
+            --expected-digest "$CANDIDATE_RECEIPT_DIGEST" \
+            --expected-predecessor "$CANDIDATE_PREDECESSOR" \
+            --source-commit "$SOURCE_COMMIT" \
+            --package-name "$PACKAGE_NAME" \
+            --package-version "$VERSION" \
+            --package-integrity "$CANDIDATE_PACKAGE_INTEGRITY" \
+            --expected-approver "$RELEASE_ADMINISTRATOR" \
+            --previous-latest "$EXPECTED_PREVIOUS_LATEST"
+          node "$RELEASE_RECEIPT_VERIFIER" \
+            --receipt "$CANDIDATE_AUTHORIZATION" \
+            --kind candidate-authorization \
+            --expected-digest "$CANDIDATE_PREDECESSOR" \
+            --expected-authorization-context-digest "$CANDIDATE_AUTHORIZATION_CONTEXT_DIGEST" \
+            --source-commit "$SOURCE_COMMIT" \
+            --package-name "$PACKAGE_NAME" \
+            --package-version "$VERSION" \
+            --expected-approver "$RELEASE_ADMINISTRATOR" \
+            --previous-latest "$EXPECTED_PREVIOUS_LATEST"
+          node "$RELEASE_RECEIPT_VERIFIER" \
+            --receipt "$CLIENT_RECEIPT" \
+            --kind client \
+            --expected-digest "$CLIENT_RECEIPT_DIGEST" \
+            --expected-predecessor "$CANDIDATE_RECEIPT_DIGEST" \
+            --source-commit "$SOURCE_COMMIT" \
+            --package-name "$PACKAGE_NAME" \
+            --package-version "$VERSION" \
+            --package-integrity "$CANDIDATE_PACKAGE_INTEGRITY" \
+            --expected-approver "$RELEASE_ADMINISTRATOR" \
+            --previous-latest "$EXPECTED_PREVIOUS_LATEST"
+          CANDIDATE_RECEIPT="$CANDIDATE_RECEIPT" CANDIDATE_AUTHORIZATION="$CANDIDATE_AUTHORIZATION" CANDIDATE_PREDECESSOR="$CANDIDATE_PREDECESSOR" CANDIDATE_PACKAGE_INTEGRITY="$CANDIDATE_PACKAGE_INTEGRITY" CLIENT_RECEIPT="$CLIENT_RECEIPT" FRESHNESS_TRANSITION="$FRESHNESS_TRANSITION" PROMOTION_AUTHORIZATION="$PROMOTION_AUTHORIZATION" node --input-type=module <<'NODE' >> "$GITHUB_OUTPUT"
+          import { readFileSync } from "node:fs";
+          import { pathToFileURL } from "node:url";
+          const { canonicalizeJcs, parseJsonStrict, sha256Jcs } =
+            await import(pathToFileURL(process.env.PUBLIC_INSTALL_VERIFIER).href);
+          const { releaseTransitionDigest } =
+            await import(pathToFileURL(process.env.RELEASE_RECEIPT_VERIFIER).href);
+          const exactKeys = (value, keys) =>
+            value !== null && typeof value === "object" && !Array.isArray(value) &&
+            JSON.stringify(Object.keys(value).sort()) === JSON.stringify([...keys].sort());
+          const canonicalUtc = (value) => {
+            if (typeof value !== "string" ||
+                !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(value)) return false;
+            const milliseconds = Date.parse(value);
+            return Number.isFinite(milliseconds) && new Date(milliseconds).toISOString() === value;
+          };
+          const candidate = parseJsonStrict(readFileSync(process.env.CANDIDATE_RECEIPT, "utf8"));
+          const candidateAuthorization = parseJsonStrict(readFileSync(process.env.CANDIDATE_AUTHORIZATION, "utf8"));
+          const client = parseJsonStrict(readFileSync(process.env.CLIENT_RECEIPT, "utf8"));
+          const authorization = parseJsonStrict(readFileSync(process.env.PROMOTION_AUTHORIZATION, "utf8"));
+          const freshness = parseJsonStrict(readFileSync(process.env.FRESHNESS_TRANSITION, "utf8"));
+          const a = candidate.evidence_payload_v1;
+          const b = client.evidence_payload_v1;
+          if (a.transition !== "candidate" || b.transition !== "client" ||
+              a.package_name !== process.env.PACKAGE_NAME || b.package_name !== process.env.PACKAGE_NAME ||
+              a.package_version !== process.env.VERSION || b.package_version !== process.env.VERSION ||
+              a.source_commit !== process.env.SOURCE_COMMIT || b.source_commit !== process.env.SOURCE_COMMIT ||
+              a.package_integrity !== process.env.CANDIDATE_PACKAGE_INTEGRITY ||
+              a.package_integrity !== b.package_integrity ||
+              a.previous_latest_version !== process.env.EXPECTED_PREVIOUS_LATEST ||
+              JSON.stringify(a.predecessor_receipt_digests) !== JSON.stringify([process.env.CANDIDATE_PREDECESSOR]) ||
+              JSON.stringify(b.predecessor_receipt_digests) !== JSON.stringify([process.env.CANDIDATE_RECEIPT_DIGEST])) {
+            throw new Error("Candidate/client receipt identity join failed");
+          }
+          const candidateAuthorizationPayload = candidateAuthorization.release_transition_evidence_payload_v1;
+          if (candidateAuthorizationPayload?.transition !== "candidate-authorization" ||
+              candidateAuthorization.release_transition_receipt_digest_v1 !== process.env.CANDIDATE_PREDECESSOR ||
+              !/^(?:source|acquisition|availability):v1:[a-f0-9]{64}$/.test(candidateAuthorizationPayload.event_id) ||
+              !/^[a-f0-9]{64}$/.test(candidateAuthorizationPayload.release_data_digest_v1)) {
+            throw new Error("Candidate authorization does not control source event and release_data_digest_v1");
+          }
+          const candidateReleaseDataDigest = candidateAuthorizationPayload.release_data_digest_v1;
+          const candidateTransitionDigest = releaseTransitionDigest({
+            transition_schema_version: 1,
+            event_id: candidateAuthorizationPayload.event_id,
+            predecessor_transition_digest: candidateAuthorizationPayload.prior_transition_digest,
+            state: "CANDIDATE_PUBLISHED",
+            occurred_at: candidate.approval.approved_at,
+            receipt_digest: process.env.CANDIDATE_RECEIPT_DIGEST,
+          });
+          const clientTransitionDigest = releaseTransitionDigest({
+            transition_schema_version: 1,
+            event_id: candidateAuthorizationPayload.event_id,
+            predecessor_transition_digest: candidateTransitionDigest,
+            state: "CLIENT_VERIFIED",
+            occurred_at: client.approval.approved_at,
+            receipt_digest: process.env.CLIENT_RECEIPT_DIGEST,
+          });
+          const requiredEvidence = [
+            { kind: "actual-claude-desktop", digest: process.env.ACTUAL_CLAUDE_RECEIPT_DIGEST },
+            { kind: "generic-stdio-journey", digest: process.env.GENERIC_STDIO_JOURNEY_DIGEST },
+            { kind: "public-install-macos-arm64", digest: process.env.MACOS_RECEIPT_DIGEST },
+            { kind: "public-install-ubuntu-glibc-x64", digest: process.env.UBUNTU_RECEIPT_DIGEST },
+            { kind: "public-install-windows-x64", digest: process.env.WINDOWS_RECEIPT_DIGEST },
+          ];
+          if (canonicalizeJcs(b.evidence_digests) !== canonicalizeJcs(requiredEvidence)) {
+            throw new Error("Promotion requires exactly the generic stdio journey, three public lanes, and actual Claude Desktop evidence");
+          }
+          if (!exactKeys(freshness, [
+            "receipt_schema_version", "freshness_transition_payload_v1",
+            "freshness_transition_payload_digest_v1", "administrator_attestation", "receipt_digest_v1",
+          ]) || freshness.receipt_schema_version !== "promotion-freshness-transition-receipt.v1") {
+            throw new Error("Promotion freshness transition shape mismatch");
+          }
+          const freshnessPayload = freshness.freshness_transition_payload_v1;
+          const freshnessPayloadDigest = freshness.freshness_transition_payload_digest_v1;
+          if (!exactKeys(freshnessPayload, [
+            "schema_version", "transition", "event_id", "transition_digest", "prior_transition_digest",
+            "first_seen_at", "deadline_at", "release_data_digest_v1",
+            "package_name", "package_version", "package_integrity", "source_commit",
+            "previous_latest_version", "candidate_receipt_digest", "client_receipt_digest",
+          ]) || freshnessPayload.schema_version !== "promotion-freshness-transition-payload.v1" ||
+              freshnessPayload.transition !== "CLIENT_VERIFIED" ||
+              !/^(?:source|acquisition|availability):v1:[a-f0-9]{64}$/.test(freshnessPayload.event_id) ||
+              freshnessPayload.transition_digest !== clientTransitionDigest ||
+              freshnessPayload.prior_transition_digest !== candidateTransitionDigest ||
+              !canonicalUtc(freshnessPayload.first_seen_at) ||
+              !canonicalUtc(freshnessPayload.deadline_at) ||
+              Date.parse(freshnessPayload.deadline_at) - Date.parse(freshnessPayload.first_seen_at) !== 604800000 ||
+              freshnessPayload.release_data_digest_v1 !== candidateReleaseDataDigest ||
+              freshnessPayload.event_id !== candidateAuthorizationPayload.event_id ||
+              freshnessPayload.first_seen_at !== candidateAuthorizationPayload.first_seen_at ||
+              freshnessPayload.deadline_at !== candidateAuthorizationPayload.deadline_at ||
+              freshnessPayload.package_name !== process.env.PACKAGE_NAME ||
+              freshnessPayload.package_version !== process.env.VERSION ||
+              freshnessPayload.package_integrity !== a.package_integrity ||
+              freshnessPayload.source_commit !== process.env.SOURCE_COMMIT ||
+              freshnessPayload.previous_latest_version !== process.env.EXPECTED_PREVIOUS_LATEST ||
+              freshnessPayload.candidate_receipt_digest !== process.env.CANDIDATE_RECEIPT_DIGEST ||
+              freshnessPayload.client_receipt_digest !== process.env.CLIENT_RECEIPT_DIGEST ||
+              sha256Jcs(freshnessPayload) !== freshnessPayloadDigest) {
+            throw new Error("Promotion freshness transition does not bind the event and release-data identity");
+          }
+          const freshnessApproval = freshness.administrator_attestation;
+          if (!exactKeys(freshnessApproval, [
+            "role", "identity", "approved_at", "decision",
+            "freshness_transition_payload_digest_v1", "attestation_digest",
+          ]) || freshnessApproval.role !== "administrator" || typeof freshnessApproval.identity !== "string" ||
+              freshnessApproval.identity !== process.env.RELEASE_ADMINISTRATOR ||
+              !canonicalUtc(freshnessApproval.approved_at) ||
+              freshnessApproval.decision !== "promotion-open-predecessor" ||
+              freshnessApproval.freshness_transition_payload_digest_v1 !== freshnessPayloadDigest) {
+            throw new Error("Promotion freshness administrator attestation is missing or unbound");
+          }
+          const { attestation_digest: freshnessAttestationDigest, ...freshnessAttestationProjection } = freshnessApproval;
+          const { receipt_digest_v1: freshnessDigest, ...freshnessProjection } = freshness;
+          if (sha256Jcs(freshnessAttestationProjection) !== freshnessAttestationDigest ||
+              sha256Jcs(freshnessProjection) !== freshnessDigest ||
+              freshnessDigest !== process.env.FRESHNESS_TRANSITION_DIGEST) {
+            throw new Error("Promotion freshness transition digest verification failed");
+          }
+          if (!exactKeys(authorization, [
+            "receipt_schema_version", "promotion_authorization_payload_v1",
+            "promotion_authorization_payload_digest_v1", "administrator_attestation", "receipt_digest_v1",
+          ]) || authorization.receipt_schema_version !== "promotion-authorization-receipt.v1") {
+            throw new Error("Promotion authorization shape mismatch");
+          }
+          const payload = authorization.promotion_authorization_payload_v1;
+          const payloadDigest = authorization.promotion_authorization_payload_digest_v1;
+          if (!exactKeys(payload, [
+            "schema_version", "transition", "package_name", "package_version", "package_integrity",
+            "source_commit", "previous_latest_version", "candidate_receipt_digest", "client_receipt_digest",
+            "public_lane_receipt_digests", "actual_claude_receipt_digest", "freshness_transition_digest",
+            "event_id", "release_data_digest_v1", "predecessor_transition_digest", "first_seen_at", "deadline_at",
+          ]) || payload.schema_version !== "promotion-authorization-payload.v1" || payload.transition !== "promotion" ||
+              payload.package_name !== process.env.PACKAGE_NAME || payload.package_version !== process.env.VERSION ||
+              payload.package_integrity !== a.package_integrity || payload.source_commit !== process.env.SOURCE_COMMIT ||
+              payload.previous_latest_version !== process.env.EXPECTED_PREVIOUS_LATEST ||
+              payload.candidate_receipt_digest !== process.env.CANDIDATE_RECEIPT_DIGEST ||
+              payload.client_receipt_digest !== process.env.CLIENT_RECEIPT_DIGEST ||
+              payload.actual_claude_receipt_digest !== process.env.ACTUAL_CLAUDE_RECEIPT_DIGEST ||
+              payload.freshness_transition_digest !== process.env.FRESHNESS_TRANSITION_DIGEST ||
+              payload.event_id !== freshnessPayload.event_id ||
+              payload.release_data_digest_v1 !== freshnessPayload.release_data_digest_v1 ||
+              payload.predecessor_transition_digest !== freshnessPayload.transition_digest ||
+              payload.first_seen_at !== freshnessPayload.first_seen_at ||
+              payload.deadline_at !== freshnessPayload.deadline_at ||
+              canonicalizeJcs(payload.public_lane_receipt_digests) !== canonicalizeJcs({
+                "macos-arm64": process.env.MACOS_RECEIPT_DIGEST,
+                "ubuntu-glibc-x64": process.env.UBUNTU_RECEIPT_DIGEST,
+                "windows-x64": process.env.WINDOWS_RECEIPT_DIGEST,
+              }) || sha256Jcs(payload) !== payloadDigest) {
+            throw new Error("Promotion authorization payload is forged or does not bind the complete evidence set");
+          }
+          const approval = authorization.administrator_attestation;
+          if (!exactKeys(approval, [
+            "role", "identity", "approved_at", "decision",
+            "promotion_authorization_payload_digest_v1", "attestation_digest",
+          ]) || approval.role !== "administrator" || typeof approval.identity !== "string" ||
+              approval.identity !== process.env.RELEASE_ADMINISTRATOR ||
+              !canonicalUtc(approval.approved_at) || approval.decision !== "promotion" ||
+              approval.promotion_authorization_payload_digest_v1 !== payloadDigest) {
+            throw new Error("Pre-existing administrator promotion approval is missing or unbound");
+          }
+          const { attestation_digest: attestationDigest, ...attestationProjection } = approval;
+          const { receipt_digest_v1: authorizationDigest, ...authorizationProjection } = authorization;
+          if (sha256Jcs(attestationProjection) !== attestationDigest ||
+              sha256Jcs(authorizationProjection) !== authorizationDigest ||
+              authorizationDigest !== process.env.PROMOTION_AUTHORIZATION_DIGEST) {
+            throw new Error("Promotion authorization digest verification failed");
+          }
+          const firstSeenMilliseconds = Date.parse(freshnessPayload.first_seen_at);
+          const deadlineMilliseconds = Date.parse(freshnessPayload.deadline_at);
+          const approvalTimes = [
+            ["candidate", candidate.approval?.approved_at],
+            ["client", client.approval?.approved_at],
+            ["freshness administrator", freshnessApproval.approved_at],
+            ["promotion authorization", approval.approved_at],
+          ];
+          for (const [name, timestamp] of approvalTimes) {
+            if (!canonicalUtc(timestamp)) throw new Error(`${name} approval time must be canonical UTC`);
+            const milliseconds = Date.parse(timestamp);
+            if (milliseconds < firstSeenMilliseconds || milliseconds > deadlineMilliseconds) {
+              throw new Error(`${name} approval time is outside the immutable authorization window`);
+            }
+          }
+          const candidateApprovalMilliseconds = Date.parse(approvalTimes[0][1]);
+          const clientApprovalMilliseconds = Date.parse(approvalTimes[1][1]);
+          const freshnessApprovalMilliseconds = Date.parse(approvalTimes[2][1]);
+          const promotionApprovalMilliseconds = Date.parse(approvalTimes[3][1]);
+          if (!(candidateApprovalMilliseconds < clientApprovalMilliseconds &&
+                clientApprovalMilliseconds <= freshnessApprovalMilliseconds &&
+                freshnessApprovalMilliseconds <= promotionApprovalMilliseconds)) {
+            throw new Error("Approval order must be candidate < client <= freshness administrator <= promotion authorization");
+          }
+          const maximumClockSkewMilliseconds = 5 * 60 * 1000;
+          const trustedCurrentMilliseconds = Date.now();
+          if (trustedCurrentMilliseconds > deadlineMilliseconds) {
+            throw new Error("Promotion authorization deadline has expired");
+          }
+          for (const [name, timestamp] of approvalTimes) {
+            if (Date.parse(timestamp) > trustedCurrentMilliseconds + maximumClockSkewMilliseconds) {
+              throw new Error(`${name} approval time is too far in the future`);
+            }
+          }
+          const outputSafe = (value) => typeof value === "string" && value.length <= 1024 &&
+            value.trim() === value && /^[^\u0000-\u001f\u007f]+$/u.test(value);
+          for (const [name, value] of Object.entries({
+            package_integrity: process.env.CANDIDATE_PACKAGE_INTEGRITY,
+            event_id: freshnessPayload.event_id,
+            release_data_digest: candidateReleaseDataDigest,
+            predecessor_transition_digest: freshnessPayload.transition_digest,
+            first_seen_at: freshnessPayload.first_seen_at,
+            deadline_at: freshnessPayload.deadline_at,
+            promotion_approved_at: approval.approved_at,
+          })) {
+            if (!outputSafe(value)) throw new Error(`Receipt-controlled ${name} is not output-safe`);
+            process.stdout.write(`${name}=${value}\n`);
+          }
+          NODE
+
+      - name: Re-fetch registry state and accept only the authorized promotion boundary
+        id: registry
+        env:
+          DEADLINE_AT: ${{ steps.receipts.outputs.deadline_at }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          CANDIDATE="$(npm view "$PACKAGE_NAME" dist-tags.candidate --json | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>process.stdout.write(JSON.parse(s)))')"
+          LATEST="$(npm view "$PACKAGE_NAME" dist-tags.latest --json | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>process.stdout.write(JSON.parse(s)))')"
+          INTEGRITY="$(npm view "$PACKAGE_NAME@$VERSION" dist.integrity --json | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>process.stdout.write(JSON.parse(s)))')"
+          test "$CANDIDATE" = "$VERSION"
+          test "$INTEGRITY" = "${{ steps.receipts.outputs.package_integrity }}"
+          case "$LATEST" in
+            "$EXPECTED_PREVIOUS_LATEST") PROMOTE_REQUIRED=true ;;
+            "$VERSION") PROMOTE_REQUIRED=false ;;
+            *) echo "Latest is neither the authorized predecessor nor exact promotion version" >&2; exit 1 ;;
+          esac
+          DEADLINE_AT="$DEADLINE_AT" node --input-type=module <<'NODE'
+          const canonicalUtc = (value) => {
+            if (typeof value !== "string" ||
+                !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(value)) return false;
+            const milliseconds = Date.parse(value);
+            return Number.isFinite(milliseconds) && new Date(milliseconds).toISOString() === value;
+          };
+          if (!canonicalUtc(process.env.DEADLINE_AT) ||
+              Date.now() > Date.parse(process.env.DEADLINE_AT)) {
+            throw new Error("Promotion authorization expired before registry state acceptance");
+          }
+          NODE
+          {
+            echo "observed_latest=$LATEST"
+            echo "promote_required=$PROMOTE_REQUIRED"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Explicitly promote the exact version to latest
+        if: steps.registry.outputs.promote_required == 'true'
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_RELEASE_TOKEN }}
+          DEADLINE_AT: ${{ steps.receipts.outputs.deadline_at }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$NODE_AUTH_TOKEN"
+          DEADLINE_AT="$DEADLINE_AT" node --input-type=module <<'NODE'
+          const canonicalUtc = (value) => {
+            if (typeof value !== "string" ||
+                !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(value)) return false;
+            const milliseconds = Date.parse(value);
+            return Number.isFinite(milliseconds) && new Date(milliseconds).toISOString() === value;
+          };
+          if (!canonicalUtc(process.env.DEADLINE_AT) ||
+              Date.now() > Date.parse(process.env.DEADLINE_AT)) {
+            throw new Error("Promotion authorization expired before registry mutation");
+          }
+          NODE
+          npm dist-tag add "$PACKAGE_NAME@$VERSION" latest
+
+      - name: Verify registry mutation, then create and verify PROMOTED_CLOSED completion
+        env:
+          EVENT_ID: ${{ steps.receipts.outputs.event_id }}
+          RELEASE_DATA_DIGEST: ${{ steps.receipts.outputs.release_data_digest }}
+          PREDECESSOR_TRANSITION_DIGEST: ${{ steps.receipts.outputs.predecessor_transition_digest }}
+          FIRST_SEEN_AT: ${{ steps.receipts.outputs.first_seen_at }}
+          DEADLINE_AT: ${{ steps.receipts.outputs.deadline_at }}
+          PROMOTION_APPROVED_AT: ${{ steps.receipts.outputs.promotion_approved_at }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          LATEST="$(npm view "$PACKAGE_NAME" dist-tags.latest --json | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>process.stdout.write(JSON.parse(s)))')"
+          INTEGRITY="$(npm view "$PACKAGE_NAME@$VERSION" dist.integrity --json | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>process.stdout.write(JSON.parse(s)))')"
+          test "$LATEST" = "$VERSION"
+          test "$INTEGRITY" = "${{ steps.receipts.outputs.package_integrity }}"
+          COMPLETION="$RUNNER_TEMP/promotion.v1.json"
+          COMPLETION="$COMPLETION" REGISTRY_INTEGRITY="$INTEGRITY" node --input-type=module <<'NODE'
+          import { writeFileSync, readFileSync } from "node:fs";
+          import { pathToFileURL } from "node:url";
+          const { canonicalizeJcs, parseJsonStrict, sha256Jcs } =
+            await import(pathToFileURL(process.env.PUBLIC_INSTALL_VERIFIER).href);
+          const exactKeys = (value, keys) => value !== null && typeof value === "object" && !Array.isArray(value) &&
+            JSON.stringify(Object.keys(value).sort()) === JSON.stringify([...keys].sort());
+          const firstSeenMilliseconds = Date.parse(process.env.FIRST_SEEN_AT);
+          const promotionApprovedMilliseconds = Date.parse(process.env.PROMOTION_APPROVED_AT);
+          const deadlineMilliseconds = Date.parse(process.env.DEADLINE_AT);
+          const verifiedAt = new Date().toISOString();
+          const verifiedAtMilliseconds = Date.parse(verifiedAt);
+          const canonicalUtc = (value) => typeof value === "string" &&
+            /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(value) &&
+            Number.isFinite(Date.parse(value)) &&
+            new Date(Date.parse(value)).toISOString() === value;
+          if (!canonicalUtc(process.env.FIRST_SEEN_AT) ||
+              !canonicalUtc(process.env.PROMOTION_APPROVED_AT) ||
+              !canonicalUtc(process.env.DEADLINE_AT) ||
+              verifiedAtMilliseconds < firstSeenMilliseconds ||
+              verifiedAtMilliseconds < promotionApprovedMilliseconds ||
+              verifiedAtMilliseconds > deadlineMilliseconds) {
+            throw new Error("Promotion authorization expired before completion recovery or is not ordered");
+          }
+          const payload = {
+            schema_version: "promotion-completion-payload.v1",
+            transition: "PROMOTED_CLOSED",
+            event_id: process.env.EVENT_ID,
+            prior_transition_digest: process.env.PREDECESSOR_TRANSITION_DIGEST,
+            first_seen_at: process.env.FIRST_SEEN_AT,
+            deadline_at: process.env.DEADLINE_AT,
+            release_data_digest_v1: process.env.RELEASE_DATA_DIGEST,
+            package_name: process.env.PACKAGE_NAME,
+            package_version: process.env.VERSION,
+            package_integrity: process.env.REGISTRY_INTEGRITY,
+            source_commit: process.env.SOURCE_COMMIT,
+            previous_latest_version: process.env.EXPECTED_PREVIOUS_LATEST,
+            predecessor_receipt_digests: [process.env.CLIENT_RECEIPT_DIGEST, process.env.FRESHNESS_TRANSITION_DIGEST],
+            candidate_receipt_digest: process.env.CANDIDATE_RECEIPT_DIGEST,
+            authorization_receipt_digest: process.env.PROMOTION_AUTHORIZATION_DIGEST,
+          };
+          const payloadDigest = sha256Jcs(payload);
+          const registryVerification = {
+            registry: "https://registry.npmjs.org/",
+            latest_version: process.env.VERSION,
+            package_integrity: process.env.REGISTRY_INTEGRITY,
+            verified_at: verifiedAt,
+          };
+          const projection = {
+            receipt_schema_version: "promotion-completion-receipt.v1",
+            promotion_completion_payload_v1: payload,
+            promotion_completion_payload_digest_v1: payloadDigest,
+            registry_verification: registryVerification,
+          };
+          const receipt = { ...projection, receipt_digest_v1: sha256Jcs(projection) };
+          writeFileSync(process.env.COMPLETION, `${JSON.stringify(receipt, null, 2)}\n`, { mode: 0o600 });
+
+          const verified = parseJsonStrict(readFileSync(process.env.COMPLETION, "utf8"));
+          const { receipt_digest_v1: verifiedReceiptDigest, ...verifiedProjection } = verified;
+          if (!exactKeys(verified, [
+            "receipt_schema_version", "promotion_completion_payload_v1",
+            "promotion_completion_payload_digest_v1", "registry_verification", "receipt_digest_v1",
+          ]) || verified.receipt_schema_version !== "promotion-completion-receipt.v1" ||
+              !exactKeys(verified.promotion_completion_payload_v1, Object.keys(payload)) ||
+              canonicalizeJcs(verified.promotion_completion_payload_v1.predecessor_receipt_digests) !==
+                canonicalizeJcs([process.env.CLIENT_RECEIPT_DIGEST, process.env.FRESHNESS_TRANSITION_DIGEST]) ||
+              verified.promotion_completion_payload_v1.event_id !== process.env.EVENT_ID ||
+              verified.promotion_completion_payload_v1.release_data_digest_v1 !== process.env.RELEASE_DATA_DIGEST ||
+              verified.promotion_completion_payload_v1.prior_transition_digest !== process.env.PREDECESSOR_TRANSITION_DIGEST ||
+              verified.promotion_completion_payload_v1.package_integrity !== process.env.REGISTRY_INTEGRITY ||
+              sha256Jcs(verified.promotion_completion_payload_v1) !== verified.promotion_completion_payload_digest_v1 ||
+              !exactKeys(verified.registry_verification, ["registry", "latest_version", "package_integrity", "verified_at"]) ||
+              verified.registry_verification.registry !== "https://registry.npmjs.org/" ||
+              verified.registry_verification.latest_version !== process.env.VERSION ||
+              verified.registry_verification.package_integrity !== process.env.REGISTRY_INTEGRITY ||
+              !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(verified.registry_verification.verified_at) ||
+              new Date(Date.parse(verified.registry_verification.verified_at)).toISOString() !== verified.registry_verification.verified_at ||
+              sha256Jcs(verifiedProjection) !== verifiedReceiptDigest) {
+            throw new Error("PROMOTED_CLOSED completion verification failed");
+          }
+          NODE
+          {
+            echo "### Promotion transition"
+            if test "${{ steps.registry.outputs.promote_required }}" = "true"; then
+              echo "Explicitly moved \`latest\` from \`$EXPECTED_PREVIOUS_LATEST\` to \`$VERSION\` and reverified its receipt-controlled integrity."
+            else
+              echo "Recovered the already-promoted exact \`$VERSION\` state and reverified its receipt-controlled integrity without another registry mutation."
+            fi
+            echo "Created \`promotion.v1.json\` after exact registry verification and bound it to event \`${{ steps.receipts.outputs.event_id }}\`, release data \`${{ steps.receipts.outputs.release_data_digest }}\`, and predecessor \`${{ steps.receipts.outputs.predecessor_transition_digest }}\`."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload post-mutation promotion completion
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: promotion-${{ env.VERSION }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/promotion.v1.json
+          if-no-files-found: error
+          retention-days: 90

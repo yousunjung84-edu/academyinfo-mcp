@@ -1,0 +1,325 @@
+name: Refresh fixed-path PR writer
+
+on:
+  workflow_run:
+    workflows: ["Refresh acquisition and validation"]
+    types: [completed]
+
+concurrency:
+  group: refresh-write-pr-${{ github.event.workflow_run.id }}
+  cancel-in-progress: false
+
+permissions: {}
+
+jobs:
+  inspect-read-only:
+    name: Verify named producer artifact without write authority
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.name == 'Refresh acquisition and validation' &&
+      github.event.workflow_run.event != 'pull_request' &&
+      github.event.workflow_run.head_branch == github.event.repository.default_branch
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      actions: read
+      contents: read
+    outputs:
+      result: ${{ steps.report.outputs.result }}
+      source_commit: ${{ steps.report.outputs.source_commit }}
+      report_digest: ${{ steps.report.outputs.report_digest }}
+    env:
+      ARTIFACT_ROOT: ${{ runner.temp }}/producer-artifact
+      SOURCE_COMMIT: ${{ github.event.workflow_run.head_sha }}
+      SOURCE_POLICY_DIGEST: ${{ vars.ACADEMYINFO_REFRESH_POLICY_DIGEST }}
+      CANONICAL_SOURCE_PAGE: ${{ vars.ACADEMYINFO_15118998_CANONICAL_PAGE }}
+    steps:
+      - name: Check out only the producer's immutable source commit
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Install exact Node 22
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Bind reviewed source policy and establish the trusted validator
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(node -p 'process.versions.node.split(`.`)[0]')" = "22"
+          test "$SOURCE_COMMIT" = "${{ github.event.workflow_run.head_sha }}"
+          node --input-type=module <<'NODE'
+          import { createHash } from "node:crypto";
+          import { appendFileSync } from "node:fs";
+
+          const canonicalPage = process.env.CANONICAL_SOURCE_PAGE;
+          const policyDigest = process.env.SOURCE_POLICY_DIGEST;
+          const url = new URL(canonicalPage);
+          if (url.protocol !== "https:" || url.href !== canonicalPage ||
+              url.username || url.password || url.search || url.hash) {
+            throw new Error("Canonical source page must be an exact HTTPS URL without credentials, a query, or a fragment");
+          }
+          if (!/^[a-f0-9]{64}$/.test(policyDigest)) {
+            throw new Error("Missing reviewed base policy digest");
+          }
+          if (!/^[a-f0-9]{40}$/.test(process.env.SOURCE_COMMIT)) {
+            throw new Error("Invalid source commit");
+          }
+          const policyBindingJcs = JSON.stringify({
+            canonical_page_url: canonicalPage,
+            policy_digest: policyDigest,
+          });
+          const boundPolicyDigest = createHash("sha256").update(policyBindingJcs).digest("hex");
+          appendFileSync(process.env.GITHUB_ENV, `BOUND_SOURCE_POLICY_DIGEST=${boundPolicyDigest}\n`);
+          NODE
+          npm ci --ignore-scripts
+          node --input-type=module <<'NODE'
+          import { readFileSync } from "node:fs";
+          const pkg = JSON.parse(readFileSync("package.json", "utf8"));
+          if (typeof pkg.scripts?.["refresh:verify-artifact"] !== "string") {
+            throw new Error("Required closed-schema writer validator is unavailable");
+          }
+          NODE
+
+      - name: Download only the named producer run artifact
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: refresh-candidate-${{ github.event.workflow_run.id }}
+          path: ${{ runner.temp }}/producer-artifact
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: ${{ github.event.workflow_run.id }}
+
+      - name: Verify closed schema, producer, policy, paths, and every hash
+        id: report
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run refresh:verify-artifact -- \
+            --artifact-root "$ARTIFACT_ROOT" \
+            --producer-workflow "Refresh acquisition and validation" \
+            --producer-run-id "${{ github.event.workflow_run.id }}" \
+            --source-commit "$SOURCE_COMMIT" \
+            --policy-digest "$BOUND_SOURCE_POLICY_DIGEST" \
+            --mode writer
+          node --input-type=module <<'NODE' >> "$GITHUB_OUTPUT"
+          import { createHash } from "node:crypto";
+          import { lstatSync, readdirSync, readFileSync } from "node:fs";
+          import { join, relative, sep } from "node:path";
+
+          const root = process.env.ARTIFACT_ROOT;
+          const report = JSON.parse(readFileSync(join(root, "validation-report.v1.json"), "utf8"));
+          const fixed = new Set([
+            "data/seed/academyinfo_15118998.sqlite",
+            "data/seed/academyinfo_15118998.manifest.json",
+            "data/seed/indicators.json",
+            "evidence/header-snapshots/15118998.headers.json",
+            "evidence/checksums/15118998.checksums.json",
+            "evidence/sample-rows/15118998.sample.json",
+          ]);
+          const auditPattern = /^evidence\/refresh\/15118998\.[a-f0-9]{12,64}\.audit\.json$/;
+          const discovered = [];
+          const walk = (dir) => {
+            for (const entry of readdirSync(dir)) {
+              const full = join(dir, entry);
+              const stat = lstatSync(full);
+              if (stat.isSymbolicLink()) throw new Error("Symlink rejected");
+              if (stat.isDirectory()) walk(full);
+              else if (stat.isFile()) discovered.push(relative(root, full).split(sep).join("/"));
+              else throw new Error("Non-regular artifact entry rejected");
+            }
+          };
+          walk(root);
+          const manifested = new Map((report.files ?? []).map((entry) => [entry.path, entry.sha256]));
+          if (manifested.size !== (report.files ?? []).length) throw new Error("Duplicate report path");
+          if (report.result === "changed") {
+            if (manifested.size !== 7 || [...fixed].some((path) => !manifested.has(path)) ||
+                [...manifested].filter(([path]) => auditPattern.test(path)).length !== 1) {
+              throw new Error("Changed report does not contain the complete fixed allowlist");
+            }
+          } else if (manifested.size !== 0 || discovered.some((path) => path !== "validation-report.v1.json")) {
+            throw new Error("Failure/no-change artifact attempted to carry writable content");
+          }
+          for (const [path, expected] of manifested) {
+            if ((!fixed.has(path) && !auditPattern.test(path)) || path.includes("..") || path.startsWith("/")) {
+              throw new Error(`Rejected candidate path: ${path}`);
+            }
+            const actual = createHash("sha256").update(readFileSync(join(root, path))).digest("hex");
+            if (actual !== expected) throw new Error(`Hash mismatch: ${path}`);
+          }
+          const expectedFiles = new Set(["validation-report.v1.json", ...manifested.keys()]);
+          if (discovered.length !== expectedFiles.size || discovered.some((path) => !expectedFiles.has(path))) {
+            throw new Error("Extra or missing artifact file");
+          }
+          if (report.source_commit !== process.env.SOURCE_COMMIT ||
+              report.canonical_page_url !== process.env.CANONICAL_SOURCE_PAGE ||
+              report.validation_policy_digest_v1 !== process.env.BOUND_SOURCE_POLICY_DIGEST ||
+              report.producer_workflow !== "Refresh acquisition and validation" ||
+              report.sanitized !== true ||
+              !/^[a-f0-9]{64}$/.test(report.report_digest_v1 ?? "")) {
+            throw new Error("Producer, source commit, policy, sanitization, or report digest mismatch");
+          }
+          process.stdout.write(`result=${report.result}\n`);
+          process.stdout.write(`source_commit=${report.source_commit}\n`);
+          process.stdout.write(`report_digest=${report.report_digest_v1}\n`);
+          NODE
+
+      - name: Stage a verified artifact only for a changed result
+        if: steps.report.outputs.result == 'changed'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: verified-refresh-${{ github.event.workflow_run.id }}-${{ steps.report.outputs.report_digest }}
+          path: ${{ runner.temp }}/producer-artifact
+          if-no-files-found: error
+          include-hidden-files: false
+          retention-days: 1
+          compression-level: 0
+
+  write-pr:
+    name: Copy fixed paths and open one PR
+    needs: inspect-read-only
+    if: needs.inspect-read-only.outputs.result == 'changed'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: refresh-pr-writer
+    permissions:
+      actions: read
+      contents: write
+      pull-requests: write
+    env:
+      ARTIFACT_ROOT: ${{ runner.temp }}/verified-artifact
+      SOURCE_COMMIT: ${{ needs.inspect-read-only.outputs.source_commit }}
+      REPORT_DIGEST: ${{ needs.inspect-read-only.outputs.report_digest }}
+      SOURCE_POLICY_DIGEST: ${{ vars.ACADEMYINFO_REFRESH_POLICY_DIGEST }}
+      CANONICAL_SOURCE_PAGE: ${{ vars.ACADEMYINFO_15118998_CANONICAL_PAGE }}
+      DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+    steps:
+      - name: Check out the verified source commit
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          ref: ${{ needs.inspect-read-only.outputs.source_commit }}
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Install exact Node 22
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Bind reviewed source policy and establish trusted verifier
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import { createHash } from "node:crypto";
+          import { appendFileSync } from "node:fs";
+
+          const canonicalPage = process.env.CANONICAL_SOURCE_PAGE;
+          const policyDigest = process.env.SOURCE_POLICY_DIGEST;
+          const defaultBranch = process.env.DEFAULT_BRANCH;
+          const url = new URL(canonicalPage);
+          if (url.protocol !== "https:" || url.href !== canonicalPage ||
+              url.username || url.password || url.search || url.hash) {
+            throw new Error("Canonical source page must be an exact HTTPS URL without credentials, a query, or a fragment");
+          }
+          if (!/^[a-f0-9]{64}$/.test(policyDigest)) {
+            throw new Error("Missing reviewed base policy digest");
+          }
+          if (!/^[A-Za-z0-9._/-]+$/.test(defaultBranch) || defaultBranch.includes("..")) {
+            throw new Error("Default branch is invalid");
+          }
+          const policyBindingJcs = JSON.stringify({
+            canonical_page_url: canonicalPage,
+            policy_digest: policyDigest,
+          });
+          const boundPolicyDigest = createHash("sha256").update(policyBindingJcs).digest("hex");
+          appendFileSync(process.env.GITHUB_ENV, `BOUND_SOURCE_POLICY_DIGEST=${boundPolicyDigest}\n`);
+          NODE
+          npm ci --ignore-scripts
+
+      - name: Download only the read-only verifier's digest-named artifact
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: verified-refresh-${{ github.event.workflow_run.id }}-${{ needs.inspect-read-only.outputs.report_digest }}
+          path: ${{ runner.temp }}/verified-artifact
+
+      - name: Reverify and copy without executing candidate content
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(node -p 'process.versions.node.split(`.`)[0]')" = "22"
+          npm run refresh:verify-artifact -- \
+            --artifact-root "$ARTIFACT_ROOT" \
+            --producer-workflow "Refresh acquisition and validation" \
+            --producer-run-id "${{ github.event.workflow_run.id }}" \
+            --source-commit "$SOURCE_COMMIT" \
+            --policy-digest "$BOUND_SOURCE_POLICY_DIGEST" \
+            --expected-report-digest "$REPORT_DIGEST" \
+            --require-result changed \
+            --mode writer
+          node --input-type=module <<'NODE'
+          import { copyFileSync, mkdirSync, readFileSync } from "node:fs";
+          import { dirname, join } from "node:path";
+          const root = process.env.ARTIFACT_ROOT;
+          const report = JSON.parse(readFileSync(join(root, "validation-report.v1.json"), "utf8"));
+          if (report.result !== "changed" ||
+              report.report_digest_v1 !== process.env.REPORT_DIGEST ||
+              report.canonical_page_url !== process.env.CANONICAL_SOURCE_PAGE ||
+              report.validation_policy_digest_v1 !== process.env.BOUND_SOURCE_POLICY_DIGEST) {
+            throw new Error("Only a digest-bound changed report may reach the writer");
+          }
+          for (const { path } of report.files) {
+            mkdirSync(dirname(path), { recursive: true });
+            copyFileSync(join(root, path), path);
+          }
+          NODE
+          if git diff --quiet -- \
+            data/seed/academyinfo_15118998.sqlite \
+            data/seed/academyinfo_15118998.manifest.json \
+            data/seed/indicators.json \
+            evidence/header-snapshots/15118998.headers.json \
+            evidence/checksums/15118998.checksums.json \
+            evidence/sample-rows/15118998.sample.json \
+            evidence/refresh; then
+            echo "Changed report produced no fixed-path content change; refusing a write." >&2
+            exit 1
+          fi
+          git add -- \
+            data/seed/academyinfo_15118998.sqlite \
+            data/seed/academyinfo_15118998.manifest.json \
+            data/seed/indicators.json \
+            evidence/header-snapshots/15118998.headers.json \
+            evidence/checksums/15118998.checksums.json \
+            evidence/sample-rows/15118998.sample.json \
+            evidence/refresh
+          git diff --cached --quiet && { echo "No staged fixed-path change." >&2; exit 1; }
+
+      - name: Push one digest-bound branch and open or reuse one PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh auth setup-git
+          BRANCH="automation/refresh-15118998-${REPORT_DIGEST:0:12}"
+          git switch -c "$BRANCH"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "chore(data): refresh 15118998 (${REPORT_DIGEST:0:12})"
+          git push --force-with-lease origin "$BRANCH"
+          EXISTING="$(gh pr list --head "$BRANCH" --state open --json url --jq '.[0].url // empty')"
+          if [ -n "$EXISTING" ]; then
+            printf 'Existing refresh PR: %s\n' "$EXISTING"
+          else
+            gh pr create \
+              --base "$DEFAULT_BRANCH" \
+              --head "$BRANCH" \
+              --title "chore(data): refresh dataset 15118998" \
+              --body "Sanitized refresh report digest: \`$REPORT_DIGEST\`\n\nProducer source commit: \`$SOURCE_COMMIT\`."
+          fi

@@ -1,7 +1,12 @@
 import { openDatabase, repositoryDatabaseError } from "./repository-db.js"
 import { institutionRowSchema } from "./repository-schemas.js"
 import type { SqliteDatabase } from "./repository-db.js"
-import type { Institution, InstitutionSearchResult, RepositoryResult } from "./repository-types.js"
+import type {
+  BatchInstitutionResolution,
+  Institution,
+  InstitutionSearchResult,
+  RepositoryResult,
+} from "./repository-types.js"
 
 const maxSearchResults = 20
 
@@ -31,6 +36,41 @@ function candidateData(
     truncated: totalMatched > candidates.length,
   }
 }
+export function resolveInstitutionsBatch(
+  db: SqliteDatabase,
+  normalizedQueries: readonly string[],
+): readonly BatchInstitutionResolution[] {
+  const institutions = allInstitutions(db)
+
+  return normalizedQueries.map((query) => {
+    const matches = matchingInstitutions(institutions, query)
+    const returnedMatches = matches.slice(0, maxSearchResults)
+
+    return {
+      query,
+      status: matches.length === 0 ? "not_found" : matches.length === 1 ? "ok" : "ambiguous",
+      matches: returnedMatches,
+      totalMatched: matches.length,
+      truncated: matches.length > returnedMatches.length,
+    }
+  })
+}
+
+function matchingInstitutions(
+  institutions: readonly Institution[],
+  query: string,
+): readonly Institution[] {
+  const exactCombined = institutions.filter(
+    (institution) => `${institution.school_name} ${institution.campus_name}` === query,
+  )
+  const exactSchool = institutions.filter((institution) => institution.school_name === query)
+
+  return exactCombined.length > 0
+    ? exactCombined
+    : exactSchool.length > 0
+      ? exactSchool
+      : institutions.filter((institution) => institution.school_name.includes(query))
+}
 
 export function searchInstitutions(query: string): RepositoryResult<InstitutionSearchResult> {
   const dbResult = openDatabase()
@@ -47,15 +87,7 @@ export function searchInstitutions(query: string): RepositoryResult<InstitutionS
     }
 
     const institutions = allInstitutions(dbResult.value)
-    const exactCombined = institutions.filter(
-      (institution) => `${institution.school_name} ${institution.campus_name}` === trimmed,
-    )
-    const exactSchool = institutions.filter((institution) => institution.school_name === trimmed)
-    const allMatches = exactCombined.length > 0
-      ? exactCombined
-      : exactSchool.length > 0
-        ? exactSchool
-        : institutions.filter((institution) => institution.school_name.includes(trimmed))
+    const allMatches = matchingInstitutions(institutions, trimmed)
     const matches = allMatches.slice(0, maxSearchResults)
 
     if (allMatches.length === 0) {

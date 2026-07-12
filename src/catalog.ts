@@ -1,3 +1,11 @@
+import { readFileSync } from "node:fs"
+import { dirname, join } from "node:path"
+import { fileURLToPath } from "node:url"
+
+import { indicatorCatalogSchema } from "./catalog-schema.js"
+import { findProjectRoot } from "./database-paths.js"
+import type { IndicatorCatalog } from "./catalog-schema.js"
+
 export type SourceMetadata = {
   readonly dataset_id: string
   readonly dataset_name: string
@@ -24,18 +32,33 @@ export type IndicatorDefinition = {
   readonly note?: string
 }
 
-export const bundledSource: SourceMetadata = {
-  dataset_id: "15118998",
-  dataset_name: "교육부_대학알리미_대학주요정보",
-  provider: "교육부",
-  source_url: "https://www.data.go.kr/data/15118998/fileData.do",
-  license: "KOGL-1 / 공공누리 제1유형(출처표시)",
-  derived_database: true,
-  bundled: true,
-  source_column: "NotVerified",
-  base_year: "NotVerified",
-  unit: "NotVerified",
+function freezeCatalog(catalog: IndicatorCatalog): Readonly<IndicatorCatalog> {
+  Object.freeze(catalog.source)
+
+  for (const indicator of catalog.indicators) {
+    Object.freeze(indicator)
+  }
+
+  Object.freeze(catalog.indicators)
+  return Object.freeze(catalog)
 }
+
+function loadCatalog(): Readonly<IndicatorCatalog> {
+  try {
+    const projectRoot = findProjectRoot(dirname(fileURLToPath(import.meta.url)))
+    const catalogJson: unknown = JSON.parse(
+      readFileSync(join(projectRoot, "data", "seed", "indicators.json"), "utf8"),
+    )
+
+    return freezeCatalog(indicatorCatalogSchema.parse(catalogJson))
+  } catch {
+    throw new Error("Bundled indicator catalog is missing or invalid.")
+  }
+}
+
+export const indicatorCatalog = loadCatalog()
+
+export const bundledSource: SourceMetadata = indicatorCatalog.source
 
 export const granularEmploymentBacklogSource: SourceMetadata = {
   dataset_id: "15139279",
@@ -50,76 +73,35 @@ export const granularEmploymentBacklogSource: SourceMetadata = {
   unit: "NotVerified",
 }
 
-export const defaultIndicators: readonly IndicatorDefinition[] = [
-  {
-    indicator: "competition_rate",
-    label: "\uC2E0\uC785\uC0DD \uACBD\uC7C1\uB960",
-    label_ko: "\uC2E0\uC785\uC0DD \uACBD\uC7C1\uB960",
-    source_column: "\uC2E0\uC785\uC0DD \uACBD\uC7C1\uB960\n(2025,:1)",
-    source_column_verified: true,
-    base_year: "2025",
-    unit: ":1",
-    enabled: true,
-    dataset_id: "15118998",
-  },
-  {
-    indicator: "fill_rate",
-    label: "\uC2E0\uC785\uC0DD \uCDA9\uC6D0\uC728",
-    label_ko: "\uC2E0\uC785\uC0DD \uCDA9\uC6D0\uC728",
-    source_column: "\uC2E0\uC785\uC0DD \uCDA9\uC6D0\uC728\n(2025,%)",
-    source_column_verified: true,
-    base_year: "2025",
-    unit: "%",
-    enabled: true,
-    dataset_id: "15118998",
-  },
-  {
-    indicator: "employment_rate",
-    label: "\uCDE8\uC5C5\uB960",
-    label_ko: "\uCDE8\uC5C5\uB960",
-    source_column: "\uCDE8\uC5C5\uB960\n(2025,%)",
-    source_column_verified: true,
-    base_year: "2025",
-    unit: "%",
-    enabled: true,
-    dataset_id: "15118998",
-    note: "School-level employment rate from dataset 15118998.",
-  },
-  {
-    indicator: "scholarship_per_student",
-    label: "\uD559\uC0DD 1\uC778\uB2F9 \uC5F0\uAC04 \uC7A5\uD559\uAE08",
-    label_ko: "\uD559\uC0DD 1\uC778\uB2F9 \uC5F0\uAC04 \uC7A5\uD559\uAE08",
-    source_column: "\uD559\uC0DD 1\uC778\uB2F9 \uC5F0\uAC04 \uC7A5\uD559\uAE08\n(2025,\uC6D0)",
-    source_column_verified: true,
-    base_year: "2025",
-    unit: "\uC6D0",
-    enabled: true,
-    dataset_id: "15118998",
-  },
-  {
-    indicator: "avg_tuition",
-    label: "\uD3C9\uADE0 \uB4F1\uB85D\uAE08",
-    label_ko: "\uD3C9\uADE0 \uB4F1\uB85D\uAE08",
-    source_column: "\uD3C9\uADE0 \uB4F1\uB85D\uAE08\n(2026,\uCC9C\uC6D0)",
-    source_column_verified: true,
-    base_year: "2026",
-    unit: "\uCC9C\uC6D0",
-    enabled: true,
-    dataset_id: "15118998",
-  },
-]
+export const defaultIndicators: readonly IndicatorDefinition[] = Object.freeze(
+  indicatorCatalog.indicators.map((indicator) =>
+    Object.freeze({
+      indicator: indicator.indicator_id,
+      label: indicator.label_ko,
+      label_ko: indicator.label_ko,
+      source_column: indicator.source_column,
+      source_column_verified: indicator.source_column_verified,
+      base_year: String(indicator.year),
+      unit: indicator.unit,
+      enabled: indicator.enabled_by_default,
+      dataset_id: indicator.source_dataset_id,
+      ...(indicator.note === undefined ? {} : { note: indicator.note }),
+    }),
+  ),
+)
 
 export function sourceForIndicator(indicator: IndicatorDefinition): SourceMetadata {
-  return {
+  return Object.freeze({
     ...bundledSource,
     source_column: indicator.source_column,
     base_year: indicator.base_year,
     unit: indicator.unit,
-  }
+  })
 }
 
-export const defaultIndicatorSources: readonly SourceMetadata[] =
-  defaultIndicators.map(sourceForIndicator)
+export const defaultIndicatorSources: readonly SourceMetadata[] = Object.freeze(
+  defaultIndicators.map(sourceForIndicator),
+)
 
 export function commonWarnings(extraWarnings: readonly string[]): readonly string[] {
   return [

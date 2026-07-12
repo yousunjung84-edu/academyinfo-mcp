@@ -9,6 +9,7 @@ import {
   assertAllDefaultIndicatorsMapped,
   validateDefaultIndicatorHeaders,
 } from "../scripts/seed15118998-validate.ts"
+import { indicatorCatalogSchema } from "../src/catalog-schema.ts"
 import { withMcpServer } from "./support/mcp-stdio-harness.ts"
 
 const projectRoot = fileURLToPath(new URL("..", import.meta.url))
@@ -133,6 +134,16 @@ function readJson(relativePath: string): unknown {
 }
 
 describe("15118998 evidence lock and seed DB", () => {
+  it("locks the catalog to exactly five ordered indicator ID/unit pairs", () => {
+    const catalog = indicatorCatalogSchema.parse(readJson("data/seed/indicators.json"))
+
+    expect(
+      catalog.indicators.map(({ indicator_id, unit }) => ({ indicator_id, unit })),
+    ).toEqual(
+      expectedIndicators.map(({ indicator_id, unit }) => ({ indicator_id, unit })),
+    )
+  })
+
   it("locks the placed source file, header evidence, manifest, and seed counts", () => {
     const checksumSnapshot = checksumSnapshotSchema.parse(
       readJson("evidence/checksums/15118998.checksums.json"),
@@ -196,12 +207,13 @@ describe("15118998 evidence lock and seed DB", () => {
       expect.arrayContaining([expect.stringContaining("avg_tuition")]),
     )
 
-    const zeroObservationCounts = Object.fromEntries(
-      expectedIndicators.map((indicator) => [indicator.indicator_id, 1]),
+    const classificationCounts = Object.fromEntries(
+      expectedIndicators.map((indicator) => [indicator.indicator_id, 0]),
     )
-    zeroObservationCounts["employment_rate"] = 0
+    expect(() => assertAllDefaultIndicatorsMapped(classificationCounts)).not.toThrow()
 
-    expect(() => assertAllDefaultIndicatorsMapped(zeroObservationCounts)).toThrow(
+    delete classificationCounts["employment_rate"]
+    expect(() => assertAllDefaultIndicatorsMapped(classificationCounts)).toThrow(
       /employment_rate/u,
     )
   })

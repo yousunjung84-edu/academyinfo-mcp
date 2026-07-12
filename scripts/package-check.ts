@@ -4,11 +4,12 @@ import { join } from "node:path"
 
 import {
   addFailure,
-  IMPLICIT_NPM_FILES,
+  collectPackageContractFailures,
+  hasExactPackedPackagePaths,
   projectRoot,
   REQUIRED_LICENSE_FILES,
-  REQUIRED_PACKAGE_FILES,
-  REQUIRED_SEED_PACKAGE_FILES,
+  REQUIRED_RUNTIME_DATA_PACKAGE_FILES,
+  REQUIRED_RUNTIME_EXECUTABLE_PACKAGE_FILES,
   type Failure,
   type PackFile,
   type PackResult,
@@ -42,23 +43,19 @@ function readPackageJson(): Record<string, unknown> {
   return isRecord(parsedPackageJson) ? parsedPackageJson : {}
 }
 
-function hasExactFilesAllowlist(packageJson: Record<string, unknown>): boolean {
-  const files = packageJson["files"]
-  return (
-    Array.isArray(files) &&
-    files.length === REQUIRED_PACKAGE_FILES.length &&
-    files.every((entry, index) => entry === REQUIRED_PACKAGE_FILES[index])
-  )
+function readPackageLock(): unknown {
+  return JSON.parse(readFileSync(join(projectRoot, "package-lock.json"), "utf8"))
 }
 
-function isAllowedPackagePath(path: string): boolean {
-  if (IMPLICIT_NPM_FILES.some((allowedPath) => path === allowedPath)) {
-    return true
-  }
 
-  return REQUIRED_PACKAGE_FILES.some((allowedPath) =>
-    allowedPath.endsWith("/**") ? path.startsWith(allowedPath.slice(0, -2)) : path === allowedPath,
-  )
+function assertExactPackagePaths(failures: Failure[], packagePaths: readonly string[]): void {
+  if (!hasExactPackedPackagePaths(packagePaths)) {
+    addFailure(
+      failures,
+      "packed_package_paths_contract",
+      "npm pack dry-run paths must equal the exact checked package manifest",
+    )
+  }
 }
 
 function runNpmPackDryRun(): readonly string[] {
@@ -80,7 +77,11 @@ function runNpmPackDryRun(): readonly string[] {
 }
 
 function assertRequiredFilesExist(failures: Failure[]): void {
-  for (const requiredPath of [...REQUIRED_LICENSE_FILES, ...REQUIRED_SEED_PACKAGE_FILES]) {
+  for (const requiredPath of [
+    ...REQUIRED_LICENSE_FILES,
+    ...REQUIRED_RUNTIME_DATA_PACKAGE_FILES,
+    ...REQUIRED_RUNTIME_EXECUTABLE_PACKAGE_FILES,
+  ]) {
     if (!existsSync(join(projectRoot, requiredPath))) {
       addFailure(failures, "required_file_missing", requiredPath)
     }
@@ -108,12 +109,18 @@ function assertLicensePolicyText(failures: Failure[]): void {
   }
 }
 
-function assertRequiredSeedsIncluded(failures: Failure[], packagePaths: readonly string[]): void {
+function assertRequiredRuntimeFilesIncluded(
+  failures: Failure[],
+  packagePaths: readonly string[],
+): void {
   const packagePathSet = new Set(packagePaths)
 
-  for (const requiredPath of REQUIRED_SEED_PACKAGE_FILES) {
+  for (const requiredPath of [
+    ...REQUIRED_RUNTIME_DATA_PACKAGE_FILES,
+    ...REQUIRED_RUNTIME_EXECUTABLE_PACKAGE_FILES,
+  ]) {
     if (!packagePathSet.has(requiredPath)) {
-      addFailure(failures, "required_seed_not_in_pack", requiredPath)
+      addFailure(failures, "required_runtime_file_not_in_pack", requiredPath)
     }
   }
 }
@@ -121,22 +128,17 @@ function assertRequiredSeedsIncluded(failures: Failure[], packagePaths: readonly
 function main(): void {
   const failures: Failure[] = []
   const packageJson = readPackageJson()
+  failures.push(...collectPackageContractFailures(packageJson, readPackageLock()))
 
   assertRequiredFilesExist(failures)
   assertLicensePolicyText(failures)
 
-  if (!hasExactFilesAllowlist(packageJson)) {
-    addFailure(failures, "package_files_allowlist", "package.json files allowlist is not exact")
-  }
 
   const packagePaths = runNpmPackDryRun()
-  assertRequiredSeedsIncluded(failures, packagePaths)
+  assertRequiredRuntimeFilesIncluded(failures, packagePaths)
+  assertExactPackagePaths(failures, packagePaths)
 
   for (const packagePath of packagePaths) {
-    if (!isAllowedPackagePath(packagePath)) {
-      addFailure(failures, "unexpected_package_path", packagePath)
-    }
-
     if (isForbiddenArtifactPath(packagePath)) {
       addFailure(failures, "forbidden_package_path", packagePath)
     }
@@ -144,9 +146,9 @@ function main(): void {
 
   scanFirstPartyFiles(failures)
 
-  for (const seedArtifact of REQUIRED_SEED_PACKAGE_FILES) {
-    const status = existsSync(join(projectRoot, seedArtifact)) ? "present" : "pending"
-    console.log(`seed_artifact: ${seedArtifact}: ${status}`)
+  for (const dataArtifact of REQUIRED_RUNTIME_DATA_PACKAGE_FILES) {
+    const status = existsSync(join(projectRoot, dataArtifact)) ? "present" : "pending"
+    console.log(`runtime_data_artifact: ${dataArtifact}: ${status}`)
   }
 
   if (failures.length > 0) {

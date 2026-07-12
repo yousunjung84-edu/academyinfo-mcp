@@ -27,6 +27,11 @@ async function createRuntimeWithoutBundledSeed(
   await cp(join(projectRoot, "dist", "src"), join(runtimeRoot, "dist", "src"), {
     recursive: true,
   })
+  await mkdir(join(runtimeRoot, "data", "seed"), { recursive: true })
+  await cp(
+    join(projectRoot, "data", "seed", "indicators.json"),
+    join(runtimeRoot, "data", "seed", "indicators.json"),
+  )
   if (options.includePackageJson) {
     await writeFile(join(runtimeRoot, "package.json"), JSON.stringify({ type: "module" }))
   }

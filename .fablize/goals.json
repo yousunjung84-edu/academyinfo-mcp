@@ -1,0 +1,34 @@
+{
+ "brief": "academyinfo-mcp 가재 핸드오버 검증 (260712)",
+ "created": "2026-07-12T00:57:50.742219+00:00",
+ "goals": [
+  {
+   "id": "G001",
+   "title": "branch-push",
+   "objective": "리뷰 브랜치 review/academyinfo-mcp-improvement-20260712 커밋·푸시",
+   "status": "pending",
+   "evidence": null
+  },
+  {
+   "id": "G002",
+   "title": "draft-pr",
+   "objective": "드래프트 PR 생성 (main←review)",
+   "status": "pending",
+   "evidence": null
+  },
+  {
+   "id": "G003",
+   "title": "clean-verify",
+   "objective": "클린 클론에서 build/lint/test/package:check/doctor/audit/diff-check 실행",
+   "status": "pending",
+   "evidence": null
+  },
+  {
+   "id": "G004",
+   "title": "report",
+   "objective": "심각도별 findings + CLEAR/ADVISORIES/BLOCKED 판정 보고",
+   "status": "pending",
+   "evidence": null
+  }
+ ]
+}

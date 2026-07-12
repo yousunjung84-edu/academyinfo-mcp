@@ -1,101 +1,112 @@
 # Release Audit
 
-Audit date: 2026-07-02
+## Audit boundary
 
-Scope: public-transition audit for `academyinfo-mcp` v0.1 after the GPT-5.5 Pro pre-public review fixes, follow-up documentation cleanup, and error-path hardening review.
+This document records the current checkout contract and the evidence still required for a public release. It is not a protected release receipt and does not authorize making a repository public, publishing a package, selecting a version or endpoint, promoting `latest`, or performing rollback.
 
-Recommendation: `GitHub public GO`; `npm publish HOLD`.
+Release conclusion: **HOLD — `BLOCKED_PENDING_BACKEND_SELECTION`**.
 
-This audit supports switching the GitHub repository from private to public after owner approval. It does not approve publishing the package to npm.
+The checkout contains an integrated local implementation, but no claim is made here that an administrator selected an unused public SemVer, approved a transition, completed the backend gate, published a candidate, produced three-lane public-install proof, exercised an actual client, promoted `latest`, or completed a rollback/no-change drill. Workflow definitions, local tests, local installs, and packed tarballs cannot substitute for those protected facts.
 
-## Current Package State
+## Integrated checkout contract
 
-| Item | Result |
-| --- | --- |
-| Package version | `0.1.0`, aligned with `src/server.ts` |
-| Code license | `MIT` in `package.json`; code license remains separate from bundled data license |
-| Runtime | `better-sqlite3`; no release-candidate built-in SQLite runtime |
-| Node engine | `>=22.0.0`; Node 20 is EOL and best-effort only |
-| Dependencies | Explicit semver ranges using caret notation for runtime and dev dependencies |
-| Runtime mode | File-first, no API key required |
-| OpenAPI | Not implemented in v0.1 |
-| Bundled data | Only normalized derivative seed for dataset `15118998` |
-| Non-bundled data | Dataset `15139279` remains v0.3/local-ingest backlog only |
-
-## Public-Transition Evidence
-
-| Gate | Status | Evidence |
+| Surface | Current contract | Evidence limit |
 | --- | --- | --- |
-| `.insane-review` tracked files | PASS | `git ls-files .insane-review` returned no tracked files. |
-| `.insane-review` ignore policy | PASS | `.gitignore` includes `.insane-review/`; local check-ignore output maps `.insane-review/test.md` to that rule. |
-| Git-history secret/private-path scan | PASS | Externally verified scan result: 0 hits. |
-| Raw/private data tracking | PASS | Externally verified: `data/raw` and `.env` were never tracked. Local path-history spot check also returned no tracked entries for `data/raw` or `.env`. |
-| Public docs posture | PASS | README includes non-affiliation, Node requirement, no-key operation, KOGL-1 attribution, data snapshot policy, and code/data license separation. |
-| Package artifact posture | PASS | Package allowlist excludes raw files, external data, `.env`, `.omo`, `.insane-review`, service keys, local paths, local user names, and `15139279` data artifacts. |
+| Runtime | File-first, offline, no-key, read-only stdio | Local implementation only; not public support proof |
+| Node | Exact engine `>=22 <23` | Node 24+ is unsupported and unclaimed |
+| Public matrix | Node 22 macOS/arm64, Windows/x64, and Ubuntu glibc/x64 | Each lane remains a target until candidate-bound public proof exists |
+| MCP dependencies | Exact `@modelcontextprotocol/sdk` `1.29.0` and `zod` `4.4.3` | Public proof must verify installed identity and registry integrity |
+| SQLite backend | `better-sqlite3` is currently integrated | Provisional until all-lane prebuilt-only proof; no backend is release-approved by this document |
+| Runtime mode | Bundled local snapshot; no API key or runtime network | No live OpenAPI or scraping behavior |
+| Bundled source | Normalized derivative of dataset `15118998` only | Point-in-time data, not a latest-data guarantee |
+| Catalog | `data/seed/indicators.json`, closed-schema KOGL-attributed JSON data | Sole packaged source-derived catalog; no executable generated fallback |
+| Excluded source | Dataset `15139279` | No raw, normalized, seed, sample, fixture, database, CSV, JSON, or derived artifact |
+| Licensing | MIT code and KOGL Type 1 bundled data remain separate | Neither license implies affiliation or endorsement |
 
-## Fix Verification Matrix
+No public version is named in this audit. Package metadata in a checkout is not evidence that the same version is unused, owned, approved, published, tagged, or promoted in the public registry.
 
-| Gate | Status | Evidence |
+## Exact eight-tool audit surface
+
+The registered product scope is exactly:
+
+1. `list_sources`
+2. `list_indicators`
+3. `search_university`
+4. `get_university_metrics`
+5. `compare_universities`
+6. `explain_indicator`
+7. `validate_source_coverage`
+8. `explore_universities`
+
+The first seven contracts remain backward compatible. The eighth tool is bounded to 10 university queries and 5 indicators, evaluates against one read-only snapshot, preserves deterministic input/catalog ordering, and fails all-or-nothing when any institution is missing or ambiguous. Ambiguity returns bounded candidates rather than a guess. None of the eight tools may write, score, weight, rank, recommend, choose a winner, or substitute for a user's institution choice.
+
+Successful values and explanations retain source/license, year or base year, unit, source column, derived/bundled state, and warnings. Missing source values stay explicit. Stdio stdout is reserved for MCP JSON-RPC.
+
+## Catalog and indicator audit surface
+
+The data-only catalog contains exactly five indicators from `15118998`:
+
+| Indicator | Year | Unit | Data boundary |
+| --- | ---: | --- | --- |
+| `competition_rate` | 2025 | `:1` | Bundled `15118998` |
+| `fill_rate` | 2025 | `%` | Bundled `15118998` |
+| `employment_rate` | 2025 | `%` | School-level bundled `15118998` only |
+| `scholarship_per_student` | 2025 | `원` | Bundled `15118998` |
+| `avg_tuition` | 2026 | `천원` | Bundled `15118998` |
+
+The catalog, logical database tables, and manifest must be independently cross-checked. Source-derived executable TypeScript/JavaScript, hard-coded catalog fallback, and any `15139279` default behavior are prohibited.
+
+## Refresh authority audit
+
+Refresh acceptance is based on semantic invariants:
+
+- exactly one header row, one natural-key mapping, and one mapping for each of the five logical indicators;
+- preserved indexed raw-cell text and exact coverage from each source row to one raw row, one institution, and five numeric-or-missing classifications;
+- verified fixed units and nondecreasing integer years;
+- missing values limited to trimmed empty text or ASCII `-`;
+- exact approved nonnegative decimal grammar and grouping;
+- canonical decimal text as semantic authority, finite nonnegative JavaScript Number conversion, and exact shortest-Number/plain-decimal round trip with no rounding.
+
+Post-download SHA-256 is transport integrity, change-detection, and audit evidence only. It does not authenticate an official source or grant approval. A prior-checksum match is not a pass, and a changed checksum is not a failure. Row/column counts, institution-set changes, values, unrelated columns, and allowed missingness are reviewed diffs, not independent acceptance rules. There is no fixed 24-column contract: valid 23-column, 25-column, or other annual shapes may pass all semantic gates.
+
+Semantic source, seed, catalog, manifest, and release-data identities use closed, self-excluding RFC 8785 JCS/SHA-256 projections with canonical decimals. Physical file hashes remain separate from semantic authority.
+
+## Open protected gates
+
+| Gate | Current state | Required protected evidence |
 | --- | --- | --- |
-| Invalid indicators fail closed | PASS | `get_university_metrics` and `compare_universities` return `status: invalid_request`, `data.error`, and `invalid_indicators` for unknown indicator names. |
-| Empty compare input fails closed | PASS | `compare_universities` returns `status: invalid_request` when `university_names` is empty or absent. |
-| Ambiguous responses include `data.error` | PASS | `search_university` ambiguous results include `data.error.code=ambiguous` with candidates and count metadata. |
-| Search truncation exposes totals | PASS | Broad search returns `returned_count`, `total_matched`, and `truncated` instead of reporting only the sliced count. |
-| Blank source values are surfaced | PASS | Metrics responses expose `missing_metrics[]` with `reason: blank_in_source`, `value: null`, source `raw_value`, and `source_column`. |
-| DB errors stay in the MCP contract | PASS | Corrupt configured SQLite input returns `status: database_error` with `data.error` and the normal response envelope; local paths and stack details are omitted. |
-| Missing bundled seed fails closed | PASS | Metadata tools no longer report healthy metadata when the bundled seed file is absent; missing seed state maps to `missing_db`. |
-| Compare errors avoid partial data | PASS | `compare_universities` returns empty `comparisons` when any requested university is not found or ambiguous. |
-| Package metadata | PASS | `package.json` has `version=0.1.0`, `license=MIT`, `engines.node >=22.0.0`, explicit caret semver ranges, `better-sqlite3`, and the `academyinfo-mcp` bin. |
-| Package-relative seed resolution | PASS | MCP stdio test launches `dist/src/index.js` from an external cwd and `validate_source_coverage` returns 488 raw rows and 2350 observations. |
-| Installed package bin smoke | PASS | A packed tarball installed into a temporary project creates `.bin/academyinfo-mcp.cmd`; launching that bin returns `compare_universities` status `ok` for two universities and `invalid_request` for an invalid indicator. |
-| Package license gate | PASS | `scripts/package-check-config.ts` enforces `LICENSE`, `DATA_LICENSE.md`, `NOTICE.md`, and `data/seed/LICENSE.15118998.md`. |
-| Package scan hardening | PASS | Text `.map`, `.json`, `.md`, and `.txt` files are scanned regardless of size; local review artifacts and sensitive package paths (`.env`, `.env.*`, `.npmrc`, `.pem`, `service-account.json`) are forbidden. |
-| README | PASS | README states Node requirement, `better-sqlite3`, no API key, point-in-time data refresh policy, current from-source use, planned post-publish npx config, and `missing_metrics` behavior. |
+| Administrator prerequisites | OPEN | Public npm identity/history/ownership, unused SemVer, release authority, 2FA/trusted publishing, provenance, protected environments, retention, and evidenced query-free source page |
+| Single backend | BLOCKED | Either all-three-lane prebuilt-only proof for the current `better-sqlite3` candidate, or a reviewed `sql.js` parity package plus Architect and administrator approval bound to the backend-selection receipt |
+| Candidate transition | NOT ESTABLISHED | Immutable non-`latest` candidate receipt joining source, package, backend, data, dependency, audit, registry, provenance, and administrator authorization evidence |
+| Public install | NOT ESTABLISHED | Exact public candidate installed through `npx -y academyinfo-mcp@<version>` on all three clean Node 22 lanes, with no local artifact or compilation and complete identity/integrity/protocol evidence |
+| Actual client | NOT ESTABLISHED | Protected receipt joining the public lanes, generic stdio journey, and actual Claude Desktop/macOS execution against the same candidate |
+| Promotion | NOT ESTABLISHED | Administrator-approved protected receipt that revalidates predecessor digests and moves the unchanged proved candidate to `latest` |
+| Rollback | NOT ESTABLISHED | Separate administrator-approved transition restoring prior-good `latest`, deprecating the bad version, preserving evidence, and reopening the original incident clock when applicable |
+| Verified no-change | NOT ESTABLISHED | Equal-byte reacquisition plus origin/license/workbook validation and administrator attestation bound to the closed receipt |
 
-## Five-Indicator Seed Counts
+The `better-sqlite3` path must prove prebuilt-only installation with fresh state, active Python/node-gyp/compiler traps, and a demonstrated canary on every official lane. If any lane fails, `sql.js` remains only a spike until one exact reviewed version satisfies behavior, custom/missing/corrupt path, WASM/package/license/security, startup/RSS, and no-native-build requirements. Exactly one backend may ship; no automatic or dual-backend fallback is permitted.
 
-Observed via read-only `better-sqlite3` query against `data/seed/academyinfo_15118998.sqlite`.
+## Candidate, public, promotion, and rollback protections
 
-| Indicator | Source dataset | Year | Unit | Observation count |
-| --- | --- | --- | --- | --- |
-| `competition_rate` | `15118998` | 2025 | `:1` | 443 |
-| `fill_rate` | `15118998` | 2025 | `%` | 488 |
-| `employment_rate` | `15118998` | 2025 | `%` | 488 |
-| `scholarship_per_student` | `15118998` | 2025 | `원` | 443 |
-| `avg_tuition` | `15118998` | 2026 | `천원` | 488 |
+A candidate may be published only under a non-`latest` tag after administrator prerequisites and immutable candidate gates pass. Candidate existence is not completion.
 
-Raw rows in seed DB: 488.
+Public proof must use fresh homes, caches, working directories, and configurations outside the checkout; an explicit public registry; no reachable local artifact; exact `npx -y academyinfo-mcp@<version>`; active build-tool traps; sanitized verbose logs; installed application/SDK/Zod identities and registry integrity; platform identity; initialization; the exact eight-tool list and eighth-tool schema; bundled-data and no-key behavior; and JSON-RPC-only stdout. Local checkout or tarball results are insufficient.
 
-## Required Serial Gate
+Promotion requires a separate protected administrator approval and must move the exact proved candidate bytes to `latest` without rebuilding. Rollback requires another protected approval, restores the exact prior-good `latest`, deprecates rather than deletes the bad version, preserves receipts, and uses a new unused SemVer for any correction.
 
-Commands run before this audit update:
+## Package and privacy boundaries
 
-| Command | Result |
-| --- | --- |
-| `npm install` | PASS under Node `v22.23.1`; production dependencies installed with 0 vulnerabilities |
-| `npm run build` | PASS; TypeScript compile plus generated bin chmod helper |
-| `npm run test` | PASS, 7 test files and 30 tests |
-| `npm run doctor` | PASS, `status: ok` |
-| `npm run package:check` | PASS, `package_check: ok` |
-| `npm run prepublishOnly` | PASS |
-| `npm pack --dry-run --json` | PASS, 136 files; required seed artifacts present; forbidden artifacts absent |
-| `npm audit --omit=dev --audit-level=high` | PASS, 0 vulnerabilities |
-| Stale runtime-reference scan | PASS, 0 hits for removed runtime terms and the old engine floor |
+Any candidate package and its evidence must include only required runtime/data/license artifacts and must exclude raw workbooks and CSVs, signed download URLs, `15139279` data, `.env` files, credentials, service keys, registry configuration, private keys, local paths, local user names, machine identifiers, local review artifacts, and dependency trees. Errors, logs, manifests, examples, and receipts follow the same confidentiality boundary.
 
-Dry-run package must include:
+## Explicit non-goals and final disposition
 
-- `data/seed/academyinfo_15118998.sqlite`
-- `data/seed/academyinfo_15118998.manifest.json`
-- `data/seed/LICENSE.15118998.md`
+This audit does not approve or claim:
 
-Dry-run package must exclude `data/raw`, `data/external`, `15139279` data artifacts, raw spreadsheets, raw CSV files, `.env`, `.env.*`, `.npmrc`, `.pem`, `service-account.json`, credentials, service keys, local paths, local user names, `.omo`, `.ultrawork`, `.insane-review`, and `node_modules`.
+- Node 24+ or an unevidenced platform;
+- a live OpenAPI bridge, scraping, runtime network access, service-key use, or write behavior;
+- granular/per-department employment data or any `15139279` artifact;
+- recommendations, rankings, scores, winners/losers, or guessed institutions;
+- fixed-checksum, fixed-row, fixed-institution, fixed-value, or fixed-24-column refresh acceptance;
+- a selected public version, endpoint, package ownership, administrator approval, candidate publication, public availability, actual client compatibility, `latest` promotion, rollback completion, or freshness closure.
 
-## Remaining Risks
-
-- `npm publish` remains on hold until an independent clean-environment install, MCP client smoke test, and npm account/package-name checks pass.
-- `npm publish` requires a multi-platform smoke matrix before approval: Node 22 and Node 24 across macOS, Windows, and Linux.
-- Linux package/install coverage is not yet verified in this audit and must be disclosed as an npm-publish gap.
-- `better-sqlite3` is a native module. Common macOS/Windows/Linux x64/arm64 platforms use prebuilt binaries, but unsupported Node/platform combinations may require a compiler.
-- Windows cannot represent Unix executable bits on the generated JS file; the build includes a chmod helper for Unix/macOS build hosts, and Windows installs expose runnable `.cmd`/`.ps1` npm bin shims.
-- The bundled seed is a point-in-time snapshot and does not claim to be latest. Refresh requires source-file, checksum, manifest, DB, and package dry-run review.
-- Optional history scrub remains a human decision. Current public-transition evidence supports public GO without treating scrub as a blocker.
+Release remains on hold at `BLOCKED_PENDING_BACKEND_SELECTION`. The last-known-good public package and data must remain available until all applicable protected gates succeed.

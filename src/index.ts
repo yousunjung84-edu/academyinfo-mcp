@@ -4,12 +4,13 @@ import { realpathSync } from "node:fs"
 import { fileURLToPath } from "node:url"
 
 import { createRuntimeLogger } from "./logging.js"
+import { ExplicitNonObjectArgumentsGuardTransport } from "./protocol-transport.js"
 import { createAcademyinfoServer } from "./server.js"
 
 export async function main(): Promise<void> {
   const logger = createRuntimeLogger()
   const server = createAcademyinfoServer()
-  const transport = new StdioServerTransport()
+  const transport = new ExplicitNonObjectArgumentsGuardTransport(new StdioServerTransport())
 
   logger.info({ event: "academyinfo_mcp_starting" }, "starting academyinfo MCP server")
   await server.connect(transport)
@@ -25,11 +26,7 @@ function isDirectEntryPoint(): boolean {
     return false
   }
 
-  try {
-    return realpathSync(entryPointPath) === fileURLToPath(import.meta.url)
-  } catch {
-    return false
-  }
+  return realpathSync(entryPointPath) === fileURLToPath(import.meta.url)
 }
 
 if (isDirectEntryPoint()) {
