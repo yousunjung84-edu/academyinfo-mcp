@@ -26,7 +26,21 @@ function isDirectEntryPoint(): boolean {
     return false
   }
 
-  return realpathSync(entryPointPath) === fileURLToPath(import.meta.url)
+  try {
+    return realpathSync(entryPointPath) === fileURLToPath(import.meta.url)
+  } catch (error: unknown) {
+    const logger = createRuntimeLogger()
+
+    logger.error(
+      {
+        event: "academyinfo_mcp_entry_point_resolution_failed",
+        errorName: error instanceof Error ? error.name : "UnknownError",
+      },
+      "academyinfo MCP entry point could not be resolved",
+    )
+    process.exitCode = 1
+    return false
+  }
 }
 
 if (isDirectEntryPoint()) {

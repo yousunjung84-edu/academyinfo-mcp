@@ -76,6 +76,8 @@ jobs:
     name: Validate external actual Claude Desktop/macOS proof
     runs-on: ubuntu-24.04
     timeout-minutes: 10
+    permissions:
+      contents: read
     environment: claude-desktop-client-proof
     env:
       PACKAGE_NAME: academyinfo-mcp

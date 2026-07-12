@@ -54,6 +54,8 @@ jobs:
     name: Node 22 ${{ matrix.lane }} exact public install
     timeout-minutes: 20
     runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: read
     environment: public-candidate-proof
     env:
       RELEASE_ADMINISTRATOR: ${{ vars.ACADEMYINFO_RELEASE_ADMINISTRATOR }}

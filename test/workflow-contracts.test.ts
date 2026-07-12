@@ -1643,6 +1643,109 @@ describe("shared public verifier fail-closed helpers", () => {
   })
 })
 
+describe("workflow privacy alignment", () => {
+  const verifierSource = readFileSync(
+    join(projectRoot, "scripts/release-receipt-verify.mjs"),
+    "utf8",
+  )
+  const workflows = [
+    {
+      name: "candidate release",
+      source: readFileSync(join(projectRoot, ".github/workflows/candidate-release.yml"), "utf8"),
+    },
+    {
+      name: "refresh acquisition",
+      source: readFileSync(join(projectRoot, ".github/workflows/refresh-acquire-validate.yml"), "utf8"),
+    },
+  ] as const
+
+  function privateMaterialLiteral(source: string): string {
+    const matches = [...source.matchAll(/^\s*const PRIVATE_MATERIAL = (\/[^\r\n]+\/[a-z]+);?\s*$/gmu)]
+    expect(matches).toHaveLength(1)
+    return matches[0]?.[1] ?? ""
+  }
+
+  function compileRegexLiteral(literal: string): RegExp {
+    const closingSlash = literal.lastIndexOf("/")
+    expect(closingSlash).toBeGreaterThan(0)
+    return new RegExp(literal.slice(1, closingSlash), literal.slice(closingSlash + 1))
+  }
+
+  it("keeps both inline guards identical to the release receipt verifier source of truth", () => {
+    const canonicalLiteral = privateMaterialLiteral(verifierSource)
+
+    for (const workflow of workflows) {
+      expect(privateMaterialLiteral(workflow.source), workflow.name).toBe(canonicalLiteral)
+      expect(
+        workflow.source.match(/if \(PRIVATE_MATERIAL\.test\(serialized\)\)/g),
+        workflow.name,
+      ).toHaveLength(1)
+      expect(workflow.source, workflow.name).toContain(
+        "scripts/release-receipt-verify.mjs, the source of truth",
+      )
+    }
+
+    expect(workflows[1].source).toMatch(/if \(\/15139279\/u\.test\(fullReportSerialized\)\)/)
+  })
+  it("excludes only exact prevalidated public URL fields from the canonical private scan", () => {
+    expect(workflows[0].source).toContain("delete closedProvenanceForPrivacyScan.registry")
+    expect(workflows[0].source).toContain("delete closedProofForPrivacyScan.registry")
+    expect(workflows[1].source).toContain("delete reportForPrivacyScan.canonical_page_url")
+    expect(workflows[1].source).toContain(
+      "report.canonical_page_url !== process.env.CANONICAL_SOURCE_PAGE",
+    )
+  })
+
+  it("covers adversarial private material categories in each workflow guard", () => {
+    const slash = String.fromCharCode(47)
+    const backslash = String.fromCharCode(92)
+    const adversarialValues = [
+      [
+        "X-Goog-Signature URL",
+        ["https:", slash, slash, "storage.googleapis.com", slash, "object?", "X-Goog-Signature", "=", "deadbeef"].join(""),
+      ],
+      ["Bearer authorization", ["Authorization: ", "Bearer", " abc_DEF-123=="].join("")],
+      ["Basic authorization", ["Authorization: ", "Basic", " dXNlcjpwYXNz"].join("")],
+      ["npm token prefix", ["npm", "_", "privateToken123"].join("")],
+      ["GitHub token prefix", ["github", "_pat_", "privateToken123"].join("")],
+      ["short GitHub token prefix", ["gh", "p_", "privateToken123"].join("")],
+      ["Slack token prefix", ["xox", "b-", "privateToken123"].join("")],
+      ["Windows private path", ["C:", backslash, "Users", backslash, "alice", backslash, "secret.txt"].join("")],
+      ["UNC private path", [backslash, backslash, "server", backslash, "share", backslash, "secret.txt"].join("")],
+      ["private path", ["", "private", "session", "secret.txt"].join(slash)],
+      ["temporary path", ["", "tmp", "session", "secret.txt"].join(slash)],
+      ["generic secret key-value", [["creden", "tial"].join(""), " = ", "private-value"].join("")],
+    ] as const
+
+    for (const workflow of workflows) {
+      const guard = compileRegexLiteral(privateMaterialLiteral(workflow.source))
+      for (const [category, value] of adversarialValues) {
+        expect(guard.test(value), `${workflow.name}: ${category}`).toBe(true)
+      }
+    }
+  })
+})
+
+describe("privileged workflow job permissions", () => {
+  const jobs = [
+    ["promote-release.yml", "promote"],
+    ["rollback-release.yml", "rollback"],
+    ["client-evidence.yml", "ingest-actual-client-evidence"],
+    ["public-candidate-verify.yml", "verify-public-candidate"],
+  ] as const
+
+  it.each(jobs)("%s grants %s only the inherited read permission explicitly", (file, jobName) => {
+    const source = readFileSync(join(projectRoot, ".github/workflows", file), "utf8")
+    const marker = `\n  ${jobName}:`
+    const jobStart = source.indexOf(marker)
+
+    expect(jobStart).toBeGreaterThan(0)
+    const jobBlock = source.slice(jobStart)
+    expect(jobBlock.match(/^    permissions:$/gmu)).toHaveLength(1)
+    expect(jobBlock).toMatch(/^    permissions:\n      contents: read$/mu)
+  })
+})
+
 describe("workflow package interfaces", () => {
   it("builds before both TypeScript workflow CLIs", () => {
     const pkg = JSON.parse(readFileSync(join(projectRoot, "package.json"), "utf8")) as { scripts: Record<string, string> }

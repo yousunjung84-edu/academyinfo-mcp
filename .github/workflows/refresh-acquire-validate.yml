@@ -157,8 +157,17 @@ jobs:
               !["changed", "no_change", "failure"].includes(report.result)) {
             throw new Error("Validation report identity or policy binding is invalid");
           }
-          const serialized = JSON.stringify(report);
-          if (/15139279|file:\/\/|[?&](?:key|token|signature|x-amz-)[^" ]*|\/(?:Users|home)\//i.test(serialized)) {
+          const fullReportSerialized = JSON.stringify(report);
+          if (/15139279/u.test(fullReportSerialized)) {
+            throw new Error("Validation report contains prohibited dataset, query-secret, or private-path material");
+          }
+          const reportForPrivacyScan = { ...report };
+          // The exact canonical public page was policy-validated above; scan every other field.
+          delete reportForPrivacyScan.canonical_page_url;
+          const serialized = JSON.stringify(reportForPrivacyScan);
+          // Keep aligned with PRIVATE_MATERIAL in scripts/release-receipt-verify.mjs, the source of truth.
+          const PRIVATE_MATERIAL = /(?:[A-Za-z][A-Za-z0-9+.-]*:\/\/|\/(?:Users|home|private|tmp)\/|\/var\/folders\/|[A-Za-z]:[\\/](?:Users|Temp|Documents and Settings)[\\/]|\\\\[^\\\r\n]+\\[^\\\r\n]+|(?:Bearer|Basic)\s+[A-Za-z0-9+/=_-]+|\b(?:npm_|github_pat_|gh[pousr]_|xox[baprs]-)[A-Za-z0-9_./+=-]*|\b(?:password|secret|token|credential)\s*[:=]\s*\S+)/iu;
+          if (PRIVATE_MATERIAL.test(serialized)) {
             throw new Error("Validation report contains prohibited dataset, query-secret, or private-path material");
           }
           if (report.result !== "changed" && files.some((path) => path !== "validation-report.v1.json")) {

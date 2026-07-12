@@ -77,6 +77,8 @@ jobs:
     name: Restore receipt-recorded last known good (Node 22)
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    permissions:
+      contents: read
     environment: npm-rollback
     env:
       RELEASE_ADMINISTRATOR: ${{ vars.ACADEMYINFO_RELEASE_ADMINISTRATOR }}
