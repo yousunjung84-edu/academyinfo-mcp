@@ -71,6 +71,7 @@ function reject(condition: unknown): asserts condition {
 }
 
 function isSafeMode(mode: number, directory: boolean): boolean {
+  if (process.platform === "win32") return true
   if ((mode & 0o022) !== 0) return false
   return directory || (mode & 0o111) === 0
 }
