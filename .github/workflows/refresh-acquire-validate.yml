@@ -20,7 +20,6 @@ jobs:
     env:
       CANONICAL_SOURCE_PAGE: ${{ vars.ACADEMYINFO_15118998_CANONICAL_PAGE }}
       SOURCE_POLICY_DIGEST: ${{ vars.ACADEMYINFO_REFRESH_POLICY_DIGEST }}
-      CANDIDATE_ROOT: ${{ runner.temp }}/refresh-candidate
     steps:
       # Pinned from the upstream v4 ref observed during workflow authoring.
       - name: Check out the immutable triggering commit
@@ -86,6 +85,7 @@ jobs:
         continue-on-error: true
         env:
           SOURCE_COMMIT: ${{ github.sha }}
+          CANDIDATE_ROOT: ${{ runner.temp }}/refresh-candidate
         shell: bash
         run: |
           set -euo pipefail
@@ -102,6 +102,7 @@ jobs:
         if: always() && steps.acquisition.outcome != 'cancelled'
         env:
           SOURCE_COMMIT: ${{ github.sha }}
+          CANDIDATE_ROOT: ${{ runner.temp }}/refresh-candidate
         shell: bash
         run: |
           set -euo pipefail
