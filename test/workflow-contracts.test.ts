@@ -431,7 +431,11 @@ describe("closed refresh artifact verifier", () => {
     writeChangedArtifact(executable)
     const executablePath = join(executable, FIXED_CANDIDATE_PATHS[0])
     chmodSync(executablePath, 0o700)
-    expect(() => verifyArtifact(verifierOptions(executable))).toThrow("rejected")
+    if (process.platform === "win32") {
+      expect(() => verifyArtifact(verifierOptions(executable))).not.toThrow()
+    } else {
+      expect(() => verifyArtifact(verifierOptions(executable))).toThrow("rejected")
+    }
   })
 
   it("rejects a signed traversal manifest without reading outside the artifact", () => {
