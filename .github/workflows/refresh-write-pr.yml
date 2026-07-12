@@ -29,7 +29,6 @@ jobs:
       source_commit: ${{ steps.report.outputs.source_commit }}
       report_digest: ${{ steps.report.outputs.report_digest }}
     env:
-      ARTIFACT_ROOT: ${{ runner.temp }}/producer-artifact
       SOURCE_COMMIT: ${{ github.event.workflow_run.head_sha }}
       SOURCE_POLICY_DIGEST: ${{ vars.ACADEMYINFO_REFRESH_POLICY_DIGEST }}
       CANONICAL_SOURCE_PAGE: ${{ vars.ACADEMYINFO_15118998_CANONICAL_PAGE }}
@@ -97,6 +96,8 @@ jobs:
 
       - name: Verify closed schema, producer, policy, paths, and every hash
         id: report
+        env:
+          ARTIFACT_ROOT: ${{ runner.temp }}/producer-artifact
         shell: bash
         run: |
           set -euo pipefail
@@ -192,7 +193,6 @@ jobs:
       contents: write
       pull-requests: write
     env:
-      ARTIFACT_ROOT: ${{ runner.temp }}/verified-artifact
       SOURCE_COMMIT: ${{ needs.inspect-read-only.outputs.source_commit }}
       REPORT_DIGEST: ${{ needs.inspect-read-only.outputs.report_digest }}
       SOURCE_POLICY_DIGEST: ${{ vars.ACADEMYINFO_REFRESH_POLICY_DIGEST }}
@@ -250,6 +250,8 @@ jobs:
           path: ${{ runner.temp }}/verified-artifact
 
       - name: Reverify and copy without executing candidate content
+        env:
+          ARTIFACT_ROOT: ${{ runner.temp }}/verified-artifact
         shell: bash
         run: |
           set -euo pipefail

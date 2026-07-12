@@ -1768,6 +1768,19 @@ describe("refresh workflow privilege and policy contracts", () => {
     "utf8",
   )
 
+  it("uses runner.temp only in step contexts where the runner context is available", () => {
+    const invalidJobEnv =
+      /^    env:\n(?:      [A-Z0-9_]+:.*\n)*      [A-Z0-9_]+: \$\{\{ runner\.temp \}\}/gmu
+
+    expect(acquisitionWorkflow).not.toMatch(invalidJobEnv)
+    expect(writerWorkflow).not.toMatch(invalidJobEnv)
+    expect(acquisitionWorkflow.match(
+      /^          CANDIDATE_ROOT: \$\{\{ runner\.temp \}\}\/refresh-candidate$/gmu,
+    )).toHaveLength(2)
+    expect(writerWorkflow.match(
+      /^          ARTIFACT_ROOT: \$\{\{ runner\.temp \}\}\/(?:producer|verified)-artifact$/gmu,
+    )).toHaveLength(2)
+  })
   it("binds the exact canonical page and reviewed base policy with SHA-256/JCS in all lanes", () => {
     const bindingBlock =
       /const policyBindingJcs = JSON\.stringify\(\{\s*canonical_page_url: canonicalPage,\s*policy_digest: policyDigest,\s*\}\);/g
