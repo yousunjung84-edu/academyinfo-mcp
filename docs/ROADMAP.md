@@ -1,167 +1,105 @@
 # Roadmap: academyinfo-mcp
 
-This roadmap defines order of work. It is not permission to skip gates or start implementation early.
+## Purpose and evidence boundary
 
-## v0.1 Release Principle
+This roadmap orders the remaining work for the integrated release contract. It does not select a public version, source endpoint, or SQLite backend; grant an approval; or prove npm availability, client execution, promotion, or rollback readiness. A checkout, workflow definition, local install, or packed tarball is not public-release evidence.
 
-v0.1 is file-first, no-key, license-aware, and read-only.
+The implemented baseline is file-first, offline, no-key, read-only, and recommendation-free. Runtime behavior must not call a live OpenAPI endpoint, scrape a website, mutate source data, or require `DATA_GO_KR_SERVICE_KEY` or `ACADEMYINFO_SERVICE_KEY`.
 
-v0.1 must not call live OpenAPI endpoints and must not require `DATA_GO_KR_SERVICE_KEY` or `ACADEMYINFO_SERVICE_KEY`.
+## Integrated baseline that must remain stable
 
-## Ticket Sequence
+### Runtime and dependency boundary
 
-### Ticket 0: Repository Governance
+- Node is exactly `>=22 <23`. Node 24 and later are not supported or claimed.
+- The only intended public lanes are Node 22 macOS/arm64, Windows/x64, and Ubuntu glibc/x64, after each lane has protected public-install evidence.
+- The MCP transport contract is pinned to exact runtime requirements `@modelcontextprotocol/sdk` `1.29.0` and `zod` `4.4.3`. Ranges or silent upgrades are prohibited.
+- Stdio stdout contains MCP JSON-RPC only; diagnostics use stderr.
 
-Status: current prompt.
+### Exact eight-tool scope
 
-Deliver:
-- `AGENTS.md`
-- `docs/PROJECT_CHARTER.md`
-- `docs/ROADMAP.md`
-- `docs/NON_GOALS.md`
+The server registers exactly these eight read-only tools:
 
-No source code, dependencies, package metadata, datasets, fixtures, SQLite files, or generated artifacts.
+1. `list_sources`
+2. `list_indicators`
+3. `search_university`
+4. `get_university_metrics`
+5. `compare_universities`
+6. `explain_indicator`
+7. `validate_source_coverage`
+8. `explore_universities`
 
-### Ticket 1: License Gate
+The first seven contracts remain backward compatible. `explore_universities` is bounded to 10 university queries and 5 indicators, uses one local snapshot, never guesses an ambiguous institution, and returns no partial metrics, comparisons, or explanations when any university is unresolved. No tool scores, weights, ranks, recommends, or selects a winner.
 
-Confirm license and attribution requirements before bundling any data.
+### Data and catalog boundary
 
-Required outputs:
-- code license decision
-- data license record for `15118998`
-- explicit non-bundling confirmation for `15139279`
-- no endorsement disclaimer text
+- Dataset `15118998` is the only bundled source.
+- `data/seed/indicators.json` is the sole packaged source-derived catalog. It is closed-schema, KOGL-attributed JSON data, not generated executable TypeScript or JavaScript and not backed by a hard-coded fallback.
+- The catalog contains exactly five logical indicators: `competition_rate`, `fill_rate`, `employment_rate`, `scholarship_per_student`, and `avg_tuition`.
+- `employment_rate` is the school-level value from `15118998` only.
+- Dataset `15139279` and all granular, per-department, or health-insurance-linked employment data remain excluded from package artifacts and default runtime behavior.
+- Code remains MIT licensed; bundled data remains separately attributed under KOGL Type 1.
 
-### Ticket 2: Evidence Lock
+### Semantic refresh authority
 
-Verify source evidence before schema or ingestion work.
+Refresh acceptance is semantic, not a frozen-file or fixed-shape comparison:
 
-Required outputs:
-- downloaded-header evidence for `15118998`
-- official documentation references where needed
-- verified source columns
-- verified units
-- verified year or base year
-- `NotVerified` list for unresolved fields
+- require one unique identity mapping and one unique mapping for each of the five logical indicators;
+- preserve indexed raw cells and map every source row exactly once to one raw row, one institution, and five numeric-or-missing classifications;
+- keep verified units fixed and years as nondecreasing integers;
+- treat only trimmed empty text and ASCII `-` as missing;
+- parse only the approved nonnegative decimal grammars, preserve canonical decimal text as semantic authority, require exact JavaScript Number round-trip safety, and never round;
+- treat post-download SHA-256 as integrity, change-detection, and audit evidence only—not source authenticity or approval.
 
-### Ticket 3: PRD And Architecture Docs
+A matching prior checksum does not approve a source, and a changed checksum does not reject it. A changed institution set, values, allowed missingness, unrelated columns, row count, or worksheet width is an administrator-reviewed diff rather than an independent pass/fail rule. Valid 23-column, 25-column, or other annual shapes may pass when every semantic invariant passes.
 
-Define the MCP product surface and file-first architecture.
+## Remaining gated sequence
 
-Required outputs:
-- read-only MCP tool list
-- response provenance contract
-- local database derivation model
-- raw-file preservation policy
-- warning model
+### Gate 1: Administrator prerequisites
 
-### Ticket 4: SQLite Schema And Indicator Dictionary
+Before any candidate publication, an administrator must establish npm identity, version history, ownership and release authority; select an unused SemVer; confirm 2FA or trusted publishing and provenance readiness; configure protected environments and retention; and provide an evidenced query-free official acquisition page. No repository document supplies these facts or approvals.
 
-Design the normalized local database and indicator dictionary.
+### Gate 2: Resolve the single backend
 
-Required outputs:
-- schema proposal
-- indicator dictionary for the `15118998` v0.1 indicators
-- source-column mapping table
-- unit and base-year fields
+The current `better-sqlite3` integration is provisional. It may ship only after the same candidate proves prebuilt-only installation on all three official Node 22 lanes with fresh state, active Python/node-gyp/compiler traps, and a demonstrated canary.
 
-### Ticket 5: `15118998` Ingestion
+If that path fails, one reviewed `sql.js` version remains a spike until it proves contract parity, custom/missing/corrupt database behavior, package/WASM/license/security posture, startup and RSS bounds, and no-native-build operation. Selecting it additionally requires separate Architect and administrator approval bound to the closed backend-selection receipt.
 
-Implement ingestion only after Tickets 1 through 4 pass.
+Until one path passes, release state is `BLOCKED_PENDING_BACKEND_SELECTION`. Exactly one backend may ship; there is no automatic fallback or dual-backend package.
 
-Required outputs:
-- raw-row preservation
-- derived database generation
-- no mutation of raw files
-- warnings for unverified fields
+### Gate 3: Semantic refresh and fixed-path writing
 
-### Ticket 6: `15139279` v0.3 Backlog Boundary
+Run acquisition and validation in a read-only trust domain from an immutable source revision. Emit only sanitized candidate artifacts and a closed report. A separate least-privilege writer must verify the producer, source revision, policy/schema versions, hashes, and complete allowlist before writing only the database, manifest, data-only catalog, header/checksum/sample evidence, and one digest-named refresh audit.
 
-Document the v0.3-only boundary for granular employment statistics without
-bundling `15139279` data or adding v0.1 runtime ingest code.
+Failure and verified-no-change paths cannot invoke content writes. Equal reacquired bytes may close an incident only after source/license/workbook revalidation and an administrator-attested verified-no-change receipt. Differing bytes remain open until the matching release-data digest reaches `latest`.
 
-Required outputs:
-- package artifact guard against `15139279`
-- `employment_rate` enabled by default only from bundled `15118998`
-- `15139279` deferred to v0.3 granular employment statistics
-- warnings if a caller asks for `15139279`-sourced granular employment data in v0.1
+### Gate 4: Protected candidate transition
 
-### Ticket 7: MCP Server And Tools
+After all local, data, dependency, privacy, package, and selected-backend gates pass on immutable inputs, publish the administrator-selected unused version only under a non-`latest` candidate tag. Preserve the prior `latest`. The protected candidate receipt must bind the source, package, backend, data, dependency, audit, registry, and provenance evidence. Candidate publication is not release completion.
 
-Implement read-only MCP tools.
+### Gate 5: Public-install and client proof
 
-Required outputs:
-- query and compare tools
-- no write tools
-- every response includes source, license, year or base year, unit, source column, derived database, bundled status, and warnings
-- no stdout logging in stdio MCP mode
+Verify the exact public candidate on the three official Node 22 lanes using fresh homes, caches, working directories, and configurations outside the checkout; an explicit public registry; no reachable local artifact; active build-tool traps; and exact `npx -y academyinfo-mcp@<version>`.
 
-### Ticket 8: Seed DB And Packaging
+Protected evidence must establish installed application/SDK/Zod identity and registry integrity, candidate tag and provenance/signature evidence, platform identity, sanitized verbose install output, no compilation, initialization, the exact eight-tool list and eighth-tool schema, a bundled-data query, no-key behavior, and JSON-RPC-only stdout.
 
-Prepare package artifacts.
+A separate protected client receipt must join those lane proofs, a generic stdio journey, and actual Claude Desktop/macOS execution against the same candidate. Cursor and Codex examples remain documentation-only unless separately exercised.
 
-Required outputs:
-- bundled seed derived only from verified `15118998`
-- no `15139279` raw, normalized, seed, sample, fixture, SQLite, CSV, JSON, or derived data
-- no API keys, service keys, private paths, or local user names
+### Gate 6: Protected promotion
 
-### Ticket 9: Tests And Quality Gates
+Only an administrator-approved protected transition may move the already-proved candidate bytes to `latest`. Promotion must reverify candidate/client predecessor digests and public identity/integrity; it must not rebuild or substitute the package. A changed-data incident closes only when its matching release-data digest reaches `latest`.
 
-Add verification gates.
+### Gate 7: Protected rollback readiness
 
-Required outputs:
-- artifact leak checks
-- source provenance checks
-- no-key startup checks
-- stdio stdout logging checks
-- non-bundled employment data checks
+Rollback must be separately administrator-approved. It restores the exact prior-good `latest`, deprecates the bad version, preserves the evidence chain, verifies the public result, and reopens the original changed-data incident clock when applicable. A correction uses a new unused SemVer; an existing version is never overwritten or reused.
 
-### Ticket 10: Public Docs
+## Explicit non-goals
 
-Write public usage documentation.
+- No live OpenAPI bridge, scraping, runtime network access, service key, write-capable tool, telemetry, or stdout diagnostics.
+- No `15139279` artifact or granular employment feature.
+- No executable source-derived catalog or mixing of MIT code terms with KOGL data obligations.
+- No recommendation, score, rank, winner/loser, guessed institution, or partial unresolved exploration result.
+- No Node 24+ support claim, dual backend, automatic backend fallback, or compiler requirement on a supported public invocation.
+- No fixed checksum, fixed row count, fixed institution set, fixed 24-column rule, rounding, or inferred source semantics.
+- No inferred version, endpoint, ownership, approval, publication, public-platform support, client compatibility, promotion, rollback completion, or freshness closure.
 
-Required outputs:
-- no-key v0.1 examples
-- neutral attribution
-- license separation
-- no private paths or credentials
-- non-affiliation disclaimer
-
-### Ticket 11: Final Release Audit
-
-Audit the release package before publication.
-
-Required outputs:
-- package contents report
-- license report
-- secret and private-path scan
-- no `15139279` package artifact evidence
-- no official endorsement language
-
-### Ticket 12: v0.2/v0.3 Backlog
-
-Track future work.
-
-Potential v0.2:
-- more local file datasets after license and evidence gates
-- richer comparison outputs
-- closed/defunct institution zero-value warning: the `15118998` source records a
-  literal `0` (not blank) for closed or no-data schools — e.g. 동부산대학교 has
-  `0` across all five indicators, and the 취업률 column holds `0` for 49 of 488
-  institutions. Ingestion faithfully mirrors the source `0` (no fabrication; not a
-  Source-First violation), but a naive consumer may misread `0%` as a real metric.
-  Add a non-destructive warning/flag for institutions whose default indicators are
-  all-zero (likely closed / no-data) — annotate only, never alter the source `0`.
-
-Potential v0.3:
-- optional OpenAPI bridge
-- graceful missing-key behavior
-- no service-key exposure
-
-## Release Gates
-
-Do not proceed past a ticket until its evidence is captured.
-
-Do not publish package artifacts until the final release audit passes.
-
-Do not add OpenAPI runtime behavior to v0.1.
+Do not weaken or skip a gate to meet a schedule. Keep the last-known-good public package and data available until the matching protected transition succeeds.

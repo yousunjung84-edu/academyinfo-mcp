@@ -36,6 +36,69 @@ const toolArguments: Record<ToolName, Record<string, unknown>> = {
   validate_source_coverage: {},
 }
 
+const expectedToolStatuses: Record<ToolName, string> = {
+  list_sources: "ok",
+  list_indicators: "ok",
+  search_university: "not_found",
+  get_university_metrics: "not_found",
+  compare_universities: "not_found",
+  explain_indicator: "ok",
+  validate_source_coverage: "ok",
+}
+
+const expectedDataKeys: Record<ToolName, readonly string[]> = {
+  list_sources: ["bundled_dataset_ids", "non_bundled_datasets", "sources"],
+  list_indicators: ["default_indicator_count", "indicators", "per_indicator_year_unit"],
+  search_university: [
+    "candidates",
+    "error",
+    "matched_count",
+    "returned_count",
+    "total_matched",
+    "truncated",
+  ],
+  get_university_metrics: [
+    "candidates",
+    "error",
+    "matched_count",
+    "metric_contracts",
+    "metrics",
+    "missing_metrics",
+    "returned_count",
+    "total_matched",
+    "truncated",
+    "university_name",
+  ],
+  compare_universities: [
+    "candidates",
+    "comparisons",
+    "error",
+    "matched_count",
+    "metric_contracts",
+    "returned_count",
+    "total_matched",
+    "truncated",
+    "university_name",
+  ],
+  explain_indicator: ["indicator"],
+  validate_source_coverage: [
+    "api_key_required",
+    "bundled_dataset_ids",
+    "default_indicator_count",
+    "default_indicators",
+    "employment_rate",
+    "file_first",
+    "non_bundled_datasets",
+    "observation_counts",
+    "observations",
+    "openapi_enabled",
+    "per_indicator_year_unit",
+    "raw_rows",
+    "seed_content_status",
+    "source_column_verified",
+  ],
+}
+
 const sourceSchema = z.object({
   dataset_id: z.string(),
   dataset_name: z.string(),
@@ -116,15 +179,35 @@ describe("v0.1 no-API-key policy", () => {
       const tools = await harness.listTools()
       const listedToolNames = tools.tools.map((tool) => tool.name)
 
-      expect(listedToolNames).toEqual(expect.arrayContaining([...toolNames]))
+      expect(listedToolNames).toEqual([
+        ...toolNames,
+        "explore_universities",
+      ])
 
       for (const toolName of toolNames) {
         const result = await harness.callTool(toolName, toolArguments[toolName])
         const response = responseSchema.parse(result.structuredContent)
 
+        expect(Object.keys(response).sort()).toEqual([
+          "data",
+          "generated_at",
+          "query",
+          "sources",
+          "status",
+          "tool",
+          "warnings",
+        ])
         expect(response.tool).toBe(toolName)
-        expect(response.status).not.toBe("api_key_missing")
+        expect(response.query).toEqual(toolArguments[toolName])
+        expect(response.status).toBe(expectedToolStatuses[toolName])
+        expect(Object.keys(response.data as Record<string, unknown>).sort()).toEqual(
+          expectedDataKeys[toolName],
+        )
         expect(response.warnings).toEqual(expect.any(Array))
+        expect(result).toEqual({
+          content: [{ type: "text", text: JSON.stringify(result.structuredContent) }],
+          structuredContent: result.structuredContent,
+        })
 
         const sources = "sources" in response ? response.sources : [response.source]
 

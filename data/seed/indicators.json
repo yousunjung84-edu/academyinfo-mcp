@@ -1,5 +1,17 @@
 {
-  "dataset_id": "15118998",
+  "catalog_schema_version": 1,
+  "source": {
+    "dataset_id": "15118998",
+    "dataset_name": "교육부_대학알리미_대학주요정보",
+    "provider": "교육부",
+    "source_url": "https://www.data.go.kr/data/15118998/fileData.do",
+    "license": "KOGL-1 / 공공누리 제1유형(출처표시)",
+    "derived_database": true,
+    "bundled": true,
+    "source_column": "NotVerified",
+    "base_year": "NotVerified",
+    "unit": "NotVerified"
+  },
   "indicators": [
     {
       "indicator_id": "competition_rate",

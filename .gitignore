@@ -22,3 +22,6 @@ data/external/**
 
 # OS
 .DS_Store
+
+# local goal-tracking tooling state
+.fablize/

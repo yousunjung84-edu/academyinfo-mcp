@@ -1,5 +1,6 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js"
 
+import { handleExploreUniversities } from "./explore-universities-handler.js"
 import {
   handleExplainIndicator,
   handleListIndicators,
@@ -15,6 +16,7 @@ import {
   compareUniversitiesInputSchema,
   emptyInputSchema,
   explainIndicatorInputSchema,
+  exploreUniversitiesRegisteredInputSchema,
   getUniversityMetricsInputSchema,
   searchUniversityInputSchema,
 } from "./tool-schemas.js"
@@ -88,5 +90,15 @@ export function registerAcademyinfoTools(server: McpServer): void {
       inputSchema: emptyInputSchema,
     },
     handleValidateSourceCoverage,
+  )
+
+  server.registerTool(
+    "explore_universities",
+    {
+      title: "Explore Universities",
+      description: "Resolve universities and return factual side-by-side local indicator data.",
+      inputSchema: exploreUniversitiesRegisteredInputSchema,
+    },
+    handleExploreUniversities,
   )
 }

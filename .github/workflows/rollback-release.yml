@@ -1,0 +1,747 @@
+name: Protected release rollback
+
+on:
+  workflow_dispatch:
+    inputs:
+      bad_version:
+        description: Exact promoted SemVer to roll back
+        required: true
+        type: string
+      bad_source_commit:
+        description: Source commit recorded by the promotion receipt
+        required: true
+        type: string
+      receipt_commit:
+        description: Protected default-branch commit containing immutable receipts
+        required: true
+        type: string
+      promotion_receipt_digest:
+        description: Immutable promotion.v1.json outer receipt digest
+        required: true
+        type: string
+      client_receipt_digest:
+        description: Immutable claude-desktop.v1.json outer receipt digest
+        required: true
+        type: string
+      promotion_freshness_receipt_digest:
+        description: Immutable promotion-freshness-transition.v1.json outer receipt digest
+        required: true
+        type: string
+      promotion_authorization_digest:
+        description: Immutable promotion-authorization.v1.json outer receipt digest
+        required: true
+        type: string
+      previous_release_receipt_digest:
+        description: Immutable candidate receipt digest for the recorded previous latest
+        required: true
+        type: string
+      prior_good_source_commit:
+        description: Full source commit recorded by the prior-good candidate receipt
+        required: true
+        type: string
+      prior_good_authorization_context_digest:
+        description: SHA-256 of the prior-good candidate authorization event/source context
+        required: true
+        type: string
+      freshness_transition_digest:
+        description: Expected verified PROMOTED_CLOSED predecessor transition digest
+        required: true
+        type: string
+      rollback_authorization_digest:
+        description: Outer digest of the closed pre-existing administrator-approved rollback payload
+        required: true
+        type: string
+      cause_code:
+        description: Factual deprecation reason
+        required: true
+        type: choice
+        options:
+          - regression
+          - data-validation
+          - package-integrity
+          - client-incompatibility
+      confirm_rollback:
+        description: Type restore-receipt-recorded-previous-latest
+        required: true
+        type: string
+
+concurrency:
+  group: academyinfo-mcp-registry-mutation
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  rollback:
+    name: Restore receipt-recorded last known good (Node 22)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    environment: npm-rollback
+    env:
+      RELEASE_ADMINISTRATOR: ${{ vars.ACADEMYINFO_RELEASE_ADMINISTRATOR }}
+      PUBLIC_INSTALL_VERIFIER_SHA256: ${{ vars.ACADEMYINFO_PUBLIC_INSTALL_VERIFIER_SHA256 }}
+      RECEIPT_VERIFIER_SHA256: ${{ vars.ACADEMYINFO_RELEASE_RECEIPT_VERIFIER_SHA256 }}
+      PACKAGE_NAME: academyinfo-mcp
+      BAD_VERSION: ${{ inputs.bad_version }}
+      BAD_SOURCE_COMMIT: ${{ inputs.bad_source_commit }}
+      RECEIPT_COMMIT: ${{ inputs.receipt_commit }}
+      PROMOTION_RECEIPT_DIGEST: ${{ inputs.promotion_receipt_digest }}
+      CLIENT_RECEIPT_DIGEST: ${{ inputs.client_receipt_digest }}
+      PROMOTION_FRESHNESS_RECEIPT_DIGEST: ${{ inputs.promotion_freshness_receipt_digest }}
+      PROMOTION_AUTHORIZATION_DIGEST: ${{ inputs.promotion_authorization_digest }}
+      PREVIOUS_RELEASE_RECEIPT_DIGEST: ${{ inputs.previous_release_receipt_digest }}
+      PRIOR_GOOD_SOURCE_COMMIT: ${{ inputs.prior_good_source_commit }}
+      PRIOR_GOOD_AUTHORIZATION_CONTEXT_DIGEST: ${{ inputs.prior_good_authorization_context_digest }}
+      FRESHNESS_TRANSITION_DIGEST: ${{ inputs.freshness_transition_digest }}
+      ROLLBACK_AUTHORIZATION_DIGEST: ${{ inputs.rollback_authorization_digest }}
+      CAUSE_CODE: ${{ inputs.cause_code }}
+      CONFIRM_ROLLBACK: ${{ inputs.confirm_rollback }}
+      REPOSITORY: ${{ github.repository }}
+      POLICY_COMMIT: ${{ github.sha }}
+      EVIDENCE_DIR: ${{ github.workspace }}/evidence-checkout
+      TRUSTED_POLICY_DIR: ${{ github.workspace }}/trusted-policy
+      DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+      NPM_CONFIG_REGISTRY: https://registry.npmjs.org/
+    steps:
+      - name: Check out the immutable protected evidence commit
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          ref: ${{ env.RECEIPT_COMMIT }}
+          persist-credentials: false
+          fetch-depth: 0
+          path: evidence-checkout
+
+      - name: Check out trusted policy from the workflow commit
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          ref: ${{ env.POLICY_COMMIT }}
+          persist-credentials: false
+          fetch-depth: 0
+          path: trusted-policy
+
+      - name: Install exact Node 22
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: "22"
+          registry-url: https://registry.npmjs.org/
+
+      - name: Validate trusted policy, protected ancestry, completed promotion, and rollback target
+        id: receipts
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$CONFIRM_ROLLBACK" = "restore-receipt-recorded-previous-latest"
+          test "$(node -p 'process.versions.node.split(`.`)[0]')" = "22"
+          node --input-type=module <<'NODE'
+          const digest = /^[a-f0-9]{64}$/;
+          const commit = /^[a-f0-9]{40}$/;
+          const semver = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/;
+          if (process.env.REPOSITORY !== "yousunjung84-edu/academyinfo-mcp" ||
+              !/^[A-Za-z0-9][A-Za-z0-9._/-]*$/.test(process.env.DEFAULT_BRANCH ?? "") ||
+              process.env.DEFAULT_BRANCH.includes("..") ||
+              process.env.DEFAULT_BRANCH.includes("//") ||
+              !semver.test(process.env.BAD_VERSION) ||
+              !commit.test(process.env.RECEIPT_COMMIT) ||
+              !commit.test(process.env.BAD_SOURCE_COMMIT) ||
+              !commit.test(process.env.PRIOR_GOOD_SOURCE_COMMIT) ||
+              !commit.test(process.env.POLICY_COMMIT)) {
+            throw new Error("Repository, protected default branch, release identity, or commit identity is invalid");
+          }
+          for (const key of [
+            "PUBLIC_INSTALL_VERIFIER_SHA256", "RECEIPT_VERIFIER_SHA256",
+            "PROMOTION_RECEIPT_DIGEST", "CLIENT_RECEIPT_DIGEST",
+            "PROMOTION_FRESHNESS_RECEIPT_DIGEST", "PROMOTION_AUTHORIZATION_DIGEST",
+            "PREVIOUS_RELEASE_RECEIPT_DIGEST", "PRIOR_GOOD_AUTHORIZATION_CONTEXT_DIGEST",
+            "FRESHNESS_TRANSITION_DIGEST", "ROLLBACK_AUTHORIZATION_DIGEST",
+          ]) {
+            if (!digest.test(process.env[key] ?? "")) throw new Error(`${key} must be an exact SHA-256`);
+          }
+          if (!/^[A-Za-z0-9](?:[A-Za-z0-9._@-]{0,127})$/.test(process.env.RELEASE_ADMINISTRATOR ?? "") ||
+              !new Set(["regression", "data-validation", "package-integrity", "client-incompatibility"]).has(process.env.CAUSE_CODE)) {
+            throw new Error("Protected administrator or rollback cause is invalid");
+          }
+          NODE
+          git -C "$EVIDENCE_DIR" check-ref-format "refs/heads/$DEFAULT_BRANCH"
+          EXPECTED_ORIGIN="https://github.com/${REPOSITORY}"
+          for checkout in "$EVIDENCE_DIR" "$TRUSTED_POLICY_DIR"; do
+            case "$(git -C "$checkout" remote get-url origin)" in
+              "$EXPECTED_ORIGIN"|"$EXPECTED_ORIGIN.git") ;;
+              *) echo "Trusted checkout origin mismatch: $checkout" >&2; exit 1 ;;
+            esac
+          done
+          test "$(git -C "$EVIDENCE_DIR" rev-parse HEAD)" = "$RECEIPT_COMMIT"
+          test "$(git -C "$TRUSTED_POLICY_DIR" rev-parse HEAD)" = "$POLICY_COMMIT"
+          git -C "$EVIDENCE_DIR" fetch --no-tags origin "refs/heads/$DEFAULT_BRANCH:refs/remotes/protected/default"
+          git -C "$EVIDENCE_DIR" merge-base --is-ancestor "$RECEIPT_COMMIT" refs/remotes/protected/default
+          git -C "$EVIDENCE_DIR" merge-base --is-ancestor "$BAD_SOURCE_COMMIT" refs/remotes/protected/default
+          git -C "$EVIDENCE_DIR" merge-base --is-ancestor "$PRIOR_GOOD_SOURCE_COMMIT" refs/remotes/protected/default
+          git -C "$TRUSTED_POLICY_DIR" fetch --no-tags origin "refs/heads/$DEFAULT_BRANCH:refs/remotes/protected/default"
+          test "$(git -C "$TRUSTED_POLICY_DIR" rev-parse refs/remotes/protected/default)" = "$POLICY_COMMIT"
+
+          PROMOTION_RECEIPT="$EVIDENCE_DIR/evidence/releases/$BAD_VERSION/promotion.v1.json"
+          CLIENT_RECEIPT="$EVIDENCE_DIR/evidence/releases/$BAD_VERSION/claude-desktop.v1.json"
+          PROMOTION_FRESHNESS_RECEIPT="$EVIDENCE_DIR/evidence/releases/$BAD_VERSION/promotion-freshness-transition.v1.json"
+          PROMOTION_AUTHORIZATION="$EVIDENCE_DIR/evidence/releases/$BAD_VERSION/promotion-authorization.v1.json"
+          ROLLBACK_AUTHORIZATION="$EVIDENCE_DIR/evidence/releases/$BAD_VERSION/rollback-authorization.v1.json"
+          for receipt in "$PROMOTION_RECEIPT" "$CLIENT_RECEIPT" "$PROMOTION_FRESHNESS_RECEIPT" "$PROMOTION_AUTHORIZATION" "$ROLLBACK_AUTHORIZATION"; do
+            test -f "$receipt"
+            test ! -L "$receipt"
+          done
+          PROMOTION_RECEIPT="$PROMOTION_RECEIPT" CLIENT_RECEIPT="$CLIENT_RECEIPT" PROMOTION_FRESHNESS_RECEIPT="$PROMOTION_FRESHNESS_RECEIPT" PROMOTION_AUTHORIZATION="$PROMOTION_AUTHORIZATION" ROLLBACK_AUTHORIZATION="$ROLLBACK_AUTHORIZATION" node --input-type=module <<'NODE' >> "$GITHUB_OUTPUT"
+          import { createHash } from "node:crypto";
+          import { lstatSync, readFileSync } from "node:fs";
+          import { join } from "node:path";
+          import { pathToFileURL } from "node:url";
+
+          const trustedPaths = {
+            public: join(process.env.TRUSTED_POLICY_DIR, "scripts/public-installed-verify.mjs"),
+            receipt: join(process.env.TRUSTED_POLICY_DIR, "scripts/release-receipt-verify.mjs"),
+          };
+          for (const [kind, path] of Object.entries(trustedPaths)) {
+            const stat = lstatSync(path);
+            if (!stat.isFile() || stat.isSymbolicLink()) throw new Error(`Trusted ${kind} verifier is not a regular file`);
+            const expected = kind === "public"
+              ? process.env.PUBLIC_INSTALL_VERIFIER_SHA256
+              : process.env.RECEIPT_VERIFIER_SHA256;
+            if (createHash("sha256").update(readFileSync(path)).digest("hex") !== expected) {
+              throw new Error(`Protected ${kind} verifier byte digest mismatch`);
+            }
+          }
+          const publicVerifier = await import(pathToFileURL(trustedPaths.public).href);
+          const receiptVerifier = await import(pathToFileURL(trustedPaths.receipt).href);
+          const { canonicalizeJcs, parseJsonStrict, sha256Jcs } = publicVerifier;
+          const { verifyReceipt, validReceiptIntegrity } = receiptVerifier;
+          const exactKeys = (value, keys) => value !== null && typeof value === "object" && !Array.isArray(value) &&
+            JSON.stringify(Object.keys(value).sort()) === JSON.stringify([...keys].sort());
+          const digest = /^[a-f0-9]{64}$/;
+          const semver = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/;
+          const eventId = /^(?:source|acquisition|availability):v1:[a-f0-9]{64}$/;
+          const time = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
+          const validTime = (value) => typeof value === "string" && time.test(value) &&
+            Number.isFinite(Date.parse(value)) && new Date(Date.parse(value)).toISOString() === value;
+          const outputSafe = (value) => typeof value === "string" && value.length <= 1024 &&
+            value.trim() === value && /^[^\u0000-\u001f\u007f]+$/u.test(value);
+          const forbiddenSelfKeys = new Set([
+            "receipt_digest_v1", "attestation_digest",
+            "freshness_transition_payload_digest_v1", "promotion_authorization_payload_digest_v1",
+          ]);
+          const excludesSelfDigests = (value) => {
+            if (Array.isArray(value)) return value.every(excludesSelfDigests);
+            if (value === null || typeof value !== "object") return true;
+            return Object.entries(value).every(([key, child]) =>
+              !forbiddenSelfKeys.has(key) && excludesSelfDigests(child));
+          };
+          const readReceipt = (path, label) => {
+            const stat = lstatSync(path);
+            if (!stat.isFile() || stat.isSymbolicLink() || stat.size <= 0 || stat.size > 1024 * 1024) {
+              throw new Error(`${label} must be a bounded regular file`);
+            }
+            return parseJsonStrict(readFileSync(path, "utf8"));
+          };
+
+          const promotion = readReceipt(process.env.PROMOTION_RECEIPT, "Promotion completion receipt");
+          if (!exactKeys(promotion, [
+            "receipt_schema_version", "promotion_completion_payload_v1",
+            "promotion_completion_payload_digest_v1", "registry_verification", "receipt_digest_v1",
+          ]) || promotion.receipt_schema_version !== "promotion-completion-receipt.v1") {
+            throw new Error("Promotion completion receipt shape mismatch");
+          }
+          const promoted = promotion.promotion_completion_payload_v1;
+          if (!exactKeys(promoted, [
+            "schema_version", "transition", "event_id", "prior_transition_digest", "first_seen_at", "deadline_at",
+            "release_data_digest_v1", "package_name", "package_version", "package_integrity", "source_commit",
+            "previous_latest_version", "predecessor_receipt_digests", "candidate_receipt_digest",
+            "authorization_receipt_digest",
+          ]) || !excludesSelfDigests(promoted) ||
+              promoted.schema_version !== "promotion-completion-payload.v1" ||
+              promoted.transition !== "PROMOTED_CLOSED" || !eventId.test(promoted.event_id) ||
+              !digest.test(promoted.prior_transition_digest) || !digest.test(promoted.release_data_digest_v1) ||
+              !validTime(promoted.first_seen_at) || !validTime(promoted.deadline_at) ||
+              Date.parse(promoted.deadline_at) - Date.parse(promoted.first_seen_at) !== 604800000 ||
+              promoted.package_name !== process.env.PACKAGE_NAME ||
+              promoted.package_version !== process.env.BAD_VERSION ||
+              promoted.source_commit !== process.env.BAD_SOURCE_COMMIT ||
+              !semver.test(promoted.previous_latest_version) ||
+              promoted.previous_latest_version === process.env.BAD_VERSION ||
+              !validReceiptIntegrity(promoted.package_integrity) ||
+              !digest.test(promoted.candidate_receipt_digest) ||
+              canonicalizeJcs(promoted.predecessor_receipt_digests) !== canonicalizeJcs([
+                process.env.CLIENT_RECEIPT_DIGEST,
+                process.env.PROMOTION_FRESHNESS_RECEIPT_DIGEST,
+              ]) ||
+              promoted.authorization_receipt_digest !== process.env.PROMOTION_AUTHORIZATION_DIGEST ||
+              sha256Jcs(promoted) !== promotion.promotion_completion_payload_digest_v1) {
+            throw new Error("Promotion completion identity or typed predecessor join failed");
+          }
+          const registry = promotion.registry_verification;
+          if (!exactKeys(registry, ["registry", "latest_version", "package_integrity", "verified_at"]) ||
+              registry.registry !== "https://registry.npmjs.org/" ||
+              registry.latest_version !== process.env.BAD_VERSION ||
+              registry.package_integrity !== promoted.package_integrity ||
+              !validTime(registry.verified_at) ||
+              sha256Jcs({
+                receipt_schema_version: promotion.receipt_schema_version,
+                promotion_completion_payload_v1: promoted,
+                promotion_completion_payload_digest_v1: promotion.promotion_completion_payload_digest_v1,
+                registry_verification: registry,
+              }) !== promotion.receipt_digest_v1 ||
+              promotion.receipt_digest_v1 !== process.env.PROMOTION_RECEIPT_DIGEST) {
+            throw new Error("Promotion completion registry proof or outer digest is forged");
+          }
+
+          const client = readReceipt(process.env.CLIENT_RECEIPT, "Client receipt");
+          const clientPayload = client.evidence_payload_v1;
+          const clientPredecessors = clientPayload?.predecessor_receipt_digests;
+          if (!Array.isArray(clientPredecessors) || clientPredecessors.length !== 1 ||
+              !digest.test(clientPredecessors[0]) ||
+              clientPredecessors[0] !== promoted.candidate_receipt_digest) {
+            throw new Error("Client receipt has an invalid or substituted candidate predecessor");
+          }
+          verifyReceipt(client, {
+            kind: "client",
+            expectedDigest: process.env.CLIENT_RECEIPT_DIGEST,
+            expectedPredecessors: clientPredecessors,
+            sourceCommit: process.env.BAD_SOURCE_COMMIT,
+            packageName: process.env.PACKAGE_NAME,
+            packageVersion: process.env.BAD_VERSION,
+            packageIntegrity: promoted.package_integrity,
+            previousLatest: promoted.previous_latest_version,
+            expectedApprover: process.env.RELEASE_ADMINISTRATOR,
+          });
+
+          const freshness = readReceipt(process.env.PROMOTION_FRESHNESS_RECEIPT, "Promotion freshness receipt");
+          if (!exactKeys(freshness, [
+            "receipt_schema_version", "freshness_transition_payload_v1",
+            "freshness_transition_payload_digest_v1", "administrator_attestation", "receipt_digest_v1",
+          ]) || freshness.receipt_schema_version !== "promotion-freshness-transition-receipt.v1") {
+            throw new Error("Promotion freshness receipt shape mismatch");
+          }
+          const freshnessPayload = freshness.freshness_transition_payload_v1;
+          const freshnessPayloadDigest = freshness.freshness_transition_payload_digest_v1;
+          if (!exactKeys(freshnessPayload, [
+            "schema_version", "transition", "event_id", "transition_digest", "prior_transition_digest",
+            "first_seen_at", "deadline_at", "release_data_digest_v1", "package_name", "package_version",
+            "package_integrity", "source_commit", "previous_latest_version", "candidate_receipt_digest",
+            "client_receipt_digest",
+          ]) || !excludesSelfDigests(freshnessPayload) ||
+              freshnessPayload.schema_version !== "promotion-freshness-transition-payload.v1" ||
+              freshnessPayload.transition !== "CLIENT_VERIFIED" ||
+              !eventId.test(freshnessPayload.event_id) ||
+              !digest.test(freshnessPayload.transition_digest) ||
+              !digest.test(freshnessPayload.prior_transition_digest) ||
+              !validTime(freshnessPayload.first_seen_at) || !validTime(freshnessPayload.deadline_at) ||
+              Date.parse(freshnessPayload.deadline_at) - Date.parse(freshnessPayload.first_seen_at) !== 604800000 ||
+              freshnessPayload.event_id !== promoted.event_id ||
+              freshnessPayload.transition_digest !== promoted.prior_transition_digest ||
+              freshnessPayload.first_seen_at !== promoted.first_seen_at ||
+              freshnessPayload.deadline_at !== promoted.deadline_at ||
+              freshnessPayload.release_data_digest_v1 !== promoted.release_data_digest_v1 ||
+              freshnessPayload.package_name !== process.env.PACKAGE_NAME ||
+              freshnessPayload.package_version !== process.env.BAD_VERSION ||
+              freshnessPayload.package_integrity !== promoted.package_integrity ||
+              freshnessPayload.source_commit !== process.env.BAD_SOURCE_COMMIT ||
+              freshnessPayload.previous_latest_version !== promoted.previous_latest_version ||
+              freshnessPayload.candidate_receipt_digest !== clientPredecessors[0] ||
+              freshnessPayload.client_receipt_digest !== process.env.CLIENT_RECEIPT_DIGEST ||
+              sha256Jcs(freshnessPayload) !== freshnessPayloadDigest) {
+            throw new Error("Promotion freshness receipt identity or JCS payload is invalid");
+          }
+          const freshnessApproval = freshness.administrator_attestation;
+          if (!exactKeys(freshnessApproval, [
+            "role", "identity", "approved_at", "decision",
+            "freshness_transition_payload_digest_v1", "attestation_digest",
+          ]) || freshnessApproval.role !== "administrator" ||
+              freshnessApproval.identity !== process.env.RELEASE_ADMINISTRATOR ||
+              !validTime(freshnessApproval.approved_at) ||
+              freshnessApproval.decision !== "promotion-open-predecessor" ||
+              freshnessApproval.freshness_transition_payload_digest_v1 !== freshnessPayloadDigest) {
+            throw new Error("Promotion freshness administrator attestation is invalid");
+          }
+          const { attestation_digest: freshnessAttestationDigest, ...freshnessAttestationProjection } = freshnessApproval;
+          const { receipt_digest_v1: freshnessDigest, ...freshnessProjection } = freshness;
+          if (sha256Jcs(freshnessAttestationProjection) !== freshnessAttestationDigest ||
+              sha256Jcs(freshnessProjection) !== freshnessDigest ||
+              freshnessDigest !== process.env.PROMOTION_FRESHNESS_RECEIPT_DIGEST) {
+            throw new Error("Promotion freshness self-excluding receipt digest is invalid");
+          }
+
+          const promotionAuthorization = readReceipt(process.env.PROMOTION_AUTHORIZATION, "Promotion authorization");
+          if (!exactKeys(promotionAuthorization, [
+            "receipt_schema_version", "promotion_authorization_payload_v1",
+            "promotion_authorization_payload_digest_v1", "administrator_attestation", "receipt_digest_v1",
+          ]) || promotionAuthorization.receipt_schema_version !== "promotion-authorization-receipt.v1") {
+            throw new Error("Promotion authorization receipt shape mismatch");
+          }
+          const promotionAuthorizationPayload = promotionAuthorization.promotion_authorization_payload_v1;
+          const promotionAuthorizationPayloadDigest = promotionAuthorization.promotion_authorization_payload_digest_v1;
+          const publicLanes = promotionAuthorizationPayload?.public_lane_receipt_digests;
+          if (!exactKeys(promotionAuthorizationPayload, [
+            "schema_version", "transition", "package_name", "package_version", "package_integrity",
+            "source_commit", "previous_latest_version", "candidate_receipt_digest", "client_receipt_digest",
+            "public_lane_receipt_digests", "actual_claude_receipt_digest", "freshness_transition_digest",
+            "event_id", "release_data_digest_v1", "predecessor_transition_digest", "first_seen_at", "deadline_at",
+          ]) || !excludesSelfDigests(promotionAuthorizationPayload) ||
+              !exactKeys(publicLanes, ["macos-arm64", "ubuntu-glibc-x64", "windows-x64"]) ||
+              !Object.values(publicLanes).every((value) => digest.test(value)) ||
+              !digest.test(promotionAuthorizationPayload.actual_claude_receipt_digest) ||
+              promotionAuthorizationPayload.schema_version !== "promotion-authorization-payload.v1" ||
+              promotionAuthorizationPayload.transition !== "promotion" ||
+              promotionAuthorizationPayload.package_name !== process.env.PACKAGE_NAME ||
+              promotionAuthorizationPayload.package_version !== process.env.BAD_VERSION ||
+              promotionAuthorizationPayload.package_integrity !== promoted.package_integrity ||
+              promotionAuthorizationPayload.source_commit !== process.env.BAD_SOURCE_COMMIT ||
+              promotionAuthorizationPayload.previous_latest_version !== promoted.previous_latest_version ||
+              promotionAuthorizationPayload.candidate_receipt_digest !== clientPredecessors[0] ||
+              promotionAuthorizationPayload.client_receipt_digest !== process.env.CLIENT_RECEIPT_DIGEST ||
+              promotionAuthorizationPayload.freshness_transition_digest !== process.env.PROMOTION_FRESHNESS_RECEIPT_DIGEST ||
+              promotionAuthorizationPayload.event_id !== promoted.event_id ||
+              promotionAuthorizationPayload.release_data_digest_v1 !== promoted.release_data_digest_v1 ||
+              promotionAuthorizationPayload.predecessor_transition_digest !== freshnessPayload.transition_digest ||
+              promotionAuthorizationPayload.first_seen_at !== promoted.first_seen_at ||
+              promotionAuthorizationPayload.deadline_at !== promoted.deadline_at ||
+              sha256Jcs(promotionAuthorizationPayload) !== promotionAuthorizationPayloadDigest) {
+            throw new Error("Promotion authorization payload identity or JCS shape is invalid");
+          }
+          const promotionApproval = promotionAuthorization.administrator_attestation;
+          if (!exactKeys(promotionApproval, [
+            "role", "identity", "approved_at", "decision",
+            "promotion_authorization_payload_digest_v1", "attestation_digest",
+          ]) || promotionApproval.role !== "administrator" ||
+              promotionApproval.identity !== process.env.RELEASE_ADMINISTRATOR ||
+              !validTime(promotionApproval.approved_at) ||
+              promotionApproval.decision !== "promotion" ||
+              promotionApproval.promotion_authorization_payload_digest_v1 !== promotionAuthorizationPayloadDigest) {
+            throw new Error("Promotion administrator attestation is invalid");
+          }
+          const { attestation_digest: promotionAttestationDigest, ...promotionAttestationProjection } = promotionApproval;
+          const { receipt_digest_v1: promotionAuthorizationDigest, ...promotionAuthorizationProjection } = promotionAuthorization;
+          if (sha256Jcs(promotionAttestationProjection) !== promotionAttestationDigest ||
+              sha256Jcs(promotionAuthorizationProjection) !== promotionAuthorizationDigest ||
+              promotionAuthorizationDigest !== process.env.PROMOTION_AUTHORIZATION_DIGEST) {
+            throw new Error("Promotion authorization self-excluding receipt digest is invalid");
+          }
+
+          const predecessorTransitionDigest = sha256Jcs({
+            transition_schema_version: 1,
+            event_id: promoted.event_id,
+            predecessor_transition_digest: promoted.prior_transition_digest,
+            state: "PROMOTED_CLOSED",
+            occurred_at: registry.verified_at,
+            receipt_digest: promotion.receipt_digest_v1,
+          });
+          if (predecessorTransitionDigest !== process.env.FRESHNESS_TRANSITION_DIGEST) {
+            throw new Error("Rollback predecessor transition digest mismatch");
+          }
+
+          const previousPath = join(process.env.EVIDENCE_DIR, "evidence", "releases", promoted.previous_latest_version, "candidate.v1.json");
+          const previous = readReceipt(previousPath, "Prior-good candidate receipt");
+          const previousPayload = previous.evidence_payload_v1;
+          const previousPredecessors = previousPayload?.predecessor_receipt_digests;
+          if (!Array.isArray(previousPredecessors) || previousPredecessors.length !== 1 ||
+              !validReceiptIntegrity(previousPayload?.package_integrity)) {
+            throw new Error("Prior-good candidate predecessor or integrity is invalid");
+          }
+          verifyReceipt(previous, {
+            kind: "candidate",
+            expectedDigest: process.env.PREVIOUS_RELEASE_RECEIPT_DIGEST,
+            expectedPredecessors: previousPredecessors,
+            sourceCommit: process.env.PRIOR_GOOD_SOURCE_COMMIT,
+            packageName: process.env.PACKAGE_NAME,
+            packageVersion: promoted.previous_latest_version,
+            packageIntegrity: previousPayload.package_integrity,
+            expectedApprover: process.env.RELEASE_ADMINISTRATOR,
+          });
+          const previousAuthorizationPath = join(process.env.EVIDENCE_DIR, "evidence", "releases", promoted.previous_latest_version, "candidate-authorization.v1.json");
+          const previousAuthorization = readReceipt(previousAuthorizationPath, "Prior-good candidate authorization");
+          verifyReceipt(previousAuthorization, {
+            kind: "candidate-authorization",
+            expectedDigest: previousPredecessors[0],
+            authorizationContextDigest: process.env.PRIOR_GOOD_AUTHORIZATION_CONTEXT_DIGEST,
+            sourceCommit: process.env.PRIOR_GOOD_SOURCE_COMMIT,
+            packageName: process.env.PACKAGE_NAME,
+            packageVersion: promoted.previous_latest_version,
+            expectedApprover: process.env.RELEASE_ADMINISTRATOR,
+          });
+          const previousAuthorizationPayload = previousAuthorization.release_transition_evidence_payload_v1;
+          if (previousAuthorizationPayload?.transition !== "candidate-authorization" ||
+              !digest.test(previousAuthorizationPayload.release_data_digest_v1)) {
+            throw new Error("Prior-good candidate authorization does not control release_data_digest_v1");
+          }
+          const previousReleaseDataDigest = previousAuthorizationPayload.release_data_digest_v1;
+
+          const authorization = readReceipt(process.env.ROLLBACK_AUTHORIZATION, "Rollback authorization");
+          if (!exactKeys(authorization, [
+            "receipt_schema_version", "rollback_authorization_payload_v1",
+            "rollback_authorization_payload_digest_v1", "administrator_attestation", "receipt_digest_v1",
+          ]) || authorization.receipt_schema_version !== "rollback-authorization-receipt.v1") {
+            throw new Error("Rollback authorization shape mismatch");
+          }
+          const payload = authorization.rollback_authorization_payload_v1;
+          const payloadDigest = authorization.rollback_authorization_payload_digest_v1;
+          if (!exactKeys(payload, [
+            "schema_version", "transition", "event_id", "predecessor_transition_digest", "first_seen_at",
+            "deadline_at", "release_data_digest_v1", "package_name", "bad_version", "bad_source_commit",
+            "bad_package_integrity", "promotion_receipt_digest", "prior_good_version",
+            "prior_good_package_integrity", "prior_good_release_data_digest_v1",
+            "prior_good_receipt_digest", "cause_code",
+          ]) || !excludesSelfDigests(payload) ||
+              payload.schema_version !== "rollback-authorization-payload.v1" || payload.transition !== "rollback" ||
+              payload.event_id !== promoted.event_id ||
+              payload.predecessor_transition_digest !== predecessorTransitionDigest ||
+              payload.first_seen_at !== promoted.first_seen_at || payload.deadline_at !== promoted.deadline_at ||
+              payload.release_data_digest_v1 !== promoted.release_data_digest_v1 ||
+              payload.package_name !== process.env.PACKAGE_NAME || payload.bad_version !== process.env.BAD_VERSION ||
+              payload.bad_source_commit !== process.env.BAD_SOURCE_COMMIT ||
+              payload.bad_package_integrity !== promoted.package_integrity ||
+              payload.promotion_receipt_digest !== process.env.PROMOTION_RECEIPT_DIGEST ||
+              payload.prior_good_version !== promoted.previous_latest_version ||
+              payload.prior_good_package_integrity !== previousPayload.package_integrity ||
+              payload.prior_good_release_data_digest_v1 !== previousReleaseDataDigest ||
+              payload.prior_good_receipt_digest !== process.env.PREVIOUS_RELEASE_RECEIPT_DIGEST ||
+              payload.cause_code !== process.env.CAUSE_CODE || sha256Jcs(payload) !== payloadDigest) {
+            throw new Error("Rollback authorization event/clock/predecessor join failed");
+          }
+          const approval = authorization.administrator_attestation;
+          if (!exactKeys(approval, [
+            "role", "identity", "approved_at", "decision",
+            "rollback_authorization_payload_digest_v1", "attestation_digest",
+          ]) || approval.role !== "administrator" ||
+              approval.identity !== process.env.RELEASE_ADMINISTRATOR ||
+              !validTime(approval.approved_at) || approval.decision !== "rollback" ||
+              approval.rollback_authorization_payload_digest_v1 !== payloadDigest) {
+            throw new Error("Pre-existing administrator rollback approval is missing or unbound");
+          }
+          const { attestation_digest: attestationDigest, ...attestationProjection } = approval;
+          const { receipt_digest_v1: authorizationDigest, ...authorizationProjection } = authorization;
+          if (sha256Jcs(attestationProjection) !== attestationDigest ||
+              sha256Jcs(authorizationProjection) !== authorizationDigest ||
+              authorizationDigest !== process.env.ROLLBACK_AUTHORIZATION_DIGEST) {
+            throw new Error("Rollback administrator attestation or outer digest mismatch");
+          }
+          const firstSeenMilliseconds = Date.parse(promoted.first_seen_at);
+          const deadlineMilliseconds = Date.parse(promoted.deadline_at);
+          const orderedTimes = [
+            ["client approval", client.approval?.approved_at],
+            ["freshness administrator approval", freshnessApproval.approved_at],
+            ["promotion administrator approval", promotionApproval.approved_at],
+            ["promotion registry verification", registry.verified_at],
+            ["rollback administrator approval", approval.approved_at],
+          ];
+          for (const [name, timestamp] of orderedTimes) {
+            if (!validTime(timestamp)) throw new Error(`${name} must be canonical UTC`);
+            const milliseconds = Date.parse(timestamp);
+            if (milliseconds < firstSeenMilliseconds || milliseconds > deadlineMilliseconds) {
+              throw new Error(`${name} is outside the immutable authorization window`);
+            }
+          }
+          const [
+            clientApprovalMilliseconds,
+            freshnessApprovalMilliseconds,
+            promotionApprovalMilliseconds,
+            registryVerificationMilliseconds,
+            rollbackApprovalMilliseconds,
+          ] = orderedTimes.map(([, timestamp]) => Date.parse(timestamp));
+          if (!(clientApprovalMilliseconds <= freshnessApprovalMilliseconds &&
+                freshnessApprovalMilliseconds <= promotionApprovalMilliseconds &&
+                promotionApprovalMilliseconds <= registryVerificationMilliseconds &&
+                registryVerificationMilliseconds < rollbackApprovalMilliseconds)) {
+            throw new Error("Rollback order must be client <= freshness <= promotion approval <= registry verification < rollback approval");
+          }
+          const maximumClockSkewMilliseconds = 5 * 60 * 1000;
+          const trustedCurrentMilliseconds = Date.now();
+          if (firstSeenMilliseconds > trustedCurrentMilliseconds + maximumClockSkewMilliseconds) {
+            throw new Error("Rollback event first-seen time is too far in the future");
+          }
+          for (const [name, timestamp] of orderedTimes) {
+            if (Date.parse(timestamp) > trustedCurrentMilliseconds + maximumClockSkewMilliseconds) {
+              throw new Error(`${name} is too far in the future`);
+            }
+          }
+          if (trustedCurrentMilliseconds > deadlineMilliseconds + maximumClockSkewMilliseconds) {
+            throw new Error("Rollback authorization deadline has expired");
+          }
+
+          const outputs = {
+            previous_version: promoted.previous_latest_version,
+            previous_integrity: previousPayload.package_integrity,
+            bad_integrity: promoted.package_integrity,
+            event_id: promoted.event_id,
+            predecessor_transition_digest: predecessorTransitionDigest,
+            first_seen_at: promoted.first_seen_at,
+            deadline_at: promoted.deadline_at,
+            release_data_digest: promoted.release_data_digest_v1,
+            previous_release_data_digest: previousReleaseDataDigest,
+          };
+          for (const [name, value] of Object.entries(outputs)) {
+            if (!outputSafe(value)) throw new Error(`Receipt-controlled ${name} is not output-safe`);
+          }
+          process.stdout.write(Object.entries(outputs).map(([name, value]) => `${name}=${value}\n`).join(""));
+          NODE
+
+      - name: Re-fetch registry identities and refuse an unrelated current latest
+        id: registry
+        shell: bash
+        run: |
+          set -euo pipefail
+          CURRENT_LATEST="$(npm view "$PACKAGE_NAME" dist-tags.latest --json | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>process.stdout.write(JSON.parse(s)))')"
+          test "$CURRENT_LATEST" = "$BAD_VERSION" || test "$CURRENT_LATEST" = "${{ steps.receipts.outputs.previous_version }}"
+          BAD_INTEGRITY="$(npm view "$PACKAGE_NAME@$BAD_VERSION" dist.integrity --json | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>process.stdout.write(JSON.parse(s)))')"
+          GOOD_INTEGRITY="$(npm view "$PACKAGE_NAME@${{ steps.receipts.outputs.previous_version }}" dist.integrity --json | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>process.stdout.write(JSON.parse(s)))')"
+          test "$BAD_INTEGRITY" = "${{ steps.receipts.outputs.bad_integrity }}"
+          test "$GOOD_INTEGRITY" = "${{ steps.receipts.outputs.previous_integrity }}"
+          printf 'current_latest=%s\n' "$CURRENT_LATEST" >> "$GITHUB_OUTPUT"
+
+      - name: Idempotently restore prior latest and deprecate the bad immutable version
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_RELEASE_TOKEN }}
+          DEADLINE_AT: ${{ steps.receipts.outputs.deadline_at }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$NODE_AUTH_TOKEN"
+          PREVIOUS_VERSION="${{ steps.receipts.outputs.previous_version }}"
+          if [ "${{ steps.registry.outputs.current_latest }}" = "$BAD_VERSION" ]; then
+            DEADLINE_AT="$DEADLINE_AT" node --input-type=module -e '
+              const deadline = Date.parse(process.env.DEADLINE_AT);
+              if (!Number.isFinite(deadline) || Date.now() > deadline + 5 * 60 * 1000) {
+                throw new Error("Rollback authorization deadline expired immediately before restoring latest");
+              }
+            '
+            npm dist-tag add "$PACKAGE_NAME@$PREVIOUS_VERSION" latest
+          fi
+          DEADLINE_AT="$DEADLINE_AT" node --input-type=module -e '
+            const deadline = Date.parse(process.env.DEADLINE_AT);
+            if (!Number.isFinite(deadline) || Date.now() > deadline + 5 * 60 * 1000) {
+              throw new Error("Rollback authorization deadline expired immediately before deprecation");
+            }
+          '
+          npm deprecate "$PACKAGE_NAME@$BAD_VERSION" "Rolled back ($CAUSE_CODE). Use $PREVIOUS_VERSION or a later fixed SemVer."
+
+      - name: Verify registry mutation, then record ROLLBACK_REOPENED
+        env:
+          PREVIOUS_VERSION: ${{ steps.receipts.outputs.previous_version }}
+          PREVIOUS_INTEGRITY: ${{ steps.receipts.outputs.previous_integrity }}
+          EVENT_ID: ${{ steps.receipts.outputs.event_id }}
+          PREDECESSOR_TRANSITION_DIGEST: ${{ steps.receipts.outputs.predecessor_transition_digest }}
+          FIRST_SEEN_AT: ${{ steps.receipts.outputs.first_seen_at }}
+          DEADLINE_AT: ${{ steps.receipts.outputs.deadline_at }}
+          RELEASE_DATA_DIGEST: ${{ steps.receipts.outputs.release_data_digest }}
+          PREVIOUS_RELEASE_DATA_DIGEST: ${{ steps.receipts.outputs.previous_release_data_digest }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          LATEST="$(npm view "$PACKAGE_NAME" dist-tags.latest --json | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>process.stdout.write(JSON.parse(s)))')"
+          INTEGRITY="$(npm view "$PACKAGE_NAME@$PREVIOUS_VERSION" dist.integrity --json | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>process.stdout.write(JSON.parse(s)))')"
+          DEPRECATION="$(npm view "$PACKAGE_NAME@$BAD_VERSION" deprecated --json | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>process.stdout.write(JSON.parse(s)))')"
+          EXPECTED_DEPRECATION="Rolled back ($CAUSE_CODE). Use $PREVIOUS_VERSION or a later fixed SemVer."
+          test "$LATEST" = "$PREVIOUS_VERSION"
+          test "$INTEGRITY" = "$PREVIOUS_INTEGRITY"
+          test "$DEPRECATION" = "$EXPECTED_DEPRECATION"
+          COMPLETION="$RUNNER_TEMP/rollback.v1.json"
+          COMPLETION="$COMPLETION" REGISTRY_INTEGRITY="$INTEGRITY" REGISTRY_DEPRECATION="$DEPRECATION" EXPECTED_DEPRECATION="$EXPECTED_DEPRECATION" node --input-type=module <<'NODE'
+          import { createHash } from "node:crypto";
+          import { lstatSync, readFileSync, writeFileSync } from "node:fs";
+          import { join } from "node:path";
+          import { pathToFileURL } from "node:url";
+          const trustedPaths = {
+            public: join(process.env.TRUSTED_POLICY_DIR, "scripts/public-installed-verify.mjs"),
+            receipt: join(process.env.TRUSTED_POLICY_DIR, "scripts/release-receipt-verify.mjs"),
+          };
+          for (const [kind, path] of Object.entries(trustedPaths)) {
+            const stat = lstatSync(path);
+            if (!stat.isFile() || stat.isSymbolicLink()) throw new Error(`Trusted ${kind} verifier is not a regular file`);
+            const expected = kind === "public"
+              ? process.env.PUBLIC_INSTALL_VERIFIER_SHA256
+              : process.env.RECEIPT_VERIFIER_SHA256;
+            if (createHash("sha256").update(readFileSync(path)).digest("hex") !== expected) {
+              throw new Error(`Protected ${kind} verifier byte digest mismatch`);
+            }
+          }
+          const { parseJsonStrict, sha256Jcs } = await import(pathToFileURL(trustedPaths.public).href);
+          const { validateClosedExactFields } = await import(pathToFileURL(trustedPaths.receipt).href);
+          const exactKeys = (value, keys) => value !== null && typeof value === "object" && !Array.isArray(value) &&
+            JSON.stringify(Object.keys(value).sort()) === JSON.stringify([...keys].sort());
+          const payload = {
+            schema_version: "rollback-completion-payload.v1",
+            transition: "ROLLBACK_REOPENED",
+            event_id: process.env.EVENT_ID,
+            prior_transition_digest: process.env.PREDECESSOR_TRANSITION_DIGEST,
+            first_seen_at: process.env.FIRST_SEEN_AT,
+            deadline_at: process.env.DEADLINE_AT,
+            release_data_digest_v1: process.env.RELEASE_DATA_DIGEST,
+            prior_good_release_data_digest_v1: process.env.PREVIOUS_RELEASE_DATA_DIGEST,
+            package_name: process.env.PACKAGE_NAME,
+            bad_version: process.env.BAD_VERSION,
+            prior_good_version: process.env.PREVIOUS_VERSION,
+            prior_good_package_integrity: process.env.REGISTRY_INTEGRITY,
+            predecessor_receipt_digests: [
+              process.env.PROMOTION_RECEIPT_DIGEST,
+              process.env.PREVIOUS_RELEASE_RECEIPT_DIGEST,
+            ],
+            authorization_receipt_digest: process.env.ROLLBACK_AUTHORIZATION_DIGEST,
+            cause_code: process.env.CAUSE_CODE,
+          };
+          const payloadDigest = sha256Jcs(payload);
+          const registryVerification = {
+            registry: "https://registry.npmjs.org/",
+            latest_version: process.env.PREVIOUS_VERSION,
+            package_integrity: process.env.REGISTRY_INTEGRITY,
+            bad_version_deprecation: process.env.REGISTRY_DEPRECATION,
+            verified_at: new Date().toISOString(),
+          };
+          const projection = {
+            receipt_schema_version: "rollback-completion-receipt.v1",
+            rollback_completion_payload_v1: payload,
+            rollback_completion_payload_digest_v1: payloadDigest,
+            registry_verification: registryVerification,
+          };
+          const receipt = { ...projection, receipt_digest_v1: sha256Jcs(projection) };
+          writeFileSync(process.env.COMPLETION, `${JSON.stringify(receipt, null, 2)}\n`, { mode: 0o600 });
+
+          const verified = parseJsonStrict(readFileSync(process.env.COMPLETION, "utf8"));
+          const { receipt_digest_v1: verifiedReceiptDigest, ...verifiedProjection } = verified;
+          validateClosedExactFields(verified.rollback_completion_payload_v1, payload);
+          validateClosedExactFields(verified.registry_verification, registryVerification);
+          if (!exactKeys(verified, [
+            "receipt_schema_version", "rollback_completion_payload_v1",
+            "rollback_completion_payload_digest_v1", "registry_verification", "receipt_digest_v1",
+          ]) || verified.receipt_schema_version !== "rollback-completion-receipt.v1" ||
+              !exactKeys(verified.rollback_completion_payload_v1, Object.keys(payload)) ||
+              verified.rollback_completion_payload_v1.transition !== "ROLLBACK_REOPENED" ||
+              verified.rollback_completion_payload_v1.event_id !== process.env.EVENT_ID ||
+              verified.rollback_completion_payload_v1.prior_transition_digest !== process.env.PREDECESSOR_TRANSITION_DIGEST ||
+              verified.rollback_completion_payload_v1.first_seen_at !== process.env.FIRST_SEEN_AT ||
+              verified.rollback_completion_payload_v1.deadline_at !== process.env.DEADLINE_AT ||
+              verified.rollback_completion_payload_v1.release_data_digest_v1 !== process.env.RELEASE_DATA_DIGEST ||
+              verified.rollback_completion_payload_v1.prior_good_release_data_digest_v1 !== process.env.PREVIOUS_RELEASE_DATA_DIGEST ||
+              verified.rollback_completion_payload_v1.prior_good_package_integrity !== process.env.REGISTRY_INTEGRITY ||
+              JSON.stringify(verified.rollback_completion_payload_v1.predecessor_receipt_digests) !==
+                JSON.stringify([process.env.PROMOTION_RECEIPT_DIGEST, process.env.PREVIOUS_RELEASE_RECEIPT_DIGEST]) ||
+              sha256Jcs(verified.rollback_completion_payload_v1) !== verified.rollback_completion_payload_digest_v1 ||
+              !exactKeys(verified.registry_verification, ["registry", "latest_version", "package_integrity", "bad_version_deprecation", "verified_at"]) ||
+              verified.registry_verification.registry !== "https://registry.npmjs.org/" ||
+              verified.registry_verification.latest_version !== process.env.PREVIOUS_VERSION ||
+              verified.registry_verification.package_integrity !== process.env.REGISTRY_INTEGRITY ||
+              verified.registry_verification.bad_version_deprecation !== process.env.EXPECTED_DEPRECATION ||
+              !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(verified.registry_verification.verified_at) ||
+              new Date(Date.parse(verified.registry_verification.verified_at)).toISOString() !== verified.registry_verification.verified_at ||
+              sha256Jcs(verifiedProjection) !== verifiedReceiptDigest) {
+            throw new Error("ROLLBACK_REOPENED completion verification failed");
+          }
+          NODE
+          {
+            echo "### Rollback transition"
+            echo "Restored receipt-recorded \`latest\` \`$PREVIOUS_VERSION\`; immutable bad version \`$BAD_VERSION\` was not overwritten."
+            echo "Created and verified \`rollback.v1.json\` only after both registry mutations succeeded; original event clock remains \`$FIRST_SEEN_AT\` through \`$DEADLINE_AT\`."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload post-mutation rollback completion
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: rollback-${{ env.BAD_VERSION }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/rollback.v1.json
+          if-no-files-found: error
+          retention-days: 90

@@ -7,12 +7,14 @@
     "academyinfo-mcp": "dist/src/index.js"
   },
   "engines": {
-    "node": ">=22.0.0"
+    "node": ">=22 <23"
   },
   "files": [
-    "dist/**",
+    "dist/src/**",
+    "dist/scripts/doctor.js",
     "data/seed/academyinfo_15118998.sqlite",
     "data/seed/academyinfo_15118998.manifest.json",
+    "data/seed/indicators.json",
     "data/seed/LICENSE.15118998.md",
     "README.md",
     "LICENSE",
@@ -23,20 +25,22 @@
     "build": "node node_modules/typescript/bin/tsc -p tsconfig.json && node dist/scripts/make-bin-executable.js",
     "test": "node node_modules/vitest/vitest.mjs run",
     "lint": "node node_modules/typescript/bin/tsc -p tsconfig.json --noEmit",
-    "doctor": "node scripts/doctor.ts",
+    "doctor": "node dist/scripts/doctor.js",
+    "refresh:acquire-validate": "npm run build && node dist/scripts/refresh-acquire-validate.js",
+    "refresh:verify-artifact": "npm run build && node dist/scripts/refresh-verify-artifact.js",
     "package:check": "npm run build && node dist/scripts/package-check.js",
-    "prepublishOnly": "npm run build && npm run package:check"
+    "prepublishOnly": "npm run package:check"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.29.0",
-    "better-sqlite3": "^11.10.0",
-    "pino": "^10.3.1",
-    "zod": "^4.4.3"
+    "@modelcontextprotocol/sdk": "1.29.0",
+    "better-sqlite3": "11.10.0",
+    "pino": "10.3.1",
+    "zod": "4.4.3"
   },
   "devDependencies": {
-    "@types/better-sqlite3": "^7.6.13",
-    "@types/node": "^26.0.1",
-    "typescript": "^6.0.3",
-    "vitest": "^4.1.9"
+    "@types/better-sqlite3": "7.6.13",
+    "@types/node": "22.20.1",
+    "typescript": "6.0.3",
+    "vitest": "4.1.9"
   }
 }

@@ -1,143 +1,135 @@
 # Project Charter: academyinfo-mcp
 
-## Project Purpose
+## Purpose and status boundary
 
-`academyinfo-mcp` provides a public, read-only MCP interface for Korean university disclosure indicators.
+`academyinfo-mcp` provides an independent, public-intended, read-only MCP interface for factual Korean university disclosure indicators from an immutable local snapshot. It is a developer-facing package, not an official portal or evaluation service.
 
-The project helps Claude Desktop, Cursor, Codex, and generic MCP clients query and compare selected university disclosure indicators from a normalized local database.
+This charter defines the release contract. Source present in a checkout is not proof of public npm availability, public-platform support, backend approval, refresh acceptance, client interoperability, publication, promotion, or rollback readiness. Those claims require the protected evidence and administrator transitions described below.
 
-The project is not an official data portal. It is a developer-facing MCP package that preserves source provenance, license metadata, raw-row auditability, and evidence warnings.
+The project is not affiliated with, sponsored by, approved by, endorsed by, or maintained by the Ministry of Education, KCUE, KEDI, data.go.kr, academyinfo.go.kr, or any university. Attribution must remain neutral and source-based.
 
-## File-First Architecture
+## Runtime contract
 
-v0.1 is file-first.
+The runtime is file-first, no-key, offline, and read-only:
 
-The v0.1 architecture must be built around local source files and a derived local database. It must not depend on live network calls for normal operation.
+- normal operation reads an immutable local SQLite seed and performs no network request;
+- no service key, account, checkout, compiler, Python, or node-gyp may be required by the supported public invocation;
+- raw source files are immutable inputs and are never runtime package contents;
+- raw rows and indexed raw-cell text remain available for auditability in the derived model;
+- responses fail closed and retain provenance, license, year/base year, unit, source column, derived/bundled state, and warnings;
+- stdio stdout contains MCP JSON-RPC only; diagnostics use stderr;
+- `ACADEMYINFO_DB_PATH` remains the supported custom local database boundary.
 
-The file-first architecture has four boundaries:
-- raw source files are immutable inputs
-- raw rows are preserved for auditability
-- normalized data is derived from verified source columns
-- MCP responses expose provenance and warnings for every returned value
+The package engine is exactly Node `>=22 <23`. Public support is limited to Node 22 macOS/arm64, Windows/x64, and Ubuntu glibc/x64 after each lane has public-install evidence. Node 24+ and systems outside that matrix are not claimed.
 
-## No-Key v0.1 Policy
+The public transport contract is intentionally tied to exact runtime dependencies:
 
-v0.1 must run without API keys.
+- `@modelcontextprotocol/sdk` `1.29.0`;
+- `zod` `4.4.3`.
 
-No v0.1 command, MCP tool, import path, test, example, or package artifact may require `DATA_GO_KR_SERVICE_KEY`, `ACADEMYINFO_SERVICE_KEY`, or any other service key.
+They must be exact package requirements, not ranges. An upgrade requires an explicit contract revision and review of request parsing, omitted/nonobject calls, unknown-key handling, registered JSON Schema, structured content, raw stdio, SDK-client behavior, and installed dependency identities.
 
-Missing API keys must not degrade v0.1 behavior because v0.1 must not depend on them.
+## Exact product scope
 
-## Optional v0.3 OpenAPI Key Policy
+The server registers exactly eight read-only tools:
 
-OpenAPI support is future work for a possible v0.3 bridge.
+1. `list_sources`
+2. `list_indicators`
+3. `search_university`
+4. `get_university_metrics`
+5. `compare_universities`
+6. `explain_indicator`
+7. `validate_source_coverage`
+8. `explore_universities`
 
-`DATA_GO_KR_SERVICE_KEY` and `ACADEMYINFO_SERVICE_KEY` are optional environment variables reserved for that future bridge.
+The first seven registrations and response behavior remain backward compatible. The eighth tool adds a bounded factual exploration-to-comparison journey without changing the legacy tools. It accepts at most 10 university queries and at most 5 indicators, evaluates valid work against a single read-only snapshot, preserves input/catalog order, and returns result arrays only when every university resolves uniquely. Ambiguity returns bounded repository-ordered candidates; no tool guesses, deduplicates a user's choices, sorts by values, scores, weights, ranks, recommends, labels a winner/loser, or performs an official evaluation.
 
-If a future v0.3 OpenAPI bridge is implemented:
-- it must fail gracefully when a service key is absent
-- it must never expose service keys in logs, MCP responses, manifests, documentation examples, package artifacts, snapshots, or error messages
-- it must not change the v0.1 file-first and no-key release contract retroactively
+## Data and catalog contract
 
-## Bundled Data Policy
+Dataset `15118998` is the only bundled source. Its five logical indicators are:
 
-Dataset `15118998` is the only bundled dataset in v0.1.
+- `competition_rate`;
+- `fill_rate`;
+- `employment_rate` (school-level only);
+- `scholarship_per_student`;
+- `avg_tuition`.
 
-It may be used for the v0.1 bundled seed only after the license gate and source-column evidence gate pass.
+`data/seed/indicators.json` is the sole packaged source-derived catalog. It is KOGL-attributed JSON data with catalog schema version 1, source/license metadata, and exactly those five indicators. A closed static schema validates it; runtime loading is package-relative and fails closed. There is no hard-coded fallback or generated executable TypeScript/JavaScript catalog. The database logical tables, manifest, and catalog are independently cross-checked.
 
-The intended v0.1 indicators from `15118998` are:
-- `competition_rate`: 신입생 경쟁률, year `2025`, unit `:1`
-- `fill_rate`: 신입생 충원율, year `2025`, unit `%`
-- `employment_rate`: 취업률, year `2025`, unit `%`
-- `scholarship_per_student`: 학생 1인당 연간 장학금, year `2025`, unit `원`
-- `avg_tuition`: 평균 등록금, year `2026`, unit `천원`
+Dataset `15139279`, granular/per-department/health-insurance-linked employment data, live OpenAPI behavior, and scraping are excluded. No raw, normalized, seed, sample, fixture, SQLite, CSV, JSON, or derived artifact from that dataset may enter the package or default runtime behavior.
 
-The verified `15118998` header embeds year and unit in each indicator column
-suffix and has no single `공시년도` column. Default indicator metadata is
-therefore per-indicator. The verified column names do not contain `(학부)`, so
-the project must not claim undergraduate-only defaults unless a verified source
-says so.
+Code is MIT licensed. Bundled data remains separately attributed under KOGL Type 1. The code license must not be applied to bundled public data.
 
-Each indicator must retain source, license, year or base year, unit, source column, derived database, bundled status, and warnings in MCP responses.
+## Refresh semantic authority
 
-## Non-Bundled Data Policy
+Annual refresh is governed by meaning, not frozen bytes or a fixed worksheet shape.
 
-Dataset `15139279` is employment data.
+`worksheet_blank_v1` is true only for an absent cell or decoded raw text whose Node 22 ECMAScript `String.prototype.trim()` is empty. That one predicate governs header discovery, last populated row, padding/trailer handling, beyond-header cells, and source-row membership. Header matching alone removes a leading BOM and converts CRLF to LF; it does not normalize Unicode, translate, or apply aliases. There must be exactly one header row and exactly one mapping for every required identity/response header and each logical indicator. Any nonblank row is a source candidate; nonblank cells beyond header width block refresh.
 
-It is v0.3 backlog only and must not be bundled in v0.1.
+Every retained cell has `worksheet_row`, `column_index`, `column_ref`, and unmodified `raw_text`. One source row maps exactly once to a raw row and institution, plus five numeric-or-missing classifications. Therefore source-row, raw-row, and institution counts agree, and classification count is source rows multiplied by five.
 
-The project must not include raw, normalized, seed, sample, or fixture data from `15139279` in package artifacts.
+After ECMAScript trim, only empty text and ASCII `-` are missing. Numeric text must match either `[0-9]+(?:\.[0-9]+)?` or `[1-9][0-9]{0,2}(?:,[0-9]{3})+(?:\.[0-9]+)?`. Signs, exponent notation, internal whitespace, decimal commas, malformed grouping, Unicode digits, NaN, and infinity are rejected. Commas are removed only after valid grouping; integer leading zeros and fractional trailing zeros are removed; zero is `0`. `001,000` is invalid, while `1,000` canonicalizes to `1000`. A canonical decimal must produce a finite nonnegative JavaScript Number and survive exact shortest-Number-to-plain-decimal round trip. Precision loss blocks refresh; values are never rounded.
 
-`employment_rate` is enabled by default only when sourced from `15118998`.
-Dataset `15139279` is deferred to the v0.3 backlog for granular,
-per-department, or health-insurance-linked employment statistics.
+Canonical decimal text is semantic authority; any legacy REAL value must equal `Number(canonical_value)` on read and pass the independent round trip. Blocking invariants are official source/workbook/license identity, unique headers and natural key, unique logical mappings, fixed units, nondecreasing integer years, exact numeric/missing domains, and complete row coverage.
 
-## Read-Only MCP Scope
+Post-download SHA-256 and physical hashes are change/integrity/audit evidence, not authenticity or approval. A matching prior checksum does not approve a source. A changed checksum does not reject it. Row or column counts, institution-set changes, values, unrelated columns, and allowed missingness are reviewed diffs but do not independently approve or block. Valid 23-column, 25-column, and other annual shapes may pass the semantic gates.
 
-The MCP server scope is read-only.
+Semantic release identity uses closed RFC 8785 JCS/SHA-256 projections with stable order and canonical decimals: source model, seed logical model, full catalog, semantic manifest, then release data. Each digest projection excludes its own digest and nonsemantic physical/workflow/time fields. Physical hashes remain separate.
 
-Allowed future tool behavior:
-- query verified indicators
-- compare verified indicators
-- return source provenance
-- return structured warnings
-- explain whether an indicator is bundled, disabled, or unavailable
+## Least-privilege supply chain
 
-Disallowed future tool behavior:
-- mutate source files
-- mutate official data
-- submit data to external services
-- write back to public portals
-- infer missing units, source columns, or values
-- produce official rankings
+Acquisition/validation and repository writing are separate trust domains.
 
-## Supported Clients
+The acquisition side has immutable source, read-only repository access, no write/publish secret or OIDC, bounded HTTPS/redirect/body/archive/XML handling, and no workbook execution. It emits only sanitized candidate artifacts and a closed digest-bearing report; it never emits the raw workbook, credentials, a signed query string, or a private path.
 
-The supported MCP client targets are:
-- Claude Desktop
-- Cursor
-- Codex
-- generic MCP clients
+The writer has only the repository/PR permissions required for fixed outputs. It verifies the named producer, source commit, policy/schema versions, hashes, complete allowlist, and absence of symlinks, traversal, extra files, or missing files. It executes no candidate content. It may write only the database, manifest, catalog, header/checksum/sample evidence, and one digest-named refresh audit. A failure or no-change path cannot invoke content writes.
 
-Client-specific examples must not contain API keys, service keys, credentials, private paths, local user names, or machine-specific identifiers.
+## Conditional single-backend gate
 
-## Non-Affiliation Disclaimer
+Exactly one SQLite backend may ship:
 
-`academyinfo-mcp` is not affiliated with, sponsored by, approved by, or officially endorsed by the Ministry of Education, KCUE, KEDI, data.go.kr, academyinfo.go.kr, or any university.
+1. `better-sqlite3` is retained only if the same package candidate proves prebuilt-only installation on all three official Node 22 lanes with fresh state, active build-tool traps, and a demonstrated trap canary.
+2. If any lane fails, `sql.js` is only a spike until one reviewed version proves legacy behavior, custom/missing/corrupt path behavior, package/WASM/license/security posture, startup and RSS limits, and no-native-build operation.
+3. Selecting `sql.js` additionally requires an acyclic backend-selection receipt whose fixed decision digest is separately approved by the Architect and administrator.
+4. Without a passing first option or a valid second-option receipt, release state is `BLOCKED_PENDING_BACKEND_SELECTION`. There is no automatic fallback and no dual-backend package.
 
-All attribution must remain neutral and source-based.
+## Release privilege boundaries
 
-## Assumptions
+Publication is a chain of separate immutable transitions:
 
-- `15118998` is the only v0.1 bundled dataset candidate.
-- `15139279` remains non-bundled and deferred to v0.3 granular employment statistics.
-- Source columns, units, and years must be verified from actual downloaded headers or official documentation before implementation.
-- Code license and data license remain separate.
+1. An administrator must establish npm identity/history/ownership, 2FA or trusted-publishing readiness, provenance, protected environments, artifact retention, and an unused SemVer.
+2. The candidate transition must publish under a non-`latest` candidate tag while the previous `latest` remains available. Its receipt must bind source, package, selected backend, data, dependency, test, audit, and provenance evidence.
+3. Public-install verifiers must exercise the exact candidate on the three clean Node 22 lanes. A separate client receipt must join those proofs, a generic stdio journey, and actual Claude Desktop/macOS evidence. Cursor/Codex examples are not evidence unless executed.
+4. A protected promotion transition must re-verify predecessor digests and administrator approval before moving that same candidate to `latest`.
+5. A protected rollback transition must restore the prior `latest`, deprecate the bad version, preserve the evidence chain, reopen any matching changed-data incident, and require a new SemVer for the fix.
 
-## Resolved v0.1 Release Facts
+Every receipt uses a closed self-excluding JCS/SHA-256 topology. Candidate creation is not completion; local tarballs cannot replace public evidence; no product or data slice publishes independently.
 
-- Code license is MIT, recorded in `package.json` and `LICENSE`.
-- Bundled data attribution for `15118998` is recorded in `DATA_LICENSE.md`, `NOTICE.md`, and `data/seed/LICENSE.15118998.md`.
-- `15118998` source headers, source columns, units, and per-indicator years were verified for the five bundled default indicators.
-- Runtime dependency versions use explicit semver ranges with caret notation.
-- v0.1 uses `better-sqlite3` and declares `engines.node >=22.0.0` because Node 20 is EOL as of July 2026.
+## Public-install acceptance
 
-## Options
+Each official lane uses a fresh home, cache, working directory, and configuration outside the checkout, an explicit public registry, no reachable local artifact, and exact `npx -y academyinfo-mcp@<version>`. Evidence must include:
 
-Option A: Keep v0.1 file-first and bundle only verified `15118998` data.
+- installed application, SDK, and Zod names, exact versions, registry tarball identities, and integrity matches;
+- candidate tag plus available signature/provenance evidence;
+- Node, operating system, architecture, and Ubuntu glibc identity;
+- active Python/node-gyp/compiler traps and a proven canary;
+- sanitized verbose install output;
+- initialize, exact eight-tool list, exact eighth-tool schema, bundled query, no-key behavior, and JSON-RPC-only stdout.
 
-Option B: Add employment data to v0.1.
+No candidate may be promoted when any lane compiles, uses another dependency version, reaches local artifacts, or lacks these proofs.
 
-Option C: Add live OpenAPI calls to v0.1.
+## Freshness, no-change, and rollback
 
-## Recommendation
+Freshness timestamps are exact UTC millisecond timestamps. Official date parsing is strict; invalid official timestamps become null with a deterministic failure classification. Invalid workflow times write no state.
 
-Use Option A.
+A provisional incident is correlated by schema, dataset, page, last accepted source SHA, and the absence of a differing SHA. Its earliest first-seen timestamp and seven-day (`604800000` ms) deadline are immutable across metadata, ETag, or repeated-failure drift. Failure keeps the last-known-good package and data available.
 
-It satisfies the no-key v0.1 policy, keeps licensing risk bounded, and preserves a clean path for later v0.3 granular employment and OpenAPI work.
+- Reacquired equal bytes may close only after origin/license/workbook validation through an administrator-attested verified-no-change receipt.
+- Differing bytes cannot use no-change closure. They enter the changed lifecycle and close only after the matching release-data digest reaches `latest`.
+- Rollback reopens the original changed-event clock rather than resetting it.
 
-## Unresolved
+## Administrator responsibility and stop conditions
 
-- Data refresh cadence and exact maintenance owner after public transition.
-- v0.3 granular employment design for `15139279`.
-- v0.3 OpenAPI bridge design.
+Administrators own registry identity and unused-version selection, trusted publication/provenance, protected environments, artifact retention, backend and release approvals, promotion, rollback, and freshness response. Documentation and source code do not imply those actions have occurred.
+
+Stop without reducing scope if official acquisition requires an invented link or scraping; source/license/workbook, header, unit, year, missing, decimal, or key semantics are unclear; exact dependency/schema behavior changes; the writer needs broader privilege; public proof misses a lane or permits compilation; receipt digests disagree; or no single backend is approved. Never round, guess, drop a lane, expose a secret/private path, silently upgrade, or claim unsupported public behavior.

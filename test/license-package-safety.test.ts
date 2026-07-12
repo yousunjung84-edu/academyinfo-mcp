@@ -11,9 +11,11 @@ import { isForbiddenArtifactPath } from "../scripts/package-check-scan.ts"
 const projectRoot = fileURLToPath(new URL("..", import.meta.url))
 
 const expectedPackageFiles = [
-  "dist/**",
+  "dist/src/**",
+  "dist/scripts/doctor.js",
   "data/seed/academyinfo_15118998.sqlite",
   "data/seed/academyinfo_15118998.manifest.json",
+  "data/seed/indicators.json",
   "data/seed/LICENSE.15118998.md",
   "README.md",
   "LICENSE",

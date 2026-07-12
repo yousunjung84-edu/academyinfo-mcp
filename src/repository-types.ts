@@ -60,3 +60,16 @@ export type Comparison = {
   readonly metrics: readonly MetricValue[]
   readonly missing_metrics: readonly MissingMetric[]
 }
+
+export type BatchInstitutionResolution = {
+  readonly query: string
+  readonly status: "not_found" | "ambiguous" | "ok"
+  readonly matches: readonly Institution[]
+  readonly totalMatched: number
+  readonly truncated: boolean
+}
+
+export type ExploreUniversitiesBatch = {
+  readonly resolutions: readonly BatchInstitutionResolution[]
+  readonly comparisons: readonly Comparison[]
+}

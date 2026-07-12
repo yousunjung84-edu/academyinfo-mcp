@@ -4,12 +4,13 @@ import { realpathSync } from "node:fs"
 import { fileURLToPath } from "node:url"
 
 import { createRuntimeLogger } from "./logging.js"
+import { ExplicitNonObjectArgumentsGuardTransport } from "./protocol-transport.js"
 import { createAcademyinfoServer } from "./server.js"
 
 export async function main(): Promise<void> {
   const logger = createRuntimeLogger()
   const server = createAcademyinfoServer()
-  const transport = new StdioServerTransport()
+  const transport = new ExplicitNonObjectArgumentsGuardTransport(new StdioServerTransport())
 
   logger.info({ event: "academyinfo_mcp_starting" }, "starting academyinfo MCP server")
   await server.connect(transport)
@@ -27,7 +28,17 @@ function isDirectEntryPoint(): boolean {
 
   try {
     return realpathSync(entryPointPath) === fileURLToPath(import.meta.url)
-  } catch {
+  } catch (error: unknown) {
+    const logger = createRuntimeLogger()
+
+    logger.error(
+      {
+        event: "academyinfo_mcp_entry_point_resolution_failed",
+        errorName: error instanceof Error ? error.name : "UnknownError",
+      },
+      "academyinfo MCP entry point could not be resolved",
+    )
+    process.exitCode = 1
     return false
   }
 }

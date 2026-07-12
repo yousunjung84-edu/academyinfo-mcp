@@ -11,8 +11,16 @@ export type IndicatorSpec = {
   readonly note?: string
 }
 
-export type ParsedHeader = {
+export type IndexedCell = {
+  readonly worksheet_row: number
+  readonly column_index: number
+  readonly column_ref: string
+  readonly raw_text: string
+}
+
+export type ParsedHeader = Partial<IndexedCell> & {
   readonly raw_header: string
+  readonly match_header?: string
   readonly parsed_label: string
   readonly parsed_year: number | null
   readonly parsed_unit: string | null
@@ -24,6 +32,7 @@ export type HeaderValidationResult =
       readonly ok: true
       readonly parsedHeaders: readonly ParsedHeader[]
       readonly indicatorColumns: ReadonlyMap<string, number>
+      readonly identityColumns: ReadonlyMap<string, number>
       readonly warnings: readonly string[]
     }
   | {
@@ -64,9 +73,13 @@ export const indicatorJsonPath = join(projectRoot, "data", "seed", "indicators.j
 export const headerSnapshotPath = join(projectRoot, "evidence", "header-snapshots", "15118998.headers.json")
 export const sampleRowsPath = join(projectRoot, "evidence", "sample-rows", "15118998.sample.json")
 export const checksumsPath = join(projectRoot, "evidence", "checksums", "15118998.checksums.json")
-export const expectedSourceChecksum = "53f7e7fbb446206a47fab1adc622d551ba88ba7f3c25ae0cdc8e41cddc637621"
+/**
+ * Historical values retained only so the existing writer can describe the
+ * currently bundled artifact. They are not refresh acceptance criteria.
+ */
+export const priorAuditSourceChecksum = "53f7e7fbb446206a47fab1adc622d551ba88ba7f3c25ae0cdc8e41cddc637621"
+export const priorAuditHeaderCount = 24
 export const expectedSheetName = "Sheet1"
-export const expectedHeaderCount = 24
 
 export const indicatorSpecs: readonly IndicatorSpec[] = [
   { indicator_id: "competition_rate", label_ko: "신입생 경쟁률", source_column: "신입생 경쟁률\n(2025,:1)", year: 2025, unit: ":1" },

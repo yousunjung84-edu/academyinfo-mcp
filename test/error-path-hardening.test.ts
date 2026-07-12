@@ -2,7 +2,7 @@ import { cp, mkdir, mkdtemp, rm, symlink, unlink, writeFile } from "node:fs/prom
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
-import { describe, expect, it } from "vitest"
+import { describe, expect, it, vi } from "vitest"
 import { z } from "zod"
 
 import { reservedKeyOverrides, responseSchema } from "./mcp-contract-helpers.ts"
@@ -27,6 +27,11 @@ async function createRuntimeWithoutBundledSeed(
   await cp(join(projectRoot, "dist", "src"), join(runtimeRoot, "dist", "src"), {
     recursive: true,
   })
+  await mkdir(join(runtimeRoot, "data", "seed"), { recursive: true })
+  await cp(
+    join(projectRoot, "data", "seed", "indicators.json"),
+    join(runtimeRoot, "data", "seed", "indicators.json"),
+  )
   if (options.includePackageJson) {
     await writeFile(join(runtimeRoot, "package.json"), JSON.stringify({ type: "module" }))
   }
@@ -39,6 +44,53 @@ async function createRuntimeWithoutBundledSeed(
 }
 
 describe("error-path hardening", () => {
+  it("reports a dangling argv entry point without an uncaught stack", async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), "academyinfo-dangling-entry-"))
+    const danglingEntryPoint = join(tempRoot, "removed-entry.js")
+    const originalArgv = [...process.argv]
+    const originalExitCode = process.exitCode
+    const stderrChunks: string[] = []
+    const stderrWrite = vi.spyOn(process.stderr, "write").mockImplementation(
+      ((chunk: string | Uint8Array) => {
+        stderrChunks.push(
+          typeof chunk === "string" ? chunk : Buffer.from(chunk).toString("utf8"),
+        )
+        return true
+      }) as typeof process.stderr.write,
+    )
+
+    try {
+      await writeFile(danglingEntryPoint, "")
+      await unlink(danglingEntryPoint)
+      process.argv[1] = danglingEntryPoint
+      process.exitCode = undefined
+      vi.resetModules()
+
+      await import("../src/index.ts")
+
+      const stderrText = stderrChunks.join("")
+      const logRecord = z
+        .object({
+          level: z.literal(50),
+          event: z.literal("academyinfo_mcp_entry_point_resolution_failed"),
+          errorName: z.literal("Error"),
+          msg: z.literal("academyinfo MCP entry point could not be resolved"),
+        })
+        .parse(JSON.parse(stderrText.trim()))
+
+      expect(process.exitCode).toBe(1)
+      expect(logRecord.event).toBe("academyinfo_mcp_entry_point_resolution_failed")
+      expect(stderrText).not.toContain("realpathSync")
+      expect(stderrText).not.toMatch(/\n\s+at\s/u)
+    } finally {
+      process.argv.splice(0, process.argv.length, ...originalArgv)
+      process.exitCode = originalExitCode
+      stderrWrite.mockRestore()
+      vi.resetModules()
+      await rm(tempRoot, { recursive: true, force: true })
+    }
+  })
+
   it("returns a structured tool envelope when the configured DB is corrupt", async () => {
     const tempRoot = await mkdtemp(join(tmpdir(), "academyinfo-corrupt-db-"))
     const corruptDbPath = join(tempRoot, "academyinfo-corrupt.sqlite")

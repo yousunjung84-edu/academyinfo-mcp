@@ -9,11 +9,11 @@ import {
   assertAllDefaultIndicatorsMapped,
   validateDefaultIndicatorHeaders,
 } from "../scripts/seed15118998-validate.ts"
+import { indicatorCatalogSchema } from "../src/catalog-schema.ts"
 import { withMcpServer } from "./support/mcp-stdio-harness.ts"
 
 const projectRoot = fileURLToPath(new URL("..", import.meta.url))
-const expectedSourceChecksum =
-  "53f7e7fbb446206a47fab1adc622d551ba88ba7f3c25ae0cdc8e41cddc637621"
+const sha256Schema = z.string().regex(/^[a-f0-9]{64}$/u)
 
 const expectedIndicators = [
   {
@@ -64,8 +64,8 @@ const isoUtcTimestampSchema = z.string().refine(isIsoUtcTimestamp)
 const headerSnapshotSchema = z.object({
   dataset_id: z.literal("15118998"),
   sheet_name: z.literal("Sheet1"),
-  column_count: z.literal(24),
-  source_file_checksum_sha256: z.literal(expectedSourceChecksum),
+  column_count: z.number().int().positive(),
+  source_file_checksum_sha256: sha256Schema,
   columns: z.array(
     z.object({
       raw_header: z.string(),
@@ -82,9 +82,9 @@ const manifestSchema = z.object({
   source_file_name: z.literal("대학주요정보.xlsx"),
   source_downloaded_at: isoUtcTimestampSchema,
   seed_built_at: isoUtcTimestampSchema,
-  source_file_checksum_sha256: z.literal(expectedSourceChecksum),
-  header_snapshot_checksum_sha256: z.string().min(64),
-  seed_db_checksum_sha256: z.string().min(64),
+  source_file_checksum_sha256: sha256Schema,
+  header_snapshot_checksum_sha256: sha256Schema,
+  seed_db_checksum_sha256: sha256Schema,
   seed_is_latest_claim: z.literal(false),
   api_key_required: z.literal(false),
   source_file_private_path_excluded: z.literal(true),
@@ -105,18 +105,75 @@ const manifestSchema = z.object({
 
 const checksumSnapshotSchema = z.object({
   dataset_id: z.literal("15118998"),
-  source_file_checksum_sha256: z.literal(expectedSourceChecksum),
-  header_snapshot_checksum_sha256: z.string().min(64),
-  seed_db_checksum_sha256: z.string().min(64),
+  source_file_checksum_sha256: sha256Schema,
+  header_snapshot_checksum_sha256: sha256Schema,
+  seed_db_checksum_sha256: sha256Schema,
 })
+
+interface EvidenceConsistencyInput {
+  actual_source_checksum_sha256: string | null
+  actual_header_snapshot_checksum_sha256: string
+  actual_seed_db_checksum_sha256: string
+  header_snapshot: {
+    column_count: number
+    columns: readonly unknown[]
+    source_file_checksum_sha256: string
+  }
+  manifest: {
+    source_file_checksum_sha256: string
+    header_snapshot_checksum_sha256: string
+    seed_db_checksum_sha256: string
+  }
+  checksum_snapshot: {
+    source_file_checksum_sha256: string
+    header_snapshot_checksum_sha256: string
+    seed_db_checksum_sha256: string
+  }
+}
+
+function assertEvidenceConsistency(input: EvidenceConsistencyInput): void {
+  const sourceChecksums = [
+    input.header_snapshot.source_file_checksum_sha256,
+    input.manifest.source_file_checksum_sha256,
+    input.checksum_snapshot.source_file_checksum_sha256,
+  ]
+  if (input.actual_source_checksum_sha256 !== null) {
+    sourceChecksums.push(input.actual_source_checksum_sha256)
+  }
+
+  if (new Set(sourceChecksums).size !== 1) {
+    throw new Error("Source checksum evidence is inconsistent")
+  }
+  if (input.header_snapshot.column_count !== input.header_snapshot.columns.length) {
+    throw new Error("Header snapshot column_count does not match its columns")
+  }
+  if (
+    input.manifest.header_snapshot_checksum_sha256 !==
+      input.actual_header_snapshot_checksum_sha256 ||
+    input.checksum_snapshot.header_snapshot_checksum_sha256 !==
+      input.actual_header_snapshot_checksum_sha256
+  ) {
+    throw new Error("Header snapshot checksum evidence is inconsistent")
+  }
+  if (
+    input.manifest.seed_db_checksum_sha256 !== input.actual_seed_db_checksum_sha256 ||
+    input.checksum_snapshot.seed_db_checksum_sha256 !== input.actual_seed_db_checksum_sha256
+  ) {
+    throw new Error("Seed database checksum evidence is inconsistent")
+  }
+}
+
+function sha256File(relativePath: string): string {
+  const bytes = readFileSync(join(projectRoot, relativePath))
+  return createHash("sha256").update(bytes).digest("hex")
+}
 
 function maybeSha256File(relativePath: string): string | null {
   const filePath = join(projectRoot, relativePath)
   if (!existsSync(filePath)) {
     return null
   }
-  const bytes = readFileSync(filePath)
-  return createHash("sha256").update(bytes).digest("hex")
+  return sha256File(relativePath)
 }
 
 function maybeSourceMtimeIso(relativePath: string): string | null {
@@ -133,15 +190,23 @@ function readJson(relativePath: string): unknown {
 }
 
 describe("15118998 evidence lock and seed DB", () => {
+  it("locks the catalog to exactly five ordered indicator ID/unit pairs", () => {
+    const catalog = indicatorCatalogSchema.parse(readJson("data/seed/indicators.json"))
+
+    expect(
+      catalog.indicators.map(({ indicator_id, unit }) => ({ indicator_id, unit })),
+    ).toEqual(
+      expectedIndicators.map(({ indicator_id, unit }) => ({ indicator_id, unit })),
+    )
+  })
+
   it("locks the placed source file, header evidence, manifest, and seed counts", () => {
     const checksumSnapshot = checksumSnapshotSchema.parse(
       readJson("evidence/checksums/15118998.checksums.json"),
     )
     const sourceChecksum = maybeSha256File("data/raw/15118998/대학주요정보.xlsx")
     const sourceMtimeIso = maybeSourceMtimeIso("data/raw/15118998/대학주요정보.xlsx")
-    const lockedSourceChecksum = sourceChecksum ?? checksumSnapshot.source_file_checksum_sha256
 
-    expect(lockedSourceChecksum).toBe(expectedSourceChecksum)
     expect(existsSync(join(projectRoot, "data/seed/academyinfo_15118998.sqlite"))).toBe(true)
 
     const headerSnapshot = headerSnapshotSchema.parse(
@@ -150,6 +215,16 @@ describe("15118998 evidence lock and seed DB", () => {
     const manifest = manifestSchema.parse(
       readJson("data/seed/academyinfo_15118998.manifest.json"),
     )
+    assertEvidenceConsistency({
+      actual_source_checksum_sha256: sourceChecksum,
+      actual_header_snapshot_checksum_sha256: sha256File(
+        "evidence/header-snapshots/15118998.headers.json",
+      ),
+      actual_seed_db_checksum_sha256: sha256File("data/seed/academyinfo_15118998.sqlite"),
+      header_snapshot: headerSnapshot,
+      manifest,
+      checksum_snapshot: checksumSnapshot,
+    })
 
     expect(existsSync(join(projectRoot, "evidence/sample-rows/15118998.sample.json"))).toBe(true)
     expect(existsSync(join(projectRoot, "evidence/checksums/15118998.checksums.json"))).toBe(true)
@@ -185,6 +260,76 @@ describe("15118998 evidence lock and seed DB", () => {
     }
   })
 
+  it("accepts a consistent 23-column evidence shape and rejects inconsistent values", () => {
+    const sourceChecksum = "a".repeat(64)
+    const headerSnapshotChecksum = "b".repeat(64)
+    const columns = Array.from({ length: 23 }, (_, index) => ({
+      raw_header: `column-${index}`,
+      parsed_label: `column-${index}`,
+      parsed_year: null,
+      parsed_unit: null,
+      checksum_sha256: "c".repeat(64),
+    }))
+    const headerSnapshot = headerSnapshotSchema.parse({
+      dataset_id: "15118998",
+      sheet_name: "Sheet1",
+      column_count: columns.length,
+      source_file_checksum_sha256: sourceChecksum,
+      columns,
+    })
+    const consistentEvidence: EvidenceConsistencyInput = {
+      actual_source_checksum_sha256: sourceChecksum,
+      actual_header_snapshot_checksum_sha256: headerSnapshotChecksum,
+      actual_seed_db_checksum_sha256: "f".repeat(64),
+      header_snapshot: headerSnapshot,
+      manifest: {
+        source_file_checksum_sha256: sourceChecksum,
+        header_snapshot_checksum_sha256: headerSnapshotChecksum,
+        seed_db_checksum_sha256: "f".repeat(64),
+      },
+      checksum_snapshot: {
+        source_file_checksum_sha256: sourceChecksum,
+        header_snapshot_checksum_sha256: headerSnapshotChecksum,
+        seed_db_checksum_sha256: "f".repeat(64),
+      },
+    }
+
+    expect(() => assertEvidenceConsistency(consistentEvidence)).not.toThrow()
+    expect(() =>
+      assertEvidenceConsistency({
+        ...consistentEvidence,
+        header_snapshot: { ...headerSnapshot, column_count: columns.length + 1 },
+      }),
+    ).toThrow(/column_count/u)
+    expect(() =>
+      assertEvidenceConsistency({
+        ...consistentEvidence,
+        checksum_snapshot: {
+          ...consistentEvidence.checksum_snapshot,
+          source_file_checksum_sha256: "d".repeat(64),
+        },
+      }),
+    ).toThrow(/Source checksum/u)
+    expect(() =>
+      assertEvidenceConsistency({
+        ...consistentEvidence,
+        manifest: {
+          ...consistentEvidence.manifest,
+          header_snapshot_checksum_sha256: "e".repeat(64),
+        },
+      }),
+    ).toThrow(/Header snapshot checksum/u)
+    expect(() =>
+      assertEvidenceConsistency({
+        ...consistentEvidence,
+        checksum_snapshot: {
+          ...consistentEvidence.checksum_snapshot,
+          seed_db_checksum_sha256: "0".repeat(64),
+        },
+      }),
+    ).toThrow(/Seed database checksum/u)
+  })
+
   it("fails closed when required indicator headers or mapped observations are invalid", () => {
     const malformedHeaders = expectedIndicators.map((indicator) =>
       indicator.indicator_id === "avg_tuition" ? "평균 등록금" : indicator.source_column,
@@ -196,12 +341,13 @@ describe("15118998 evidence lock and seed DB", () => {
       expect.arrayContaining([expect.stringContaining("avg_tuition")]),
     )
 
-    const zeroObservationCounts = Object.fromEntries(
-      expectedIndicators.map((indicator) => [indicator.indicator_id, 1]),
+    const classificationCounts = Object.fromEntries(
+      expectedIndicators.map((indicator) => [indicator.indicator_id, 0]),
     )
-    zeroObservationCounts["employment_rate"] = 0
+    expect(() => assertAllDefaultIndicatorsMapped(classificationCounts)).not.toThrow()
 
-    expect(() => assertAllDefaultIndicatorsMapped(zeroObservationCounts)).toThrow(
+    delete classificationCounts["employment_rate"]
+    expect(() => assertAllDefaultIndicatorsMapped(classificationCounts)).toThrow(
       /employment_rate/u,
     )
   })

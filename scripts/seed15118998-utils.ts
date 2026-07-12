@@ -2,7 +2,11 @@ import { createHash } from "node:crypto"
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs"
 import { dirname, resolve } from "node:path"
 
-import type { ParsedHeader } from "./seed15118998-config.js"
+import {
+  priorAuditHeaderCount,
+  priorAuditSourceChecksum,
+  type ParsedHeader,
+} from "./seed15118998-config.js"
 
 export function sha256Bytes(bytes: Buffer | string): string {
   return createHash("sha256").update(bytes).digest("hex")
@@ -10,6 +14,27 @@ export function sha256Bytes(bytes: Buffer | string): string {
 
 export function sha256File(path: string): string {
   return sha256Bytes(readFileSync(path))
+}
+
+export type RefreshAuditEvidence = {
+  readonly prior_source_file_checksum_sha256: string
+  readonly source_checksum_changed: boolean
+  readonly prior_header_count: number
+  readonly observed_header_count: number
+  readonly header_count_changed: boolean
+}
+
+export function buildRefreshAuditEvidence(
+  sourceChecksum: string,
+  observedHeaderCount: number,
+): RefreshAuditEvidence {
+  return {
+    prior_source_file_checksum_sha256: priorAuditSourceChecksum,
+    source_checksum_changed: sourceChecksum !== priorAuditSourceChecksum,
+    prior_header_count: priorAuditHeaderCount,
+    observed_header_count: observedHeaderCount,
+    header_count_changed: observedHeaderCount !== priorAuditHeaderCount,
+  }
 }
 
 export function ensureParent(path: string): void {
