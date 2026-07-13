@@ -2,11 +2,13 @@
 
 ## Audit boundary
 
-This document records the current checkout contract and the evidence still required for a public release. It is not a protected release receipt and does not authorize making a repository public, publishing a package, selecting a version or endpoint, promoting `latest`, or performing rollback.
+This document records the current checkout contract and the evidence still required for a public release. It is not a protected release receipt and does not authorize making a repository public, selecting a version or endpoint, publishing a package, moving `latest`, or performing npm administration. Every npm registry write is a human terminal ceremony governed by [`manual-publish-runbook.md`](manual-publish-runbook.md).
 
-Release conclusion: **HOLD — `BLOCKED_PENDING_BACKEND_SELECTION`**.
+Release conclusion: **HOLD — `BLOCKED_PENDING_BACKEND_SELECTION` (backend proof narrative); first publication proceeds via the human ceremony in [`manual-publish-runbook.md`](manual-publish-runbook.md), while the optional workflow verifier chain remains unusable for a first publication (absent-`latest` not representable by its inputs)**.
 
-The checkout contains an integrated local implementation, but no claim is made here that an administrator selected an unused public SemVer, approved a transition, completed the backend gate, published a candidate, produced three-lane public-install proof, exercised an actual client, promoted `latest`, or completed a rollback/no-change drill. Workflow definitions, local tests, local installs, and packed tarballs cannot substitute for those protected facts.
+The checkout contains an integrated local implementation, but no claim is made here that an administrator selected an unused public SemVer, approved a transition, completed the sole-backend proof, published a candidate, produced three-lane public-install proof, exercised an actual client, completed readiness verification, moved `latest`, or completed a fix-forward/no-change drill. Workflow definitions, local tests, local installs, and packed tarballs cannot substitute for those facts. Except for the exact fixed-path repository/PR writer in `refresh-write-pr.yml`, Actions only verify, build, read anonymous registry state, and upload sanitized artifacts; they hold no npm credential or OIDC authority.
+
+When public npm `latest` is absent, the **optional workflow verifier chain** (candidate/client/promotion receipts and workflow inputs) cannot run for a first-ever publication: each stage requires exact SemVer `expected_previous_latest`, and promotion parses an existing public `dist-tags.latest`. No sentinel, placeholder, candidate version, or fabricated SemVer may be used as predecessor evidence. This limits only workflow-verified evidence — the first publication itself is executed through the self-contained human ceremony in [`manual-publish-runbook.md`](manual-publish-runbook.md) (owner decision, 2026-07-13), which dispatches no workflow. If workflow-verified evidence is wanted for a first publication, a reviewed absent-`latest` predecessor contract (`absent | present` union) can be added later; for subsequent releases the verifiers work as-is. Human terminal ceremonies remain the only permitted registry writes in all cases.
 
 ## Integrated checkout contract
 
@@ -15,8 +17,8 @@ The checkout contains an integrated local implementation, but no claim is made h
 | Runtime | File-first, offline, no-key, read-only stdio | Local implementation only; not public support proof |
 | Node | Exact engine `>=22 <23` | Node 24+ is unsupported and unclaimed |
 | Public matrix | Node 22 macOS/arm64, Windows/x64, and Ubuntu glibc/x64 | Each lane remains a target until candidate-bound public proof exists |
-| MCP dependencies | Exact `@modelcontextprotocol/sdk` `1.29.0` and `zod` `4.4.3` | Public proof must verify installed identity and registry integrity |
-| SQLite backend | `better-sqlite3` is currently integrated | Provisional until all-lane prebuilt-only proof; no backend is release-approved by this document |
+| Runtime dependencies | Exact `@modelcontextprotocol/sdk` `1.29.0`, `pino` `10.3.1`, `zod` `4.4.3`, and `better-sqlite3` `11.10.0` | Public proof must verify installed identity and registry integrity |
+| SQLite backend | Sole backend `better-sqlite3` `11.10.0`; no alternate or runtime fallback | Release remains blocked until all-lane prebuilt-only proof exists |
 | Runtime mode | Bundled local snapshot; no API key or runtime network | No live OpenAPI or scraping behavior |
 | Bundled source | Normalized derivative of dataset `15118998` only | Point-in-time data, not a latest-data guarantee |
 | Catalog | `data/seed/indicators.json`, closed-schema KOGL-attributed JSON data | Sole packaged source-derived catalog; no executable generated fallback |
@@ -75,24 +77,33 @@ Semantic source, seed, catalog, manifest, and release-data identities use closed
 
 | Gate | Current state | Required protected evidence |
 | --- | --- | --- |
-| Administrator prerequisites | OPEN | Public npm identity/history/ownership, unused SemVer, release authority, 2FA/trusted publishing, provenance, protected environments, retention, and evidenced query-free source page |
-| Single backend | BLOCKED | Either all-three-lane prebuilt-only proof for the current `better-sqlite3` candidate, or a reviewed `sql.js` parity package plus Architect and administrator approval bound to the backend-selection receipt |
-| Candidate transition | NOT ESTABLISHED | Immutable non-`latest` candidate receipt joining source, package, backend, data, dependency, audit, registry, provenance, and administrator authorization evidence |
+| Administrator prerequisites | OPEN | Public npm identity/history/ownership, actual unused SemVer, release authority, enforced 2FA, separate short-lived least-privilege candidate/promotion credentials, retention, and evidenced query-free source page |
+| First-publication bootstrap | MANUAL (runbook) | Human ceremony per [`manual-publish-runbook.md`](manual-publish-runbook.md); the optional workflow verifier chain stays unusable for a first publication until a reviewed absent-`latest` predecessor contract exists (its exact-SemVer inputs cannot represent an absent public `latest`) |
+| Sole backend | BLOCKED | All-three-lane prebuilt-only proof for `better-sqlite3` `11.10.0`, including active build traps and exact package/integrity joins |
+| Candidate transition | NOT ESTABLISHED | Successful read-only Action handoff plus human candidate-only publication of the exact preverified tarball, immediate credential revocation/authentication-failure proof, anonymous registry post-state, and administrator-bound receipt |
 | Public install | NOT ESTABLISHED | Exact public candidate installed through `npx -y academyinfo-mcp@<version>` on all three clean Node 22 lanes, with no local artifact or compilation and complete identity/integrity/protocol evidence |
 | Actual client | NOT ESTABLISHED | Protected receipt joining the public lanes, generic stdio journey, and actual Claude Desktop/macOS execution against the same candidate |
-| Promotion | NOT ESTABLISHED | Administrator-approved protected receipt that revalidates predecessor digests and moves the unchanged proved candidate to `latest` |
-| Rollback | NOT ESTABLISHED | Separate administrator-approved transition restoring prior-good `latest`, deprecating the bad version, preserving evidence, and reopening the original incident clock when applicable |
+| Promotion | NOT ESTABLISHED | Complete predecessor/public/client/freshness proofs, a pre-existing administrator promotion authorization bound before dispatch, successful read-only readiness verification of that authorization and anonymous registry state, then a separate human terminal ceremony moving only the unchanged proved candidate to `latest` |
+| First-release failure | ROLLBACK UNAVAILABLE | Deterministic `FIRST_RELEASE_ROLLBACK_UNAVAILABLE` report, preserved evidence/incident clock, and fix-forward `0.1.1`; no prior-good dist-tag restore or deprecation |
 | Verified no-change | NOT ESTABLISHED | Equal-byte reacquisition plus origin/license/workbook validation and administrator attestation bound to the closed receipt |
 
-The `better-sqlite3` path must prove prebuilt-only installation with fresh state, active Python/node-gyp/compiler traps, and a demonstrated canary on every official lane. If any lane fails, `sql.js` remains only a spike until one exact reviewed version satisfies behavior, custom/missing/corrupt path, WASM/package/license/security, startup/RSS, and no-native-build requirements. Exactly one backend may ship; no automatic or dual-backend fallback is permitted.
+The `better-sqlite3` `11.10.0` path must prove prebuilt-only installation with fresh state, active Python/node-gyp/compiler traps, and a demonstrated canary on every official lane. It is the sole backend; `sql.js`, dual-backend packaging, dependency substitution, and automatic runtime fallback are not authorized.
 
-## Candidate, public, promotion, and rollback protections
+## Actions, candidate, public proof, and promotion protections
 
-A candidate may be published only under a non-`latest` tag after administrator prerequisites and immutable candidate gates pass. Candidate existence is not completion.
+All Actions `uses:` references remain pinned to full commit SHAs. Npm-release verification workflows have contents-read permission only and no npm credential, OIDC, or registry-write command. They may build and verify immutable inputs, read the public npm registry anonymously, and upload sanitized artifacts. `refresh-write-pr.yml` remains the sole exact repository/PR write-permission exception and has no npm/OIDC authority.
 
-Public proof must use fresh homes, caches, working directories, and configurations outside the checkout; an explicit public registry; no reachable local artifact; exact `npx -y academyinfo-mcp@<version>`; active build-tool traps; sanitized verbose logs; installed application/SDK/Zod identities and registry integrity; platform identity; initialization; the exact eight-tool list and eighth-tool schema; bundled-data and no-key behavior; and JSON-RPC-only stdout. Local checkout or tarball results are insufficient.
+Under the current predecessor contract, a candidate workflow may run only when anonymous public history supplies a real previous `latest` SemVer. If `latest` is absent (first publication), the workflow verifiers are simply not used — the human ceremony in [`manual-publish-runbook.md`](manual-publish-runbook.md) proceeds without them and must not fabricate predecessor evidence to force a dispatch.
 
-Promotion requires a separate protected administrator approval and must move the exact proved candidate bytes to `latest` without rebuilding. Rollback requires another protected approval, restores the exact prior-good `latest`, deprecates rather than deletes the bad version, preserves receipts, and uses a new unused SemVer for any correction.
+A candidate may be published only by a human under a non-`latest` tag after administrator prerequisites and immutable candidate gates pass. The operator must publish the exact digest-matched tarball from the read-only candidate handoff without rebuilding or repacking, then immediately revoke the candidate-only credential and prove it fails authentication. Candidate existence is not completion.
+
+Public proof must use fresh homes, caches, working directories, and configurations outside the checkout; an explicit public registry; no reachable local artifact; the actual selected SemVer rather than a placeholder; active build-tool traps; sanitized verbose logs; installed application and all four exact direct dependencies; platform identity; initialization; the exact eight-tool list and eighth-tool schema; bundled-data and no-key behavior; and JSON-RPC-only stdout. Local checkout or tarball results are insufficient.
+
+After all three public lanes, the generic stdio journey, actual Claude evidence, protected client ingest, and administrator-attested freshness evidence pass, the administrator must create the pre-existing promotion authorization bound to that complete immutable evidence set and predecessor state. Only then may `promote-release.yml` run. It verifies that authorization and anonymous candidate/`latest` registry state before uploading `promotion-readiness.v1.json`; it does not create approval or move `latest`. After readiness succeeds, a human follows [`manual-publish-runbook.md`](manual-publish-runbook.md) with a separate short-lived least-privilege credential to move the exact proved candidate to `latest`. Any immediate registry-state comparison is an operator staleness recheck, not a second approval. TOTP is entered only interactively, never in argv/log/evidence. The credential is revoked immediately and its authentication failure is proved before anonymous post-state verification.
+
+Once an initial `0.1.0` has actually reached `latest`, that first release has no rollback. `rollback-release.yml` emits only deterministic `FIRST_RELEASE_ROLLBACK_UNAVAILABLE` evidence. Defective `0.1.0` is not overwritten, restored, or deprecated by CI; correction is fix-forward `0.1.1` through the full candidate/proof/freshness/authorization/readiness/manual-promotion sequence. (The first publication itself is executed via [`manual-publish-runbook.md`](manual-publish-runbook.md); this failure path governs what happens afterward.) Publication, dist-tag, deprecation, unpublish, token, owner, access, and all other npm administration are prohibited in CI.
+
+The historical lifecycle narrative `BLOCKED_PENDING_BACKEND_SELECTION` remains intact. This read-only Actions migration neither advances nor closes that state and does not add canonical absent-`latest` support. In the current checkout it means the required all-lane `better-sqlite3` `11.10.0` proof is still absent; it does not authorize an alternate backend.
 
 ## Package and privacy boundaries
 
@@ -107,6 +118,6 @@ This audit does not approve or claim:
 - granular/per-department employment data or any `15139279` artifact;
 - recommendations, rankings, scores, winners/losers, or guessed institutions;
 - fixed-checksum, fixed-row, fixed-institution, fixed-value, or fixed-24-column refresh acceptance;
-- a selected public version, endpoint, package ownership, administrator approval, candidate publication, public availability, actual client compatibility, `latest` promotion, rollback completion, or freshness closure.
+- a selected public version, endpoint, package ownership, administrator authorization, candidate publication, public availability, actual client compatibility, successful readiness verification, `latest` movement, rollback completion, fix-forward completion, or freshness closure.
 
-Release remains on hold at `BLOCKED_PENDING_BACKEND_SELECTION`. The last-known-good public package and data must remain available until all applicable protected gates succeed.
+The backend-proof narrative remains at `BLOCKED_PENDING_BACKEND_SELECTION`. First publication is executable at the owner's discretion via the human ceremony in [`manual-publish-runbook.md`](manual-publish-runbook.md); workflow-verified first-publication evidence additionally requires absent-`latest` predecessor support. The last-known-good public package and data, where they exist, must remain available until the applicable evidence gates and human registry ceremonies succeed.

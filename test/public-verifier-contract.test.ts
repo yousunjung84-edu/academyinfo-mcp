@@ -30,6 +30,7 @@ import {
 } from "../scripts/release-receipt-verify.mjs"
 import { collectPackageContractFailures } from "../scripts/package-check-config.js"
 import { handleExploreUniversities } from "../src/explore-universities-handler.js"
+import { semanticActionKeyLines } from "./workflow-yaml-policy.js"
 
 const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..")
 const publicWorkflow = readFileSync(resolve(projectRoot, ".github/workflows/public-candidate-verify.yml"), "utf8")
@@ -43,6 +44,9 @@ const VERSION = "0.1.1"
 const SOURCE_COMMIT = "1".repeat(40)
 const CANDIDATE_DIGEST = "2".repeat(64)
 const PACKAGE_INTEGRITY = `sha512-${Buffer.alloc(64, 7).toString("base64")}`
+const FULL_SHA_ACTION_REFERENCE = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+@[a-f0-9]{40}$/u
+const CANONICAL_ACTION_REFERENCE_LINE =
+  /^ *(?:- )?uses: ([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+@[A-Za-z0-9_.-]+)(?: +#.*)?$/u
 const EXPECTED_TOOLS = [
   "list_sources",
   "list_indicators",
@@ -231,7 +235,17 @@ function verifyClientReleaseReceipt(
 }
 
 function actionReferences(workflow: string): string[] {
-  return [...workflow.matchAll(/^\s*uses:\s*(\S+)\s*$/gmu)].map((match) => match[1] ?? "")
+  const references: string[] = []
+  for (const { index, line } of semanticActionKeyLines(workflow)) {
+    const match = line.match(CANONICAL_ACTION_REFERENCE_LINE)
+    if (!match?.[1]) {
+      throw new Error(
+        `line ${index + 1}: action reference must use canonical unquoted block form`,
+      )
+    }
+    references.push(match[1])
+  }
+  return references
 }
 
 function expectBefore(workflow: string, prerequisite: string, mutation: string): void {
@@ -281,21 +295,86 @@ describe("public candidate workflow contract", () => {
   it("uses only commit-pinned actions and has no registry mutation authority", () => {
     const references = actionReferences(publicWorkflow)
     expect(references.length).toBeGreaterThan(0)
-    expect(references.every((reference) => /@[a-f0-9]{40}$/.test(reference))).toBe(true)
+    expect(references.every((reference) => FULL_SHA_ACTION_REFERENCE.test(reference))).toBe(true)
     expect(publicWorkflow).toContain("permissions:\n  contents: read")
     expect(publicWorkflow).not.toMatch(/npm\s+(?:publish|dist-tag|unpublish|deprecate)\b/u)
     expect(publicWorkflow).not.toContain("id-token: write")
     expect(publicWorkflow).not.toContain("NODE_AUTH_TOKEN")
   })
 
-  it("routes every untrusted dispatch value through environment bindings", () => {
-    for (const workflow of [candidateWorkflow, publicWorkflow, clientWorkflow, promotionWorkflow, rollbackWorkflow]) {
+  it("captures every action reference before an optional trailing YAML comment", () => {
+    const pinnedReference = `actions/checkout@${"a".repeat(40)}`
+    const workflow = `steps:
+  - uses: ${pinnedReference}
+  - uses: actions/setup-node@main # mutable branch
+`
+    const references = actionReferences(workflow)
+    expect(references).toEqual([pinnedReference, "actions/setup-node@main"])
+    expect(references.every((reference) => FULL_SHA_ACTION_REFERENCE.test(reference))).toBe(false)
+  })
+
+  it.each([
+    ["quoted mapping key", "", `  - "uses": actions/checkout@${"a".repeat(40)}`],
+    ["single-quoted mapping key", "", `  - 'uses': actions/checkout@${"a".repeat(40)}`],
+    ["escaped double-quoted mapping key", "", '  - "u\\u0073es": actions/checkout@main'],
+    ["quoted mapping value", "", `  - uses: "actions/checkout@${"a".repeat(40)}"`],
+    ["flow-style mapping", "", `  - { uses: actions/checkout@${"a".repeat(40)} }`],
+    [
+      "explicit escaped mapping key",
+      "",
+      '  - ? "u\\u0073es"\n    : actions/checkout@main',
+    ],
+    ["anchored mapping key", "", "  - &action-key uses: actions/checkout@main"],
+    [
+      "alias mapping key",
+      "action-key: &action-key uses\n",
+      "  - *action-key: actions/checkout@main",
+    ],
+    [
+      "merge mapping key",
+      "step-defaults: &step-defaults\n  name: inherited\n",
+      "  - <<: *step-defaults",
+    ],
+  ] as const)(
+    "rejects a %s instead of skipping its action reference",
+    (_category, preamble, actionLine) => {
+      const pinnedReference = `actions/checkout@${"a".repeat(40)}`
+      expect(() =>
+        actionReferences(`${preamble}steps:
+  - uses: ${pinnedReference}
+${actionLine}
+`),
+      ).toThrow("action reference must use canonical unquoted block form")
+    },
+  )
+  it("does not let a comment spoof a block scalar and hide a mutable action", () => {
+    const pinnedReference = `actions/checkout@${"a".repeat(40)}`
+    const references = actionReferences(`steps:
+  - uses: ${pinnedReference}
+# run: |
+  - uses: actions/setup-node@main
+`)
+    expect(references).toEqual([pinnedReference, "actions/setup-node@main"])
+    expect(references.every((reference) => FULL_SHA_ACTION_REFERENCE.test(reference))).toBe(false)
+  })
+
+  it("ignores quoted object keys inside an embedded run-script body", () => {
+    const pinnedReference = `actions/checkout@${"a".repeat(40)}`
+    const workflow = `steps:
+  - run: |
+      const payload = { "uses": "script data" };
+  - uses: ${pinnedReference}
+`
+    expect(actionReferences(workflow)).toEqual([pinnedReference])
+  })
+
+  it("routes every declared dispatch value through environment bindings", () => {
+    for (const workflow of [candidateWorkflow, publicWorkflow, clientWorkflow, promotionWorkflow]) {
       expectDispatchInputsOnlyInEnvironment(workflow)
     }
     expect(publicWorkflow).toContain("$env:CONFIRM_PUBLIC_READ_ONLY")
     expect(clientWorkflow).toContain("process.env.CONFIRM_ACTUAL_NOT_SIMULATED")
     expect(promotionWorkflow).toContain('$CONFIRM_PROMOTE"')
-    expect(rollbackWorkflow).toContain('$CONFIRM_ROLLBACK"')
   })
 
   it("uses protected verifier bytes and validates the immutable candidate receipt before candidate execution", () => {
@@ -317,118 +396,102 @@ describe("public candidate workflow contract", () => {
   })
 })
 
-describe("candidate publication privilege boundary", () => {
-  it("keeps every dispatch value out of shell interpolation and uses only pinned actions", () => {
-    expectDispatchInputsOnlyInEnvironment(candidateWorkflow)
-    const references = actionReferences(candidateWorkflow)
-    expect(references.length).toBeGreaterThan(0)
-    expect(references.every((reference) => /@[a-f0-9]{40}$/u.test(reference))).toBe(true)
-    expect(candidateWorkflow).not.toContain("NODE_AUTH_TOKEN")
-  })
-
-  it("runs candidate code only in the unprivileged job and publishes only the verified tarball", () => {
-    const unprivileged = candidateWorkflow.slice(
-      candidateWorkflow.indexOf("  verify-build:"),
-      candidateWorkflow.indexOf("  publish-candidate:"),
-    )
-    const publisher = candidateWorkflow.slice(candidateWorkflow.indexOf("  publish-candidate:"))
-    expect(unprivileged).toContain("permissions:\n      contents: read")
-    expect(unprivileged).not.toContain("id-token: write")
-    expect(unprivileged).not.toContain("environment: npm-candidate")
-    for (const command of ["npm ci", "npm run build", "npm test", "npm run package:check", "npm pack"]) {
-      expect(unprivileged).toContain(command)
-      expect(publisher).not.toContain(command)
+describe("candidate read-only build handoff boundary", () => {
+  it("has only the contents-read-only verify-build job and no registry authority", () => {
+    expect([...candidateWorkflow.matchAll(/^ {2}([a-z][a-z0-9-]*):\n {4}name:/gmu)]
+      .map((match) => match[1])).toEqual(["verify-build"])
+    expect(candidateWorkflow.match(/^\s+contents: read$/gmu)).toHaveLength(2)
+    expect(candidateWorkflow).not.toContain("publish-candidate:")
+    expect(candidateWorkflow).not.toContain("npm-candidate")
+    expect(candidateWorkflow).not.toMatch(/^\s+environment:/gmu)
+    expect(candidateWorkflow).not.toContain("id-token: write")
+    for (const credential of ["NODE_AUTH_TOKEN", "NPM_TOKEN", "_authToken", "always-auth:"]) {
+      expect(candidateWorkflow).not.toContain(credential)
     }
-    expect(publisher).toContain("environment: npm-candidate")
-    expect(publisher).toContain("id-token: write")
-    expect(publisher).toContain("actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093")
-    expect(publisher).not.toContain("actions/checkout@")
-    expect(publisher).toContain('npm publish "$TARBALL" --access public --tag candidate --provenance --ignore-scripts')
-    expect(publisher).toContain('NPM_CONFIG_IGNORE_SCRIPTS: "true"')
+    expect(candidateWorkflow).not.toMatch(/npm\s+(?:publish|dist-tag|unpublish|deprecate)\b/u)
   })
 
-  it("loads authorization and verifier from separate protected history with configured verifier bytes", () => {
+  it("uses immutable separate checkouts and validates protected verifier bytes before candidate execution", () => {
     expect(candidateWorkflow).toContain("path: trusted-receipts")
+    expect(candidateWorkflow).toContain("path: trusted-policy")
     expect(candidateWorkflow).toContain("path: candidate-source")
     expect(candidateWorkflow).toContain("ref: ${{ env.RECEIPT_COMMIT }}")
+    expect(candidateWorkflow).toContain("ref: ${{ env.POLICY_COMMIT }}")
     expect(candidateWorkflow).toContain("ref: ${{ env.SOURCE_COMMIT }}")
+    expect(candidateWorkflow.match(/persist-credentials: false/gu)).toHaveLength(3)
     expect(candidateWorkflow).toContain("Source and protected receipt commits must be separate immutable identities")
-    expect(candidateWorkflow).toContain("vars.ACADEMYINFO_RELEASE_RECEIPT_VERIFIER_SHA256")
-    expect(candidateWorkflow).toContain("Protected receipt verifier byte digest mismatch")
     expect(candidateWorkflow).toContain("Receipt commit is not immutable protected default-branch history")
-    expect(candidateWorkflow).toContain("Downloaded trusted verifier byte digest mismatch")
-    expect(candidateWorkflow).toContain("Handoff authorization evidence does not match the independently verified receipt")
-    expect(candidateWorkflow).toContain('trusted-receipts/evidence/releases/$VERSION/candidate-authorization.v1.json')
-    expect(candidateWorkflow).not.toContain("candidate-source/scripts/release-receipt-verify.mjs")
-    expectBefore(candidateWorkflow, "--kind candidate-authorization", "npm ci")
-    expectBefore(candidateWorkflow, "Downloaded trusted verifier byte digest mismatch", "package/package.json")
-  })
-
-  it("binds handoff policy to the exact protected tip and rechecks it after publication approval", () => {
+    expect(candidateWorkflow).toContain("Source commit is not immutable protected default-branch history")
     expect(candidateWorkflow).toContain(
       'test "$(git -C trusted-policy rev-parse "origin/$DEFAULT_BRANCH")" = "$POLICY_COMMIT"',
     )
-    expect(candidateWorkflow).toContain("Current workflow policy is not the exact protected default-branch tip")
-    expect(candidateWorkflow).toContain("policy_commit: process.env.POLICY_COMMIT")
-    expect(candidateWorkflow).toContain('handoff.policy_commit !== process.env.POLICY_COMMIT')
-    expect(candidateWorkflow).toContain(
-      'test "$(git -C "$POLICY_RECHECK" rev-parse refs/remotes/protected/default)" = "$POLICY_COMMIT"',
-    )
-    expect(candidateWorkflow).toContain("Protected publication verifier byte digest mismatch")
-    expectBefore(candidateWorkflow, "Publication policy is no longer the exact protected default-branch tip", 'npm publish "$TARBALL"')
-    expectBefore(candidateWorkflow, "Protected publication verifier byte digest mismatch", 'npm publish "$TARBALL"')
+    expect(candidateWorkflow).toContain("vars.ACADEMYINFO_RELEASE_RECEIPT_VERIFIER_SHA256")
+    expect(candidateWorkflow).toContain("Protected receipt verifier byte digest mismatch")
+    expect(candidateWorkflow).toContain('trusted-receipts/evidence/releases/$VERSION/candidate-authorization.v1.json')
+    expect(candidateWorkflow).not.toContain("candidate-source/scripts/release-receipt-verify.mjs")
+    expectBefore(candidateWorkflow, "Protected receipt verifier byte digest mismatch", "--kind candidate-authorization")
+    expectBefore(candidateWorkflow, "--kind candidate-authorization", "npm ci")
   })
 
-  it("emits closed unattested post-state evidence and cannot self-mint administrator approval", () => {
-    expectBefore(candidateWorkflow, 'npm publish "$TARBALL"', 'schema_version: "candidate-registry-post-state.v1"')
-    expectBefore(candidateWorkflow, 'test "$LATEST" = "$EXPECTED_PREVIOUS_LATEST"', 'schema_version: "candidate-registry-post-state.v1"')
+  it("packs one exact tarball and binds its hashes into the trusted handoff", () => {
+    for (const command of ["npm ci", "npm run build", "npm test", "npm run package:check"]) {
+      expect(candidateWorkflow).toContain(command)
+    }
+    expect(candidateWorkflow).toContain(
+      'npm pack --ignore-scripts --json --pack-destination "$HANDOFF"',
+    )
+    expect(candidateWorkflow).toContain("Exactly one authorized package tarball required")
+    expect(candidateWorkflow).toContain(
+      'createHash("sha256").update(bytes).digest("hex")',
+    )
+    expect(candidateWorkflow).toContain(
+      'createHash("sha512").update(bytes).digest("base64")',
+    )
     for (const binding of [
+      'schema_version: "candidate-package-handoff.v1"',
+      "tarball_filename: process.env.TARBALL_NAME",
+      "tarball_sha256: process.env.TARBALL_SHA256",
+      "package_integrity: process.env.PACKAGE_INTEGRITY",
+      "receipt_commit: process.env.RECEIPT_COMMIT",
+      "policy_commit: process.env.POLICY_COMMIT",
+      "receipt_verifier_sha256: process.env.RECEIPT_VERIFIER_SHA256",
+      "authorization_receipt_digest: process.env.AUTHORIZATION_RECEIPT_DIGEST",
+      "authorization_context_digest: process.env.AUTHORIZATION_CONTEXT_DIGEST",
+      "authorization_evidence:",
+    ]) expect(candidateWorkflow).toContain(binding)
+    expect(candidateWorkflow).toContain("name: ${{ steps.package.outputs.artifact_name }}")
+    expect(candidateWorkflow).toContain("artifact_name=candidate-package-%s")
+    expectBefore(candidateWorkflow, "npm run package:check", "npm pack --ignore-scripts")
+    expectBefore(candidateWorkflow, "npm pack --ignore-scripts", 'schema_version: "candidate-package-handoff.v1"')
+  })
+
+  it("uploads only the digest-named handoff with pinned actions", () => {
+    expectDispatchInputsOnlyInEnvironment(candidateWorkflow)
+    const references = actionReferences(candidateWorkflow)
+    expect(references.length).toBeGreaterThan(0)
+    expect(references.every((reference) => FULL_SHA_ACTION_REFERENCE.test(reference))).toBe(true)
+    expect(references.filter((reference) => reference.startsWith("actions/upload-artifact@"))).toEqual([
+      "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
+    ])
+    expect(candidateWorkflow).toContain("path: ${{ runner.temp }}/candidate-handoff")
+    expect(candidateWorkflow).toContain("if-no-files-found: error")
+  })
+
+  it("cannot self-mint publication, provenance, post-state, or completion evidence", () => {
+    for (const forbidden of [
+      "candidate-registry-post-state.v1",
+      "candidate-registry-provenance-proof.v1",
       "candidate-evidence-payload.v1.json",
       "registry-post-state.v1.json",
-      'predecessor_receipt_digests: [process.env.AUTHORIZATION_RECEIPT_DIGEST]',
-      '{ kind: "authorization-receipt"',
-      '{ kind: "registry-post-state"',
-      '{ kind: "release-data"',
-      '{ kind: "source-tarball"',
-      "policy_versions: handoff.authorization_evidence.policy_versions",
-      'sanitized: true',
-      "Post-state evidence fields are not closed",
-      "Upload unattested post-state evidence for separate administrator attestation and persistence",
-      "No administrator approval or final \\`candidate.v1.json\\` was created here.",
-      "Public verification remains blocked until a separately attested and protected-persisted final \\`candidate.v1.json\\` exists.",
-      "This is not release completion.",
-    ]) expect(candidateWorkflow).toContain(binding)
-    for (const forbidden of [
-      'role: "administrator"',
-      'decision: "candidate"',
-      "approvalProjection",
-      "attestation_digest",
-      'receipt_schema_version: "candidate-receipt.v1"',
-      "--kind candidate",
-      "--expected-approver \"$RELEASE_ADMINISTRATOR\"",
-      "Candidate receipt digest:",
-    ]) expect(candidateWorkflow.slice(candidateWorkflow.indexOf("  publish-candidate:"))).not.toContain(forbidden)
-  })
-
-  it("retrieves verified npm signature/provenance evidence without widening candidate evidence kinds", () => {
-    for (const binding of [
-      "npm audit signatures --json --include-attestations",
       "registry-provenance.v1.json",
-      'schema_version: "candidate-registry-provenance-proof.v1"',
-      "registry_signatures_digest: sha256Jcs(signatures)",
-      "verified_attestation_bundles_digest: sha256Jcs(verifiedTarget.attestationBundles)",
-      "verification_report_digest: sha256Jcs(verificationReport)",
-      "closedProof.registry_provenance_digest !== provenanceProofDigest",
-      "Registry post-state provenance digest join mismatch",
-    ]) expect(candidateWorkflow).toContain(binding)
-    expect(candidateWorkflow).toContain("verificationReport.invalid.length !== 0")
-    expect(candidateWorkflow).toContain("verificationReport.missing.length !== 0")
-    expect(candidateWorkflow).toContain("verifiedTargets.length !== 1")
-    expect(candidateWorkflow).toContain(
-      "canonicalizeJcs(verifiedTarget.attestations) !== canonicalizeJcs(registryDist.attestations)",
-    )
-    expect(candidateWorkflow).not.toContain('{ kind: "registry-provenance"')
-    expectBefore(candidateWorkflow, 'npm publish "$TARBALL"', "npm audit signatures --json --include-attestations")
+      'receipt_schema_version: "candidate-receipt.v1"',
+      'transition: "CANDIDATE_PUBLISHED"',
+      "candidate.v1.json",
+      "Candidate receipt digest:",
+      "This is release completion.",
+    ]) expect(candidateWorkflow).not.toContain(forbidden)
+    expect(candidateWorkflow).not.toContain("npm audit signatures --json --include-attestations")
+    expect(candidateWorkflow).not.toContain("new Date().toISOString()")
   })
 
   it("runs the focused workflow-security contracts explicitly in CI", () => {
@@ -695,7 +758,7 @@ describe("actual Claude Desktop protected ingest", () => {
     expect(clientWorkflow).not.toMatch(/npm\s+(?:publish|dist-tag|unpublish|deprecate|install|exec)\b/u)
     expect(clientWorkflow).not.toContain("npx -y")
     expect(clientWorkflow).not.toContain("NODE_AUTH_TOKEN")
-    expect(actionReferences(clientWorkflow).every((reference) => /@[a-f0-9]{40}$/.test(reference))).toBe(true)
+    expect(actionReferences(clientWorkflow).every((reference) => FULL_SHA_ACTION_REFERENCE.test(reference))).toBe(true)
   })
 
   it("requires the exact current policy tip and fully binds candidate/client predecessor history", () => {
@@ -819,150 +882,255 @@ describe("actual Claude Desktop protected ingest", () => {
   })
 })
 
-describe("protected mutation authorization order", () => {
-  it("requires the exact five-kind evidence set and rejects forged promotion authorization before latest", () => {
+describe("promotion read-only readiness boundary", () => {
+  it("is contents-read-only, action-pinned, and has no registry mutation authority", () => {
+    expect([...promotionWorkflow.matchAll(/^ {2}([a-z][a-z0-9-]*):\n {4}name:/gmu)]
+      .map((match) => match[1])).toEqual(["readiness"])
+    expect(promotionWorkflow.match(/^\s+contents: read$/gmu)).toHaveLength(2)
+    expect(promotionWorkflow).not.toContain("contents: write")
+    expect(promotionWorkflow).not.toMatch(/^\s+environment:/gmu)
+    expect(promotionWorkflow).not.toContain("id-token: write")
+    for (const credential of ["NODE_AUTH_TOKEN", "NPM_TOKEN", "_authToken", "always-auth:"]) {
+      expect(promotionWorkflow).not.toContain(credential)
+    }
+    expect(promotionWorkflow).not.toMatch(/npm\s+(?:publish|dist-tag|unpublish|deprecate)\b/u)
+    const references = actionReferences(promotionWorkflow)
+    expect(references.length).toBeGreaterThan(0)
+    expect(references.every((reference) => FULL_SHA_ACTION_REFERENCE.test(reference))).toBe(true)
+  })
+
+  it("joins immutable candidate, client, freshness, and administrator evidence", () => {
     expect(requiredEvidenceBindings(promotionWorkflow)).toEqual(REQUIRED_EVIDENCE_BINDINGS)
     expect(promotionWorkflow).not.toContain("generic_stdio_receipt_digest")
     expect(promotionWorkflow).not.toContain("GENERIC_STDIO_RECEIPT_DIGEST")
-    expect(promotionWorkflow).toContain(
-      "canonicalizeJcs(b.evidence_digests) !== canonicalizeJcs(requiredEvidence)",
-    )
-    expect(promotionWorkflow).toContain("promotion-authorization.v1.json")
-    expect(promotionWorkflow).toContain("sha256Jcs(payload) !== payloadDigest")
-    expect(promotionWorkflow).toContain("sha256Jcs(attestationProjection) !== attestationDigest")
-    expect(promotionWorkflow).toContain("authorizationDigest !== process.env.PROMOTION_AUTHORIZATION_DIGEST")
-    expect(promotionWorkflow).not.toContain("${{ github.actor }}")
-    expectBefore(promotionWorkflow, "Promotion authorization digest verification failed", "npm dist-tag add")
-  })
-
-  it("authorizes against an open predecessor and creates PROMOTED_CLOSED only after latest verification", () => {
-    expect(promotionWorkflow).toContain("promotion-freshness-transition.v1.json")
-    expect(promotionWorkflow).toContain('freshnessPayload.transition !== "CLIENT_VERIFIED"')
-    expect(promotionWorkflow).toContain("freshnessPayload.release_data_digest_v1 !== candidateReleaseDataDigest")
-    expect(promotionWorkflow).toContain("candidateAuthorizationPayload.release_data_digest_v1")
-    expect(promotionWorkflow).toContain("freshnessPayload.event_id !== candidateAuthorizationPayload.event_id")
-    expect(promotionWorkflow).toContain("payload.event_id !== freshnessPayload.event_id")
-    expect(promotionWorkflow).toContain("payload.release_data_digest_v1 !== freshnessPayload.release_data_digest_v1")
-    expect(promotionWorkflow).toContain("payload.predecessor_transition_digest !== freshnessPayload.transition_digest")
-    expect(promotionWorkflow).toContain("payload.first_seen_at !== freshnessPayload.first_seen_at")
-    expect(promotionWorkflow).toContain("payload.deadline_at !== freshnessPayload.deadline_at")
-    expect(promotionWorkflow).toContain('transition: "PROMOTED_CLOSED"')
-    expect(promotionWorkflow).toContain("PROMOTED_CLOSED completion verification failed")
-    expectBefore(promotionWorkflow, "Promotion authorization digest verification failed", "npm dist-tag add")
-    expectBefore(promotionWorkflow, "npm dist-tag add", 'transition: "PROMOTED_CLOSED"')
-    expectBefore(promotionWorkflow, 'test "$INTEGRITY" = "${{ steps.receipts.outputs.package_integrity }}"', 'transition: "PROMOTED_CLOSED"')
-  })
-
-  it("loads the completed predecessor and records ROLLBACK_REOPENED only after both mutations", () => {
-    for (const binding of [
-      "prior_good_version",
-      "prior_good_package_integrity",
-      "prior_good_release_data_digest_v1",
-      "prior_good_receipt_digest",
-      "predecessor_transition_digest",
-      "first_seen_at",
-      "deadline_at",
-    ]) expect(rollbackWorkflow).toContain(binding)
-    expect(rollbackWorkflow).toContain("rollback-authorization.v1.json")
-    expect(rollbackWorkflow).toContain("promotion-completion-receipt.v1")
-    expect(rollbackWorkflow).toContain("sha256Jcs(payload) !== payloadDigest")
-    expect(rollbackWorkflow).toContain("sha256Jcs(attestationProjection) !== attestationDigest")
-    expect(rollbackWorkflow).toContain("authorizationDigest !== process.env.ROLLBACK_AUTHORIZATION_DIGEST")
-    expect(rollbackWorkflow).not.toContain("${{ github.actor }}")
-    expectBefore(rollbackWorkflow, "Rollback administrator attestation or outer digest mismatch", "npm dist-tag add")
-    expectBefore(rollbackWorkflow, "Rollback administrator attestation or outer digest mismatch", "npm deprecate")
-    expectBefore(rollbackWorkflow, "npm deprecate", 'transition: "ROLLBACK_REOPENED"')
-    expectBefore(rollbackWorkflow, 'test "$INTEGRITY" = "$PREVIOUS_INTEGRITY"', 'transition: "ROLLBACK_REOPENED"')
-  })
-  it("pins trusted origins and policy bytes, serializes registry mutation, and types rollback predecessors", () => {
-    for (const workflow of [candidateWorkflow, publicWorkflow, clientWorkflow, promotionWorkflow, rollbackWorkflow]) {
-      expect(workflow).toContain("merge-base --is-ancestor")
-      expect(workflow).not.toContain("remote set-url origin")
-    }
-    for (const workflow of [publicWorkflow, clientWorkflow, promotionWorkflow, rollbackWorkflow]) {
-      expect(workflow).toContain("trusted-policy")
-      expect(workflow).toContain("ACADEMYINFO_PUBLIC_INSTALL_VERIFIER_SHA256")
-      expect(workflow).toContain("ACADEMYINFO_RELEASE_RECEIPT_VERIFIER_SHA256")
-    }
-    expect(promotionWorkflow).toContain("group: academyinfo-mcp-registry-mutation")
-    expect(rollbackWorkflow).toContain("group: academyinfo-mcp-registry-mutation")
-    expect(promotionWorkflow).toContain("const trustedCurrentMilliseconds = Date.now()")
-    expect(promotionWorkflow).toContain(
-      "Approval order must be candidate < client <= freshness administrator <= promotion authorization",
-    )
-    expect(rollbackWorkflow).toContain("process.env.CLIENT_RECEIPT_DIGEST")
-    expect(rollbackWorkflow).toContain("process.env.PROMOTION_FRESHNESS_RECEIPT_DIGEST")
-    expect(rollbackWorkflow).toContain(
-      "promoted.authorization_receipt_digest !== process.env.PROMOTION_AUTHORIZATION_DIGEST",
-    )
-  })
-})
-
-describe("final transition cleaner regressions", () => {
-  it("requires the fetched protected default tip as current policy in promotion and rollback", () => {
+    for (const receipt of [
+      "candidate-authorization.v1.json",
+      "candidate.v1.json",
+      "claude-desktop.v1.json",
+      "promotion-freshness-transition.v1.json",
+      "promotion-authorization.v1.json",
+    ]) expect(promotionWorkflow).toContain(receipt)
+    expect(promotionWorkflow).toContain("path: trusted-receipts")
+    expect(promotionWorkflow).toContain("path: trusted-policy")
+    expect(promotionWorkflow.match(/persist-credentials: false/gu)).toHaveLength(2)
     expect(promotionWorkflow).toContain(
       'test "$(git -C trusted-policy rev-parse "refs/remotes/origin/$DEFAULT_BRANCH")" = "$TRUSTED_POLICY_COMMIT"',
     )
-    expect(promotionWorkflow).not.toContain(
-      'merge-base --is-ancestor "$TRUSTED_POLICY_COMMIT"',
+    expect(promotionWorkflow).toContain("vars.ACADEMYINFO_PUBLIC_INSTALL_VERIFIER_SHA256")
+    expect(promotionWorkflow).toContain("vars.ACADEMYINFO_RELEASE_RECEIPT_VERIFIER_SHA256")
+    expect(promotionWorkflow).toContain('throw new Error(`${pathKey} protected byte SHA-256 mismatch`)')
+    expect(promotionWorkflow).toContain(
+      "canonicalizeJcs(b.evidence_digests) !== canonicalizeJcs(requiredEvidence)",
     )
-    expect(rollbackWorkflow).toContain(
-      'git -C "$TRUSTED_POLICY_DIR" fetch --no-tags origin "refs/heads/$DEFAULT_BRANCH:refs/remotes/protected/default"',
+    expect(promotionWorkflow).toContain('freshnessPayload.transition !== "CLIENT_VERIFIED"')
+    expect(promotionWorkflow).toContain("freshnessDigest !== process.env.FRESHNESS_TRANSITION_DIGEST")
+    expect(promotionWorkflow).toContain("sha256Jcs(attestationProjection) !== attestationDigest")
+    expect(promotionWorkflow).toContain("authorizationDigest !== process.env.PROMOTION_AUTHORIZATION_DIGEST")
+    expect(promotionWorkflow).toContain(
+      "Approval order must be candidate < client <= freshness administrator <= promotion authorization",
     )
-    expect(rollbackWorkflow).toContain(
-      'test "$(git -C "$TRUSTED_POLICY_DIR" rev-parse refs/remotes/protected/default)" = "$POLICY_COMMIT"',
+    expect(promotionWorkflow).not.toContain("${{ github.actor }}")
+    expectBefore(promotionWorkflow, "protected byte SHA-256 mismatch", "--kind candidate")
+    expectBefore(promotionWorkflow, "--kind candidate", "--kind client")
+  })
+
+  it("rejects forged event, release-data, predecessor, clock, and evidence joins", () => {
+    for (const guard of [
+      "freshnessPayload.release_data_digest_v1 !== candidateReleaseDataDigest",
+      "freshnessPayload.event_id !== candidateAuthorizationPayload.event_id",
+      "payload.event_id !== freshnessPayload.event_id",
+      "payload.release_data_digest_v1 !== freshnessPayload.release_data_digest_v1",
+      "payload.predecessor_transition_digest !== freshnessPayload.transition_digest",
+      "payload.first_seen_at !== freshnessPayload.first_seen_at",
+      "payload.deadline_at !== freshnessPayload.deadline_at",
+      "Promotion authorization payload is forged or does not bind the complete evidence set",
+      "Promotion freshness administrator attestation is missing or unbound",
+      "Promotion authorization deadline has expired",
+      "approval time is too far in the future",
+      "Receipt-controlled ${name} is not output-safe",
+    ]) expect(promotionWorkflow).toContain(guard)
+  })
+
+  it("checks candidate, latest, and integrity anonymously without changing them", () => {
+    expect(promotionWorkflow.match(/npm view /gu)).toHaveLength(3)
+    expect(promotionWorkflow).toContain(
+      'npm view "$PACKAGE_NAME" dist-tags.candidate --json',
     )
-    expect(rollbackWorkflow).not.toContain(
-      'merge-base --is-ancestor "$POLICY_COMMIT"',
+    expect(promotionWorkflow).toContain(
+      'npm view "$PACKAGE_NAME" dist-tags.latest --json',
+    )
+    expect(promotionWorkflow).toContain(
+      'npm view "$PACKAGE_NAME@$VERSION" dist.integrity --json',
+    )
+    expect(promotionWorkflow).toContain('test "$CANDIDATE" = "$VERSION"')
+    expect(promotionWorkflow).toContain('test "$LATEST" = "$EXPECTED_PREVIOUS_LATEST"')
+    expect(promotionWorkflow).toContain('test "$INTEGRITY" = "$EXPECTED_PACKAGE_INTEGRITY"')
+    expectBefore(
+      promotionWorkflow,
+      "Promotion authorization digest verification failed",
+      'CANDIDATE="$(npm view',
+    )
+    expectBefore(
+      promotionWorkflow,
+      'test "$INTEGRITY" = "$EXPECTED_PACKAGE_INTEGRITY"',
+      'schema_version: "promotion-readiness.v1"',
     )
   })
 
-  it("recovers only the exact authorized promotion without repeating the mutation", () => {
-    expect(promotionWorkflow).toContain('case "$LATEST" in')
-    expect(promotionWorkflow).toContain('test "$VERSION" != "$EXPECTED_PREVIOUS_LATEST"')
-    expect(promotionWorkflow).toContain('"$EXPECTED_PREVIOUS_LATEST") PROMOTE_REQUIRED=true ;;')
-    expect(promotionWorkflow).toContain('"$VERSION") PROMOTE_REQUIRED=false ;;')
+  it("emits and verifies one closed sanitized human-promotion readiness artifact", () => {
+    for (const binding of [
+      'schema_version: "promotion-readiness.v1"',
+      'status: "READY_FOR_HUMAN_PROMOTION"',
+      "receipt_identities:",
+      "verified_evidence_identity:",
+      "expected_registry_state:",
+      "observed_registry_state:",
+      "sanitized: true",
+      "Promotion readiness fields are not closed",
+      "Promotion readiness identity or registry observation mismatch",
+    ]) expect(promotionWorkflow).toContain(binding)
     expect(promotionWorkflow).toContain(
-      '*) echo "Latest is neither the authorized predecessor nor exact promotion version" >&2; exit 1 ;;',
+      "JSON.stringify(verified) !== JSON.stringify(readiness)",
     )
-    expect(promotionWorkflow).toContain("if: steps.registry.outputs.promote_required == 'true'")
-    expect(promotionWorkflow).toContain('echo "observed_latest=$LATEST"')
-    expect(promotionWorkflow).toContain("Promotion authorization expired before registry state acceptance")
-    expect(promotionWorkflow).toContain("Promotion authorization expired before completion recovery")
-    expect(promotionWorkflow).toContain("const verifiedAt = new Date().toISOString()")
-    expect(promotionWorkflow).toContain("verifiedAtMilliseconds > deadlineMilliseconds")
-    expect(promotionWorkflow).toContain("verified_at: verifiedAt")
-    expect(promotionWorkflow).toContain("PROMOTION_APPROVED_AT: ${{ steps.receipts.outputs.promotion_approved_at }}")
-    expect(promotionWorkflow).toContain("verifiedAtMilliseconds < firstSeenMilliseconds")
-    expect(promotionWorkflow).toContain("verifiedAtMilliseconds < promotionApprovedMilliseconds")
-    expect(
-      promotionWorkflow.split(
-        'test "$INTEGRITY" = "${{ steps.receipts.outputs.package_integrity }}"',
-      ),
-    ).toHaveLength(3)
-    expectBefore(promotionWorkflow, 'case "$LATEST" in', 'echo "observed_latest=$LATEST"')
-    expectBefore(
-      promotionWorkflow,
-      "Promotion authorization expired before registry state acceptance",
-      'echo "observed_latest=$LATEST"',
+    expect(promotionWorkflow).toContain(
+      'verified.status !== "READY_FOR_HUMAN_PROMOTION"',
     )
-    expectBefore(
-      promotionWorkflow,
-      "Promotion authorization expired before completion recovery",
-      'transition: "PROMOTED_CLOSED"',
+    expect(promotionWorkflow).toContain(
+      "verified.observed_registry_state.package_integrity !==",
     )
-    expectBefore(
-      promotionWorkflow,
-      "if: steps.registry.outputs.promote_required == 'true'",
-      "npm dist-tag add",
+    expect(promotionWorkflow).toContain(
+      "Date.parse(verified.observed_registry_state.observed_at) >",
     )
-    expectBefore(promotionWorkflow, 'test "$LATEST" = "$VERSION"', 'transition: "PROMOTED_CLOSED"')
-    const uploadCompletion = promotionWorkflow.slice(
-      promotionWorkflow.indexOf("- name: Upload post-mutation promotion completion"),
+    expect(promotionWorkflow).toContain(
+      "No promotion occurred in this workflow; \\`latest\\` remains \\`$EXPECTED_PREVIOUS_LATEST\\`.",
     )
-    expect(uploadCompletion).not.toContain("\n        if:")
-    expect(uploadCompletion).toContain("path: ${{ runner.temp }}/promotion.v1.json")
+    expect(promotionWorkflow).toContain("Any npm registry write remains a human terminal ceremony.")
+    expect(promotionWorkflow).toContain("path: ${{ runner.temp }}/promotion-readiness.v1.json")
+    expect(actionReferences(promotionWorkflow)
+      .filter((reference) => reference.startsWith("actions/upload-artifact@"))).toEqual([
+      "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
+    ])
   })
+
+  it("never claims promotion completion or recovery", () => {
+    for (const forbidden of [
+      'transition: "PROMOTED_CLOSED"',
+      "PROMOTED_CLOSED completion",
+      "promotion-completion",
+      "promote_required",
+      "post-mutation",
+      "promotion.v1.json",
+    ]) expect(promotionWorkflow).not.toContain(forbidden)
+  })
+})
+
+describe("first-release rollback read-only boundary", () => {
+  it("has no dispatch inputs, environment, credentials, or administrator operation", () => {
+    expect(rollbackWorkflow).toContain("on:\n  workflow_dispatch:\n")
+    expect(rollbackWorkflow).not.toContain("inputs:")
+    expect(rollbackWorkflow).not.toMatch(/^\s+env:/gmu)
+    expect(rollbackWorkflow).not.toMatch(/^\s+environment:/gmu)
+    expect(rollbackWorkflow).not.toContain("id-token: write")
+    for (const credential of ["NODE_AUTH_TOKEN", "NPM_TOKEN", "_authToken", "always-auth:"]) {
+      expect(rollbackWorkflow).not.toContain(credential)
+    }
+    expect(rollbackWorkflow).not.toContain("administrator")
+    expect(rollbackWorkflow).not.toContain("attestation")
+    expect(rollbackWorkflow).not.toContain("authorization")
+    expect(rollbackWorkflow).not.toContain("${{ github.actor }}")
+    expect([...rollbackWorkflow.matchAll(/^ {2}([a-z][a-z0-9-]*):\n {4}name:/gmu)]
+      .map((match) => match[1])).toEqual(["verify-rollback-availability"])
+    expect(rollbackWorkflow.match(/^\s+contents: read$/gmu)).toHaveLength(2)
+  })
+
+  it("deterministically emits and verifies the closed fix-forward result", () => {
+    for (const binding of [
+      'schema_version: "first-release-rollback-unavailable.v1"',
+      'status: "FIRST_RELEASE_ROLLBACK_UNAVAILABLE"',
+      'code: "FIRST_RELEASE_ROLLBACK_UNAVAILABLE"',
+      'package_name: "academyinfo-mcp"',
+      'first_release_version: "0.1.0"',
+      "rollback_available: false",
+      'required_recovery: "FIX_FORWARD"',
+      'required_fix_forward_version: "0.1.1"',
+      "sanitized: true",
+      "JSON.stringify(verified) !== JSON.stringify(expected)",
+      "JSON.stringify(Object.keys(verified).sort()) !== JSON.stringify(exactArtifactKeys)",
+      "First-release rollback unavailability artifact verification failed",
+    ]) expect(rollbackWorkflow).toContain(binding)
+    expect(rollbackWorkflow).not.toContain("new Date().toISOString()")
+    expectBefore(rollbackWorkflow, "writeFileSync(process.env.ARTIFACT", "JSON.parse(readFileSync(process.env.ARTIFACT")
+    expectBefore(rollbackWorkflow, "First-release rollback unavailability artifact verification failed", "exit 0")
+    expect(rollbackWorkflow).toContain(
+      "First-release rollback unavailability report generation succeeded; artifact upload is still required.",
+    )
+    expect(rollbackWorkflow).not.toContain(
+      "This workflow did not modify npm registry state and completed successfully.",
+    )
+  })
+
+  it("rejects an added rollback artifact field with an independent exact key allowlist", () => {
+    const allowlistBlock = rollbackWorkflow.match(
+      /const exactArtifactKeys = \[\n([\s\S]*?)\n\s+\];/u,
+    )
+    expect(allowlistBlock?.[1]).toBeDefined()
+    const workflowAllowlist = [
+      ...(allowlistBlock?.[1] ?? "").matchAll(/^\s+"([^"]+)",?$/gmu),
+    ].map((match) => match[1] ?? "")
+    expect(workflowAllowlist).toEqual([
+      "code",
+      "first_release_version",
+      "message",
+      "package_name",
+      "required_fix_forward_version",
+      "required_recovery",
+      "rollback_available",
+      "sanitized",
+      "schema_version",
+      "status",
+    ])
+
+    const cleanArtifact = {
+      schema_version: "first-release-rollback-unavailable.v1",
+      status: "FIRST_RELEASE_ROLLBACK_UNAVAILABLE",
+      code: "FIRST_RELEASE_ROLLBACK_UNAVAILABLE",
+      package_name: "academyinfo-mcp",
+      first_release_version: "0.1.0",
+      rollback_available: false,
+      required_recovery: "FIX_FORWARD",
+      required_fix_forward_version: "0.1.1",
+      message: "First-release failures require fix-forward 0.1.1 because no prior release exists to restore.",
+      sanitized: true,
+    }
+    const hasExactKeys = (artifact: Record<string, unknown>): boolean =>
+      JSON.stringify(Object.keys(artifact).sort()) === JSON.stringify(workflowAllowlist)
+
+    expect(hasExactKeys(cleanArtifact)).toBe(true)
+    expect(hasExactKeys({ ...cleanArtifact, unexpected_field: "forged" })).toBe(false)
+    expect(rollbackWorkflow).not.toContain("Object.keys(expected)")
+  })
+
+  it("uploads with the pinned action and exits successfully without a registry or admin operation", () => {
+    const references = actionReferences(rollbackWorkflow)
+    expect(references).toEqual([
+      "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
+    ])
+    expect(rollbackWorkflow).toContain(
+      "path: ${{ runner.temp }}/first-release-rollback-unavailable.v1.json",
+    )
+    expect(rollbackWorkflow).toContain("if-no-files-found: error")
+    expect(rollbackWorkflow).toContain("exit 0")
+    expect(rollbackWorkflow).not.toMatch(/npm\s+(?:publish|dist-tag|unpublish|deprecate|view)\b/u)
+    expect(rollbackWorkflow).not.toContain("rollback-authorization.v1.json")
+    expect(rollbackWorkflow).not.toContain("promotion-completion")
+    expect(rollbackWorkflow).not.toContain("ROLLBACK_REOPENED")
+    expect(rollbackWorkflow).not.toMatch(/^\s+- name: .*restore/gimu)
+    expect(rollbackWorkflow).not.toContain("prior_good_")
+    expect(rollbackWorkflow).not.toContain("gh api")
+  })
+})
+
+describe("read-only release verifier regressions", () => {
   it("joins every public lane to candidate-controlled integrity before exposing outputs", () => {
     expect(publicWorkflow).toContain("packageIntegrity: process.env.CANDIDATE_PACKAGE_INTEGRITY")
     expect(publicWorkflow).toContain("Installed registry integrity is unrelated to candidate receipt")
@@ -986,25 +1154,6 @@ describe("final transition cleaner regressions", () => {
       `sha256-${Buffer.alloc(64, 7).toString("base64")}`,
       `${PACKAGE_INTEGRITY.slice(0, -2)}AA`,
     ]) expect(validReceiptIntegrity(forged)).toBe(false)
-    expect(promotionWorkflow).toContain("Receipt-controlled ${name} is not output-safe")
-    expect(rollbackWorkflow).toContain("Receipt-controlled ${name} is not output-safe")
-  })
-
-  it("rejects forged event, release-data digest, clock, and predecessor joins", () => {
-    for (const guard of [
-      "payload.event_id !== freshnessPayload.event_id",
-      "payload.release_data_digest_v1 !== freshnessPayload.release_data_digest_v1",
-      "payload.predecessor_transition_digest !== freshnessPayload.transition_digest",
-      "payload.first_seen_at !== freshnessPayload.first_seen_at",
-      "payload.deadline_at !== freshnessPayload.deadline_at",
-    ]) expect(promotionWorkflow).toContain(guard)
-    for (const guard of [
-      "payload.event_id !== promoted.event_id",
-      "payload.predecessor_transition_digest !== predecessorTransitionDigest",
-      "payload.release_data_digest_v1 !== promoted.release_data_digest_v1",
-      "payload.first_seen_at !== promoted.first_seen_at",
-      "payload.deadline_at !== promoted.deadline_at",
-    ]) expect(rollbackWorkflow).toContain(guard)
   })
 
   it("validates and hashes only closed candidate/client transition projections", () => {
@@ -1061,66 +1210,37 @@ describe("final transition cleaner regressions", () => {
     }
   })
 
-  it("keeps the bad release-data target distinct from closed prior-good evidence", () => {
-    expect(rollbackWorkflow).toContain("release_data_digest_v1: process.env.RELEASE_DATA_DIGEST")
-    expect(rollbackWorkflow).toContain("prior_good_release_data_digest_v1: process.env.PREVIOUS_RELEASE_DATA_DIGEST")
-    expect(rollbackWorkflow).toContain(
-      "verified.rollback_completion_payload_v1.release_data_digest_v1 !== process.env.RELEASE_DATA_DIGEST",
-    )
-    expect(rollbackWorkflow).toContain(
-      "verified.rollback_completion_payload_v1.prior_good_release_data_digest_v1 !== process.env.PREVIOUS_RELEASE_DATA_DIGEST",
-    )
-
+  it("keeps distinct receipt identities and rejects reordered closed evidence", () => {
     const expected = {
-      release_data_digest_v1: "1".repeat(64),
-      prior_good_release_data_digest_v1: "2".repeat(64),
-      predecessor_receipt_digests: ["3".repeat(64), "4".repeat(64)],
+      candidate_receipt_digest: "1".repeat(64),
+      client_receipt_digest: "2".repeat(64),
+      public_lane_receipt_digests: ["3".repeat(64), "4".repeat(64)],
     }
     expect(() => validateClosedExactFields(expected, expected)).not.toThrow()
     expect(() => validateClosedExactFields({
       ...expected,
-      release_data_digest_v1: expected.prior_good_release_data_digest_v1,
-      prior_good_release_data_digest_v1: expected.release_data_digest_v1,
+      candidate_receipt_digest: expected.client_receipt_digest,
+      client_receipt_digest: expected.candidate_receipt_digest,
     }, expected)).toThrow()
     expect(() => validateClosedExactFields({
       ...expected,
-      predecessor_receipt_digests: [...expected.predecessor_receipt_digests].reverse(),
+      public_lane_receipt_digests: [...expected.public_lane_receipt_digests].reverse(),
     }, expected)).toThrow()
   })
 
-  it("rejects missing or wrong post-mutation bad-version deprecation evidence", () => {
-    expect(rollbackWorkflow).toContain('npm view "$PACKAGE_NAME@$BAD_VERSION" deprecated --json')
-    expect(rollbackWorkflow).toContain('test "$DEPRECATION" = "$EXPECTED_DEPRECATION"')
-    expect(rollbackWorkflow).toContain("bad_version_deprecation: process.env.REGISTRY_DEPRECATION")
-    expect(rollbackWorkflow).toContain(
-      "verified.registry_verification.bad_version_deprecation !== process.env.EXPECTED_DEPRECATION",
-    )
-    expectBefore(
-      rollbackWorkflow,
-      'test "$DEPRECATION" = "$EXPECTED_DEPRECATION"',
-      'transition: "ROLLBACK_REOPENED"',
-    )
-
+  it("rejects missing or forged closed anonymous registry observations", () => {
     const expected = {
       registry: "https://registry.npmjs.org/",
-      latest_version: "0.1.0",
+      candidate_dist_tag: VERSION,
+      latest_dist_tag: "0.1.0",
       package_integrity: PACKAGE_INTEGRITY,
-      bad_version_deprecation: "Rolled back (regression). Use 0.1.0 or a later fixed SemVer.",
-      verified_at: "2026-07-11T00:02:00.000Z",
+      observed_at: "2026-07-11T00:02:00.000Z",
     }
-    const { bad_version_deprecation: _omitted, ...missing } = expected
+    const { candidate_dist_tag: _omitted, ...missing } = expected
     expect(() => validateClosedExactFields(missing, expected)).toThrow()
     expect(() => validateClosedExactFields({
       ...expected,
-      bad_version_deprecation: "Use any version.",
+      candidate_dist_tag: "0.1.2",
     }, expected)).toThrow()
-  })
-
-  it("cannot record completion truth when either registry mutation fails", () => {
-    expectBefore(promotionWorkflow, "npm dist-tag add", 'transition: "PROMOTED_CLOSED"')
-    expectBefore(promotionWorkflow, 'test "$LATEST" = "$VERSION"', 'transition: "PROMOTED_CLOSED"')
-    expectBefore(rollbackWorkflow, "npm dist-tag add", 'transition: "ROLLBACK_REOPENED"')
-    expectBefore(rollbackWorkflow, "npm deprecate", 'transition: "ROLLBACK_REOPENED"')
-    expectBefore(rollbackWorkflow, 'test "$LATEST" = "$PREVIOUS_VERSION"', 'transition: "ROLLBACK_REOPENED"')
   })
 })

@@ -2,7 +2,9 @@
 
 ## Current evidence boundary
 
-The checkout implements the local eight-tool server, data-only catalog, Node `>=22 <23`, the exact closed four-package direct production dependency set with one current backend, and seven protected refresh/release workflow definitions. Workflow presence establishes no execution or external evidence. The checkout does **not** establish an administrator-selected public version, a completed single-backend gate, a public candidate, three-lane public-install proof, an actual-client receipt, protected client-evidence ingest, promotion, or a rollback/no-change drill. Keep publication and `latest` promotion blocked until every applicable unchecked item below has a protected evidence reference.
+The checkout implements the local eight-tool server, data-only catalog, Node `>=22 <23`, the exact closed four-package direct production dependency set with `better-sqlite3` `11.10.0` as the sole backend, and seven refresh/release workflow definitions. Except for the fixed-path repository/PR writer in `refresh-write-pr.yml`, Actions are read-only: they verify, build, read anonymous npm registry state, and upload sanitized artifacts. Workflow presence establishes no execution or external evidence. The checkout does **not** establish an administrator-selected public version, completed backend proof, public candidate, three-lane public-install proof, actual-client receipt, protected client-evidence ingest, successful readiness verification, movement of `latest`, or a fix-forward drill. Every npm registry write is a human terminal ceremony governed by [`manual-publish-runbook.md`](manual-publish-runbook.md). Keep candidate publication and `latest` movement blocked until every applicable unchecked item below has a protected evidence reference.
+
+**First-publication scope note.** When public npm `latest` is absent (i.e., the very first publication), the optional workflow verifiers `candidate-release.yml`, `client-evidence.yml`, and `promote-release.yml` cannot complete: their predecessor contract requires exact SemVer `expected_previous_latest`, and promotion parses an existing public `dist-tags.latest`. Do not use a sentinel, placeholder, candidate version, or fabricated SemVer as predecessor evidence. This limits only the **workflow verifiers** — the first publication itself proceeds through the self-contained human ceremony in [`manual-publish-runbook.md`](manual-publish-runbook.md), which dispatches no workflow (owner decision, 2026-07-13). If workflow-verified evidence is wanted for a first publication, implement absent-`latest` predecessor support (`absent | present` union) as a separate reviewed change; for subsequent releases the verifiers work as-is.
 
 Do not copy local paths, credentials, signed URLs, or private runner details into a checklist receipt.
 
@@ -11,9 +13,10 @@ Do not copy local paths, credentials, signed URLs, or private runner details int
 - [ ] Confirm the npm package identity and complete version history from the public registry.
 - [ ] Confirm current package ownership and release authority.
 - [ ] Select an unused SemVer; do not infer it from `package.json` or overwrite an existing version.
-- [ ] Confirm 2FA/trusted-publishing and provenance/signature readiness.
-- [ ] Configure exactly the protected environments `refresh-pr-writer`, `npm-candidate`, `public-candidate-proof`, `claude-desktop-client-proof`, `npm-promotion`, and `npm-rollback`, each with its required administrator approval.
-- [ ] Define protected variables `ACADEMYINFO_RELEASE_ADMINISTRATOR`, `ACADEMYINFO_PUBLIC_INSTALL_VERIFIER_SHA256`, and `ACADEMYINFO_RELEASE_RECEIPT_VERIFIER_SHA256`; confirm every protected gate binds the exact reviewed administrator identity and current-policy verifier bytes rather than receipt-provided identity or caller-selected historical code.
+- [ ] If public `latest` exists, confirm it resolves to the exact SemVer supplied as `expected_previous_latest` before any workflow dispatch. If `latest` is absent (first publication), skip the workflow-dispatch items in sections 7–9 and follow [`manual-publish-runbook.md`](manual-publish-runbook.md) directly; never invent predecessor evidence to force a dispatch.
+- [ ] Confirm npm account 2FA is enforced and that separate short-lived, least-privilege credentials can be created for the candidate-only publication and eventual `latest` movement ceremonies.
+- [ ] Configure the protected environments still used by the checked-in evidence workflows: `refresh-pr-writer`, `public-candidate-proof`, and `claude-desktop-client-proof`, each with its required administrator approval.
+- [ ] Define protected variables `ACADEMYINFO_RELEASE_ADMINISTRATOR`, `ACADEMYINFO_PUBLIC_INSTALL_VERIFIER_SHA256`, and `ACADEMYINFO_RELEASE_RECEIPT_VERIFIER_SHA256` wherever the read-only workflow contract requires them; confirm every protected gate binds the exact reviewed administrator identity and current-policy verifier bytes rather than receipt-provided identity or caller-selected historical code.
 - [ ] Configure artifact/receipt retention and immutable predecessor-digest access.
 - [ ] Confirm the official Node 22 lanes: macOS/arm64, Windows/x64, and Ubuntu glibc/x64. Do not add a Node 24 support claim.
 - [ ] Record an evidenced official acquisition link without putting a signed query string in artifacts.
@@ -21,8 +24,8 @@ Do not copy local paths, credentials, signed URLs, or private runner details int
 ## 2. Scope and dependency gate
 
 - [ ] Confirm `engines.node` is exactly `>=22 <23` in the packed candidate.
-- [ ] Confirm the complete direct production dependency map is exact and closed: `@modelcontextprotocol/sdk` `1.29.0`, `pino` `10.3.1`, `zod` `4.4.3`, and exactly one approved backend (`better-sqlite3` `11.10.0` in the current package), without caret, tilde, tag, alternate registry, override, or controlling second runtime copy.
-- [ ] Confirm the lockfile root, installed package identities, public registry tarball URLs, and SHA-512 integrities match that complete map. A separately approved backend replacement must update the package, lock, verifier, and evidence contract together.
+- [ ] Confirm the complete direct production dependency map is exact and closed: `@modelcontextprotocol/sdk` `1.29.0`, `pino` `10.3.1`, `zod` `4.4.3`, and the sole backend `better-sqlite3` `11.10.0`, without caret, tilde, tag, alternate registry, override, alternate backend, or controlling second runtime copy.
+- [ ] Confirm the lockfile root, installed package identities, public registry tarball URLs, and SHA-512 integrities match that complete map.
 - [ ] Confirm exactly eight tools are registered: `list_sources`, `list_indicators`, `search_university`, `get_university_metrics`, `compare_universities`, `explain_indicator`, `validate_source_coverage`, and `explore_universities`.
 - [ ] Confirm all seven legacy registrations/default response behavior remain unchanged.
 - [ ] Confirm `tools/list` registers `explore_universities` with this exact permissive Draft-07 outer input schema:
@@ -55,27 +58,16 @@ Do not copy local paths, credentials, signed URLs, or private runner details int
 - [ ] Confirm package and evidence exclude raw workbook/CSV, signed download URLs, `.env`, credentials, service keys, local user names, private paths, machine identifiers, and every `15139279` artifact.
 - [ ] Confirm package audit, license audit, security audit, and secret/private-path scans have candidate-bound receipts.
 
-## 4. Conditional single-backend gate
+## 4. Sole-backend gate
 
-Release exactly one backend.
-
-### Option A: retain `better-sqlite3`
+Release only `better-sqlite3` `11.10.0`. No alternate backend, dual-backend package, or runtime fallback is authorized.
 
 - [ ] Install the same candidate on all three clean Node 22 public lanes.
 - [ ] Use active Python, node-gyp, and compiler traps and prove the traps with a canary.
 - [ ] Confirm no source compilation or build tool runs on any lane.
 - [ ] Record bundled/custom/missing/corrupt database behavior and external-working-directory behavior.
-
-### Option B: select `sql.js` only if Option A fails
-
-- [ ] Pin and review one exact `sql.js` identity/integrity.
-- [ ] Prove seven-tool goldens, eighth-tool behavior, `ACADEMYINFO_DB_PATH`, bundled/custom/missing/corrupt databases, and external-working-directory parity.
-- [ ] Review WASM packaging, license/security, startup time, RSS, and no-native-build evidence on all lanes.
-- [ ] Build the closed backend decision payload over source commit and all required evidence digests.
-- [ ] Obtain separate Architect and administrator approvals bound to that payload digest.
-- [ ] Validate the self-excluding outer backend-selection receipt and final receipt digest.
-
-- [ ] Confirm the candidate includes exactly the selected backend and no runtime fallback. If neither option has valid evidence, record `BLOCKED_PENDING_BACKEND_SELECTION` and stop.
+- [ ] Bind the all-lane evidence to the exact source, package integrity, and `better-sqlite3` `11.10.0` identity.
+- [ ] If the evidence is incomplete or any lane fails, retain or record the historical lifecycle state `BLOCKED_PENDING_BACKEND_SELECTION` and stop. That state does not authorize changing the backend; the read-only Actions migration neither advances nor closes it.
 
 ## 5. Refresh acquisition and semantic validation
 - [ ] Dispatch or observe `.github/workflows/refresh-acquire-validate.yml` only after repository variables `ACADEMYINFO_15118998_CANONICAL_PAGE` and `ACADEMYINFO_REFRESH_POLICY_DIGEST` contain administrator-reviewed, query-free source-page and policy-digest values.
@@ -103,15 +95,18 @@ Release exactly one backend.
 - [ ] Confirm failure and verified-no-change paths cannot invoke content writes.
 - [ ] Obtain administrator review of the semantic diff; do not treat checksum/count/value equality as approval.
 
-## 7. Candidate transition
-- [ ] Dispatch `.github/workflows/candidate-release.yml` only with every exact immutable input: `version`, `source_commit`, `source_tag`, `receipt_commit`, `authorization_receipt_digest`, `authorization_context_digest`, `expected_previous_latest`, and `confirm_candidate_only` set to `publish-to-candidate-not-latest`; confirm protected verifier SHA-256 and administrator identity variables are set.
+## 7. Candidate verification and human candidate-only publication
 
+The workflow-dispatch items in this section apply only when registry history supplies a real previous `latest` SemVer — an absent `latest` is not representable by the current candidate/client/promotion receipts or workflow inputs. For the first publication, the human ceremony in [`manual-publish-runbook.md`](manual-publish-runbook.md) is the operative path and does not use these dispatches.
+
+- [ ] Dispatch `.github/workflows/candidate-release.yml` only with every exact immutable input: `version`, `source_commit`, `source_tag`, `receipt_commit`, `authorization_receipt_digest`, `authorization_context_digest`, `expected_previous_latest`, and the workflow's exact `confirm_candidate_only` literal. The legacy confirmation wording is dispatch compatibility, not publication authority.
 - [ ] Confirm `candidate-authorization.v1.json` uses exactly the reviewed evidence kinds `backend-decision`, `release-data`, `source-revision`, and `version-registry-state`, plus an allowed policy set containing `release`; reject free-form kinds, policies, identifiers, paths, URIs, or credential-shaped material.
-- [ ] Re-run protected build, behavior, package, license, security, privacy, dependency, semantic, and selected-backend gates on the immutable candidate input.
-- [ ] Publish the administrator-selected exact version only under the candidate tag; preserve current `latest`.
-- [ ] Record registry package identity/integrity, selected backend, source/data digests, and predecessor evidence in the closed post-state candidate evidence payload. Independently install the exact published candidate with scripts disabled, run `npm audit signatures --json --include-attestations`, and persist the sanitized closed `candidate-registry-provenance-proof.v1` digest inside `candidate-registry-post-state.v1`; then obtain a separate administrator attestation over the candidate evidence digest before creating and persisting final `candidate.v1.json`.
-- [ ] Confirm publication output and receipt are sanitized.
-- [ ] Do not describe candidate publication as release completion.
+- [ ] Confirm the workflow has contents-read permission only, no OIDC or npm credential, and re-runs build, behavior, package, license, security, privacy, dependency, semantic, and sole-backend gates on the immutable candidate input.
+- [ ] Download the digest-named handoff artifact and independently match its exact tarball SHA-256, SHA-512 SRI, package/version, source commit/tag, and authorization digests. Do not rebuild or repack it.
+- [ ] Follow [`manual-publish-runbook.md`](manual-publish-runbook.md) to publish that exact preverified tarball under the non-`latest` candidate tag from a human terminal. Use the actual administrator-selected unused SemVer; placeholder versions and automated publication are prohibited.
+- [ ] Revoke the candidate credential immediately, prove the revoked credential fails authentication, and retain only sanitized evidence. No token, TOTP, npm configuration, credential-shaped value, private path, or terminal transcript may enter logs or evidence.
+- [ ] Read the public registry anonymously and record package identity/integrity, candidate dist-tag state, `better-sqlite3` `11.10.0`, source/data digests, and predecessor evidence in the closed post-state candidate payload. Obtain a separate administrator attestation over that digest before persisting final `candidate.v1.json`.
+- [ ] Do not describe candidate publication as release completion, and do not claim provenance or signature evidence unless it was independently observed.
 
 ## 8. Public install and client proof
 
@@ -123,7 +118,7 @@ Release exactly one backend.
 - [ ] Run exact `npx -y academyinfo-mcp@<version>` through an external JSON-RPC verifier.
 - [ ] Record Node/OS/architecture and Ubuntu glibc identity.
 - [ ] Record installed application plus SDK, Pino, Zod, and selected-backend names/versions; verify every direct dependency tarball integrity against public registry metadata.
-- [ ] Confirm candidate tag and provenance/signature evidence.
+- [ ] Confirm the candidate dist-tag. Record provenance/signature evidence only when independently observed from the public registry; do not infer it from publication intent or workflow output.
 - [ ] Keep active build traps and canary proof; save verbose sanitized install evidence.
 - [ ] Verify initialization, exact eight-tool listing, exact `explore_universities` schema, a bundled query, no-key behavior, and JSON-RPC-only stdout.
 - [ ] Complete the factual Ubuntu journey, including an unresolved case followed by exact-campus resolution, comparison, and indicator explanation without ranking/recommendation.
@@ -132,43 +127,44 @@ Release exactly one backend.
 - [ ] Persist, at the workflow's fixed paths in one immutable protected default-branch evidence commit, `candidate.v1.json`, all three `public-install/public-install-<lane>.v1.json` receipts, `claude-desktop-actual.v1.json`, every actual-client artifact under `claude-desktop-actual-artifacts/<kind>.evidence`, `client-evidence-payload.v1.json`, and `client-administrator-attestation.v1.json`.
 - [ ] Dispatch `.github/workflows/client-evidence.yml` only with every exact immutable input: `version`, `source_commit`, `receipt_commit`, `package_integrity`, `candidate_receipt_digest`, independently supplied `candidate_predecessor_receipt_digest`, `expected_previous_latest`, `macos_arm64_receipt_digest`, `windows_x64_receipt_digest`, `ubuntu_glibc_x64_receipt_digest`, `generic_stdio_journey_digest`, `actual_claude_receipt_digest`, `client_payload_digest`, `administrator_attestation_digest`, and `confirm_actual_not_simulated` set to `ingest-operator-supplied-actual-claude-desktop-evidence`.
 - [ ] Confirm `client-evidence.yml` only ingests, validates, and joins the pre-existing actual-Claude receipt under contents-read permission; it does not launch, install, fabricate, or simulate Claude Desktop, write the repository, publish, move a dist-tag, or promote.
-- [ ] Persist the workflow's exact client-proof output separately at `evidence/releases/<version>/claude-desktop.v1.json` before promotion.
+- [ ] Persist the workflow's exact client-proof output separately at `evidence/releases/<version>/claude-desktop.v1.json` before requesting promotion readiness.
 
-## 9. Promotion
-- [ ] Dispatch `.github/workflows/promote-release.yml` only after its protected candidate/client evidence exists, with every exact immutable input: `version`, `source_commit`, `receipt_commit`, `candidate_receipt_digest`, `candidate_authorization_context_digest`, `client_receipt_digest`, `macos_arm64_receipt_digest`, `windows_x64_receipt_digest`, `ubuntu_glibc_x64_receipt_digest`, `actual_claude_receipt_digest`, `generic_stdio_journey_digest`, `freshness_transition_digest`, `promotion_authorization_digest`, `expected_previous_latest`, and `confirm_promote` set to `promote-receipt-bound-candidate`. The workflow file is not evidence that client proof occurred.
-- [ ] Confirm candidate publication, promotion, and rollback all use the same package-scoped concurrency group, `academyinfo-mcp-registry-mutation`, with `cancel-in-progress: false`; do not run any of these registry mutations outside that lock.
+## 9. Promotion readiness and human `latest` movement
 
-- [ ] Re-fetch and verify the exact public candidate and all candidate/client predecessor digests.
-- [ ] Confirm every required public lane and actual Claude receipt passed and no evidence is local-only.
-- [ ] Obtain administrator promotion approval bound to the immutable promotion payload.
-- [ ] Move that exact candidate—not rebuilt bytes—to `latest`.
-- [ ] Write the self-excluding promotion receipt and verify public `latest` resolves to the same identity/integrity. Retain the uploaded post-mutation `promotion.v1.json`, then persist that file byte-identically at `evidence/releases/<version>/promotion.v1.json` in a protected immutable default-branch evidence commit. Rollback is unavailable until that protected copy exists and its outer receipt digest is supplied.
-- [ ] Close a changed-data incident only when its matching release-data digest is now `latest`.
+- [ ] Confirm all three public lanes, the generic stdio journey, actual Claude Desktop evidence, protected client ingest, and separately persisted client receipt passed against the same candidate; no evidence may be local-only.
+- [ ] Create and validate the administrator-attested freshness transition receipt that binds the same candidate/client chain, event, release-data digest, immutable first-seen time, and seven-day deadline in the required `CLIENT_VERIFIED` state.
+- [ ] Have the administrator review the complete immutable evidence and create the pre-existing promotion authorization bound to the exact candidate, client receipt, three public lanes, actual-Claude receipt, freshness transition, predecessor state, event, release-data digest, first-seen time, and deadline. This bound authorization must exist before readiness dispatch.
+- [ ] Dispatch `.github/workflows/promote-release.yml` only after that promotion authorization and all protected candidate/client/freshness evidence exist, using every exact immutable workflow input, including `promotion_authorization_digest` and exact-SemVer `expected_previous_latest`.
+- [ ] Confirm the workflow has contents-read permission only, no npm credential or OIDC, verifies the pre-existing bound promotion authorization and anonymous candidate/`latest` registry state plus all immutable predecessor joins, and uploads sanitized `promotion-readiness.v1.json`. The artifact is readiness evidence only; it neither creates approval nor moves `latest`.
+- [ ] Only after readiness succeeds, follow [`manual-publish-runbook.md`](manual-publish-runbook.md) from a human terminal to move that exact candidate—not rebuilt bytes—to `latest`. Any immediate registry-state comparison is an operator staleness recheck, not a second promotion approval.
+- [ ] Use a new short-lived least-privilege credential, enter TOTP interactively without `--otp` or any other argv/log/evidence exposure, revoke the credential immediately, and prove authentication fails after revocation.
+- [ ] Verify anonymously that public `latest` resolves to the same package identity/integrity, then persist the sanitized post-state evidence and close a changed-data incident only when its matching release-data digest is now `latest`.
+- [ ] Never perform publication, dist-tag, token, owner, access, deprecation, unpublish, or other npm administration from CI.
 
 ## 10. Freshness and verified-no-change
 
 - [ ] Parse official dates strictly; represent invalid official times as null with the deterministic failure class, and reject invalid workflow times without writing state.
 - [ ] Correlate provisional incidents by schema/dataset/page/last accepted SHA and absence of a differing SHA.
 - [ ] Preserve the earliest first-seen timestamp and seven-day (`604800000` ms) deadline across metadata, ETag, and repeated-failure drift.
-- [ ] Keep last-known-good data/version available on acquisition, validation, candidate, client, or promotion failure.
+- [ ] Keep last-known-good data/version, where one exists, available on acquisition, validation, candidate, client, readiness, or human publication/promotion failure.
 - [ ] For equal reacquired SHA, revalidate origin/license/workbook and create the closed no-change payload and digest.
 - [ ] Obtain administrator no-change attestation bound to that digest, validate the self-excluding outer receipt, and close only through `VERIFIED_NO_CHANGE_CLOSED`.
 - [ ] For differing SHA, prohibit no-change closure and keep the event open until matching promotion.
 
-## 11. Rollback
-- [ ] Before dispatch, require the byte-identical protected `evidence/releases/<bad_version>/promotion.v1.json` in the immutable `receipt_commit`; do not substitute or reconstruct the uploaded promotion output.
-- [ ] Dispatch `.github/workflows/rollback-release.yml` only with every exact immutable input: `bad_version`, `bad_source_commit`, `receipt_commit`, `promotion_receipt_digest`, `client_receipt_digest`, `promotion_freshness_receipt_digest`, `promotion_authorization_digest`, `previous_release_receipt_digest`, `prior_good_source_commit`, `prior_good_authorization_context_digest`, `freshness_transition_digest`, `rollback_authorization_digest`, `cause_code`, and `confirm_rollback` set to `restore-receipt-recorded-previous-latest`. Restrict `cause_code` to the implemented choices `regression`, `data-validation`, `package-integrity`, or `client-incompatibility`, and use the shared `academyinfo-mcp-registry-mutation` lock with `cancel-in-progress: false`.
+## 11. After a first release exists: failure and fix-forward
 
-- [ ] Verify the bad and prior-good version identities plus promotion predecessor digest.
-- [ ] Obtain administrator rollback approval bound to the immutable rollback payload.
-- [ ] Restore the prior exact version to `latest` and deprecate the bad version without deleting evidence.
-- [ ] Verify public `latest` identity/integrity after rollback.
-- [ ] Reopen the original changed-event clock and deadline; do not create a fresh clock.
-- [ ] Record the self-excluding rollback receipt and issue any fix under a new unused SemVer. Retain the uploaded post-mutation `rollback.v1.json`, then persist that file byte-identically at `evidence/releases/<bad_version>/rollback.v1.json` in a protected immutable default-branch evidence commit; do not delete it.
+This section applies only after an initial version has actually been published and reached `latest`. (The first publication itself is executed via [`manual-publish-runbook.md`](manual-publish-runbook.md).)
+
+- [ ] Treat `.github/workflows/rollback-release.yml` as a read-only verifier with no dispatch inputs, protected npm environment, credential, OIDC, or registry mutation authority.
+- [ ] Require its deterministic sanitized `FIRST_RELEASE_ROLLBACK_UNAVAILABLE` report; do not interpret successful report generation as a rollback.
+- [ ] Once the first release exists, there is no prior-good release to restore or deprecate. Do not run a rollback or invent predecessor evidence.
+- [ ] Preserve all candidate, public-lane, actual-client, freshness, authorization, readiness, and registry-state evidence; leave any changed-data incident open.
+- [ ] If defective `0.1.0` exists, correct the defect and fix forward as exact version `0.1.1`, repeating candidate-only publication, proofs, freshness evidence, pre-existing bound promotion authorization, readiness verification, and human `latest` movement. Never overwrite or reuse `0.1.0`.
+- [ ] Do not run dist-tag restore, deprecate, unpublish, or npm administrator operations from Actions.
 
 ## Final declaration
 
 - [ ] Every receipt projection excludes its own digest and joins immutable predecessor outer digests.
 - [ ] All evidence references are public/sanitized or protected without exposing a secret/private path.
-- [ ] Administrator confirms all gates applicable to the selected backend and release path.
-- [ ] Only then describe the exact version as promoted and supported on the evidenced Node 22 matrix.
+- [ ] Administrator confirms all gates applicable to the `better-sqlite3` `11.10.0` release path.
+- [ ] Only after the read-only proofs, required administrator attestations, pre-existing bound promotion authorization, successful readiness verification, and human terminal registry ceremonies are complete may the exact version be described as promoted and supported on the evidenced Node 22 matrix.

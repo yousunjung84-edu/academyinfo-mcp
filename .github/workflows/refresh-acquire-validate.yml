@@ -17,9 +17,12 @@ jobs:
     name: Read-only acquisition (Node 22)
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    permissions:
+      contents: read
     env:
       CANONICAL_SOURCE_PAGE: ${{ vars.ACADEMYINFO_15118998_CANONICAL_PAGE }}
       SOURCE_POLICY_DIGEST: ${{ vars.ACADEMYINFO_REFRESH_POLICY_DIGEST }}
+      NPM_CONFIG_REGISTRY: https://registry.npmjs.org/
     steps:
       # Pinned from the upstream v4 ref observed during workflow authoring.
       - name: Check out the immutable triggering commit
@@ -34,7 +37,6 @@ jobs:
         with:
           node-version: "22"
           cache: npm
-          registry-url: https://registry.npmjs.org/
 
       - name: Bind the exact reviewed source page to the base policy
         shell: bash
@@ -64,7 +66,13 @@ jobs:
           NODE
 
       - name: Install the reviewed source tree
-        run: npm ci --ignore-scripts
+        shell: bash
+        run: |
+          set -euo pipefail
+          NPM_USERCONFIG="$(mktemp "$RUNNER_TEMP/npm-userconfig.XXXXXX")"
+          chmod 0600 "$NPM_USERCONFIG"
+          export NPM_CONFIG_USERCONFIG="$NPM_USERCONFIG"
+          npm ci --ignore-scripts
 
       - name: Require the bounded acquisition interface
         shell: bash
