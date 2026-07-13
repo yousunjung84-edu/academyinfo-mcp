@@ -4,7 +4,7 @@
 
 The checkout implements the local eight-tool server, data-only catalog, Node `>=22 <23`, the exact closed four-package direct production dependency set with `better-sqlite3` `11.10.0` as the sole backend, and seven refresh/release workflow definitions. Except for the fixed-path repository/PR writer in `refresh-write-pr.yml`, Actions are read-only: they verify, build, read anonymous npm registry state, and upload sanitized artifacts. Workflow presence establishes no execution or external evidence. The checkout does **not** establish an administrator-selected public version, completed backend proof, public candidate, three-lane public-install proof, actual-client receipt, protected client-evidence ingest, successful readiness verification, movement of `latest`, or a fix-forward drill. Every npm registry write is a human terminal ceremony governed by [`manual-publish-runbook.md`](manual-publish-runbook.md). Keep candidate publication and `latest` movement blocked until every applicable unchecked item below has a protected evidence reference.
 
-Current first-publication bootstrap is **HOLD/UNSUPPORTED**. When public npm `latest` is absent, `candidate-release.yml`, `client-evidence.yml`, and `promote-release.yml` cannot complete because their predecessor contract requires exact SemVer `expected_previous_latest`; promotion also parses an existing public `dist-tags.latest` and validates it as SemVer. Do not use a sentinel, placeholder, candidate version, or fabricated SemVer as predecessor evidence. A separately reviewed canonical absent-`latest` contract must land before an initial `0.1.0` path is executable. This migration remains useful and read-only; it does not make first publication operable. Once that prerequisite is implemented, the manual human ceremonies remain the only permitted registry writes.
+**First-publication scope note.** When public npm `latest` is absent (i.e., the very first publication), the optional workflow verifiers `candidate-release.yml`, `client-evidence.yml`, and `promote-release.yml` cannot complete: their predecessor contract requires exact SemVer `expected_previous_latest`, and promotion parses an existing public `dist-tags.latest`. Do not use a sentinel, placeholder, candidate version, or fabricated SemVer as predecessor evidence. This limits only the **workflow verifiers** — the first publication itself proceeds through the self-contained human ceremony in [`manual-publish-runbook.md`](manual-publish-runbook.md), which dispatches no workflow (owner decision, 2026-07-13). If workflow-verified evidence is wanted for a first publication, implement absent-`latest` predecessor support (`absent | present` union) as a separate reviewed change; for subsequent releases the verifiers work as-is.
 
 Do not copy local paths, credentials, signed URLs, or private runner details into a checklist receipt.
 
@@ -13,7 +13,7 @@ Do not copy local paths, credentials, signed URLs, or private runner details int
 - [ ] Confirm the npm package identity and complete version history from the public registry.
 - [ ] Confirm current package ownership and release authority.
 - [ ] Select an unused SemVer; do not infer it from `package.json` or overwrite an existing version.
-- [ ] Under the current contract, confirm public `latest` resolves to the exact SemVer supplied as `expected_previous_latest`. If it is absent, record first-publication bootstrap as `HOLD/UNSUPPORTED` and stop before candidate dispatch without inventing predecessor evidence.
+- [ ] If public `latest` exists, confirm it resolves to the exact SemVer supplied as `expected_previous_latest` before any workflow dispatch. If `latest` is absent (first publication), skip the workflow-dispatch items in sections 7–9 and follow [`manual-publish-runbook.md`](manual-publish-runbook.md) directly; never invent predecessor evidence to force a dispatch.
 - [ ] Confirm npm account 2FA is enforced and that separate short-lived, least-privilege credentials can be created for the candidate-only publication and eventual `latest` movement ceremonies.
 - [ ] Configure the protected environments still used by the checked-in evidence workflows: `refresh-pr-writer`, `public-candidate-proof`, and `claude-desktop-client-proof`, each with its required administrator approval.
 - [ ] Define protected variables `ACADEMYINFO_RELEASE_ADMINISTRATOR`, `ACADEMYINFO_PUBLIC_INSTALL_VERIFIER_SHA256`, and `ACADEMYINFO_RELEASE_RECEIPT_VERIFIER_SHA256` wherever the read-only workflow contract requires them; confirm every protected gate binds the exact reviewed administrator identity and current-policy verifier bytes rather than receipt-provided identity or caller-selected historical code.
@@ -97,7 +97,7 @@ Release only `better-sqlite3` `11.10.0`. No alternate backend, dual-backend pack
 
 ## 7. Candidate verification and human candidate-only publication
 
-The current chain may enter this section only when registry history supplies a real previous `latest` SemVer. An absent `latest` is not representable by the current candidate/client/promotion receipts or workflow inputs.
+The workflow-dispatch items in this section apply only when registry history supplies a real previous `latest` SemVer — an absent `latest` is not representable by the current candidate/client/promotion receipts or workflow inputs. For the first publication, the human ceremony in [`manual-publish-runbook.md`](manual-publish-runbook.md) is the operative path and does not use these dispatches.
 
 - [ ] Dispatch `.github/workflows/candidate-release.yml` only with every exact immutable input: `version`, `source_commit`, `source_tag`, `receipt_commit`, `authorization_receipt_digest`, `authorization_context_digest`, `expected_previous_latest`, and the workflow's exact `confirm_candidate_only` literal. The legacy confirmation wording is dispatch compatibility, not publication authority.
 - [ ] Confirm `candidate-authorization.v1.json` uses exactly the reviewed evidence kinds `backend-decision`, `release-data`, `source-revision`, and `version-registry-state`, plus an allowed policy set containing `release`; reject free-form kinds, policies, identifiers, paths, URIs, or credential-shaped material.
@@ -153,7 +153,7 @@ The current chain may enter this section only when registry history supplies a r
 
 ## 11. After a first release exists: failure and fix-forward
 
-This section applies only after an initial version has actually been published and reached `latest`; it does not make the currently unsupported first-ever `0.1.0` publication executable.
+This section applies only after an initial version has actually been published and reached `latest`. (The first publication itself is executed via [`manual-publish-runbook.md`](manual-publish-runbook.md).)
 
 - [ ] Treat `.github/workflows/rollback-release.yml` as a read-only verifier with no dispatch inputs, protected npm environment, credential, OIDC, or registry mutation authority.
 - [ ] Require its deterministic sanitized `FIRST_RELEASE_ROLLBACK_UNAVAILABLE` report; do not interpret successful report generation as a rollback.
