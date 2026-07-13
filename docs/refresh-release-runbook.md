@@ -185,7 +185,7 @@ Controlled-clock builds must have identical semantic digests even when timestamp
 
 1. Alias the incident to the changed lifecycle while preserving original first-seen/deadline.
 2. Prohibit verified-no-change closure.
-3. If registry history supplies a real previous `latest` SemVer, continue through the fixed-path writer, read-only candidate build/handoff, human candidate-only publication, public/client proof, administrator-attested freshness evidence, pre-existing bound promotion authorization, read-only promotion readiness, and human movement of `latest`. If `latest` is absent, first-publication bootstrap remains `HOLD/UNSUPPORTED`.
+3. If registry history supplies a real previous `latest` SemVer, continue through the fixed-path writer, read-only candidate build/handoff, human candidate-only publication, public/client proof, administrator-attested freshness evidence, pre-existing bound promotion authorization, read-only promotion readiness, and human movement of `latest`. If `latest` is absent (first publication), the workflow verifier chain is not used; the human ceremony in [`manual-publish-runbook.md`](manual-publish-runbook.md) is the operative path.
 4. Close the incident only when anonymous post-state verification proves that the exact matching `release_data_digest_v1` is on `latest`.
 
 ## F. Fixed-path repository writer
@@ -277,7 +277,7 @@ Only after that authorization exists, dispatch `.github/workflows/promote-releas
 
 `.github/workflows/rollback-release.yml` has no dispatch inputs or protected npm environment. It is a contents-read-only verifier that uploads `first-release-rollback-unavailable.v1.json` with deterministic result `FIRST_RELEASE_ROLLBACK_UNAVAILABLE`. It cannot restore a dist-tag, deprecate, unpublish, write the repository, or administer npm. A successful run proves only that the report was emitted.
 
-This section applies only after an initial version has actually been published and reached `latest`; it does not make the currently unsupported first-ever `0.1.0` publication executable. At every stage before human movement of `latest`, stop, preserve the current public state, leave the incident open, and correct the failure without weakening gates. Once defective `0.1.0` exists, there is no prior-good package to restore:
+This section applies only after an initial version has actually been published and reached `latest`. (The first publication itself is executed via [`manual-publish-runbook.md`](manual-publish-runbook.md).) At every stage before human movement of `latest`, stop, preserve the current public state, leave the incident open, and correct the failure without weakening gates. Once defective `0.1.0` exists, there is no prior-good package to restore:
 
 1. Do not invent a predecessor, restore a dist-tag, deprecate `0.1.0`, or call the report a rollback.
 2. Preserve the candidate, three-lane, actual-Claude, freshness, authorization, readiness, and public registry-state evidence.
@@ -299,7 +299,7 @@ Stop and escalate without inventing or weakening policy when:
 - any official lane compiles, fails, or lacks public identity/integrity evidence;
 - the required all-lane `better-sqlite3` `11.10.0` evidence/receipt is absent or invalid;
 - a receipt digest or predecessor join disagrees;
-- public `latest` is absent under the current exact-SemVer predecessor contract, so first-publication bootstrap remains `HOLD/UNSUPPORTED`;
+- a workflow-verifier dispatch is attempted while public `latest` is absent (the exact-SemVer predecessor contract cannot represent it — for a first publication use [`manual-publish-runbook.md`](manual-publish-runbook.md) instead and never fabricate predecessor evidence);
 - a required protected-environment approval, administrator attestation, bound promotion authorization, evidence proof, or manual-ceremony prerequisite is absent;
 - evidence would expose a token, TOTP, npm configuration, credential, signed query string, private path, local user name, or machine identifier.
 
