@@ -6,6 +6,7 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  readdirSync,
   rmSync,
   symlinkSync,
   writeFileSync,
@@ -40,6 +41,7 @@ import {
   validateBundledQueryPayload,
   validateSha512Sri,
 } from "../scripts/public-installed-verify.mjs"
+import { semanticActionKeyLines } from "./workflow-yaml-policy.js"
 
 const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..")
 const A = "a".repeat(64)
@@ -67,6 +69,176 @@ afterEach(() => {
 
 function digest(bytes: string | Uint8Array): string {
   return createHash("sha256").update(bytes).digest("hex")
+}
+type WorkflowPermission = readonly [scope: string, access: "none" | "read" | "write"]
+const CANONICAL_ACTION_USE =
+  /^ *(?:- )?uses: ([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+@[a-f0-9]{40})(?: +#.*)?$/u
+
+const ordinaryWorkflowPermissions: readonly WorkflowPermission[] = [["contents", "read"]]
+const refreshWorkflowPermissions: Readonly<Record<string, readonly WorkflowPermission[]>> = {
+  "inspect-read-only": [
+    ["actions", "read"],
+    ["contents", "read"],
+  ],
+  "write-pr": [
+    ["actions", "read"],
+    ["contents", "write"],
+    ["pull-requests", "write"],
+  ],
+}
+
+function assertWorkflowPolicy(fileName: string, source: string): void {
+  const forbiddenText = [
+    ["id-token: write", /\bid-token\s*:\s*["']?write["']?\b/iu],
+    ["npm credential material", /(?:NPM_RELEASE_TOKEN|NODE_AUTH_TOKEN|NPM_TOKEN|_authToken|always-auth|registry-url)/iu],
+    [
+      "registry-mutating command",
+      /\bnpm[ \t]+(?:publish|dist-tag|deprecate|unpublish|owner|access|token|login|adduser)\b/iu,
+    ],
+  ] as const
+
+  for (const [description, pattern] of forbiddenText) {
+    if (pattern.test(source)) throw new Error(`${fileName}: forbidden ${description}`)
+  }
+
+  const lines = source.replace(/\r\n?/gu, "\n").split("\n")
+  for (const { index, line } of semanticActionKeyLines(source)) {
+    if (!CANONICAL_ACTION_USE.test(line)) {
+      throw new Error(
+        `${fileName}:${index + 1}: action reference must use the canonical unquoted block form and be pinned to a full lowercase commit SHA`,
+      )
+    }
+  }
+
+  const jobsStart = lines.findIndex((line) => /^jobs:\s*(?:#.*)?$/u.test(line))
+  if (jobsStart < 0) throw new Error(`${fileName}: missing jobs block`)
+
+  const workflowPermissionIndexes: number[] = []
+  for (const [index, line] of lines.entries()) {
+    if (
+      /^(?:(?:permissions|"permissions"|'permissions')[ \t]*:|\{.*(?:permissions|"permissions"|'permissions')[ \t]*:)/u.test(
+        line,
+      )
+    ) {
+      workflowPermissionIndexes.push(index)
+    }
+  }
+  if (workflowPermissionIndexes.length !== 1) {
+    throw new Error(`${fileName}: expected one canonical workflow-level permissions declaration`)
+  }
+
+  const workflowPermissionIndex = workflowPermissionIndexes[0] ?? -1
+  const workflowPermissionLine = lines[workflowPermissionIndex] ?? ""
+  if (workflowPermissionIndex >= jobsStart) {
+    throw new Error(`${fileName}: workflow-level permissions must precede jobs`)
+  }
+  if (fileName === "refresh-write-pr.yml") {
+    if (workflowPermissionLine !== "permissions: {}") {
+      throw new Error(`${fileName}: workflow-level permissions must be exactly permissions: {}`)
+    }
+  } else {
+    const canonicalFlowPermissions = workflowPermissionLine === "permissions: { contents: read }"
+    let canonicalBlockPermissions = false
+    if (workflowPermissionLine === "permissions:") {
+      const entries: string[] = []
+      for (let index = workflowPermissionIndex + 1; index < lines.length; index += 1) {
+        const line = lines[index] ?? ""
+        if (/^\s*(?:#.*)?$/u.test(line)) continue
+        if (/^\S/u.test(line)) break
+        entries.push(line)
+      }
+      canonicalBlockPermissions = entries.length === 1 && entries[0] === "  contents: read"
+    }
+    if (!canonicalFlowPermissions && !canonicalBlockPermissions) {
+      throw new Error(
+        `${fileName}: workflow-level permissions must be exactly the canonical contents-read default`,
+      )
+    }
+  }
+
+  let jobsEnd = lines.length
+  for (let index = jobsStart + 1; index < lines.length; index += 1) {
+    if (/^\S/u.test(lines[index] ?? "") && !/^#/u.test(lines[index] ?? "")) {
+      jobsEnd = index
+      break
+    }
+  }
+
+  const jobs: Array<{ name: string; start: number }> = []
+  for (let index = jobsStart + 1; index < jobsEnd; index += 1) {
+    const line = lines[index] ?? ""
+    if (!/^  \S/u.test(line) || /^  #/u.test(line)) continue
+    const match = line.match(/^  ([A-Za-z0-9][A-Za-z0-9_-]*):\s*(?:#.*)?$/u)
+    if (!match?.[1]) {
+      throw new Error(
+        `${fileName}:${index + 1}: jobs must use canonical unquoted block job declarations`,
+      )
+    }
+    jobs.push({ name: match[1], start: index })
+  }
+  if (jobs.length === 0) throw new Error(`${fileName}: jobs block has no statically named jobs`)
+
+  for (const [jobIndex, job] of jobs.entries()) {
+    const jobEnd = jobs[jobIndex + 1]?.start ?? jobsEnd
+    const permissionIndexes: number[] = []
+    for (let index = job.start + 1; index < jobEnd; index += 1) {
+      if (/^    permissions:\s*(?:#.*)?$/u.test(lines[index] ?? "")) {
+        permissionIndexes.push(index)
+      }
+    }
+    if (permissionIndexes.length !== 1) {
+      throw new Error(`${fileName}:${job.name}: expected one explicit permissions block`)
+    }
+
+    const permissions: WorkflowPermission[] = []
+    for (let index = (permissionIndexes[0] ?? 0) + 1; index < jobEnd; index += 1) {
+      const line = lines[index] ?? ""
+      if (/^\s*(?:#.*)?$/u.test(line)) continue
+      if (/^    \S/u.test(line)) break
+      const match = line.match(/^      ([A-Za-z][A-Za-z-]*):\s*(none|read|write)\s*(?:#.*)?$/u)
+      if (!match?.[1] || !match[2]) {
+        throw new Error(`${fileName}:${job.name}: permissions must be static none/read/write entries`)
+      }
+      permissions.push([match[1], match[2] as WorkflowPermission[1]])
+    }
+
+    const exception =
+      fileName === "refresh-write-pr.yml" ? refreshWorkflowPermissions[job.name] : undefined
+    const expected = exception ?? ordinaryWorkflowPermissions
+    const exact =
+      permissions.length === expected.length &&
+      expected.every(([scope, access]) =>
+        permissions.some(([actualScope, actualAccess]) => actualScope === scope && actualAccess === access),
+      )
+    if (!exact) {
+      throw new Error(`${fileName}:${job.name}: permissions are not the exact least-privilege policy`)
+    }
+  }
+}
+
+function workflowPolicyFixture(
+  run: string,
+  permissions: readonly string[] | null = ["contents: read"],
+  jobName = "verify",
+  actionReference: string | null = null,
+  workflowPermissions = "permissions:\n  contents: read",
+): string {
+  const permissionBlock =
+    permissions === null
+      ? ""
+      : `    permissions:\n${permissions.map((permission) => `      ${permission}`).join("\n")}\n`
+  const actionStep = actionReference === null ? "" : `      - uses: ${actionReference}\n`
+  return `name: Policy fixture
+on:
+  workflow_dispatch:
+${workflowPermissions}
+jobs:
+  ${jobName}:
+${permissionBlock}    runs-on: ubuntu-latest
+    steps:
+${actionStep}      - run: |
+          ${run}
+`
 }
 
 function crc32(bytes: Uint8Array): number {
@@ -1654,10 +1826,6 @@ describe("workflow privacy alignment", () => {
   )
   const workflows = [
     {
-      name: "candidate release",
-      source: readFileSync(join(projectRoot, ".github/workflows/candidate-release.yml"), "utf8"),
-    },
-    {
       name: "refresh acquisition",
       source: readFileSync(join(projectRoot, ".github/workflows/refresh-acquire-validate.yml"), "utf8"),
     },
@@ -1675,7 +1843,7 @@ describe("workflow privacy alignment", () => {
     return new RegExp(literal.slice(1, closingSlash), literal.slice(closingSlash + 1))
   }
 
-  it("keeps both inline guards identical to the release receipt verifier source of truth", () => {
+  it("keeps the inline guard identical to the release receipt verifier source of truth", () => {
     const canonicalLiteral = privateMaterialLiteral(verifierSource)
 
     for (const workflow of workflows) {
@@ -1689,13 +1857,11 @@ describe("workflow privacy alignment", () => {
       )
     }
 
-    expect(workflows[1].source).toMatch(/if \(\/15139279\/u\.test\(fullReportSerialized\)\)/)
+    expect(workflows[0].source).toMatch(/if \(\/15139279\/u\.test\(fullReportSerialized\)\)/)
   })
   it("excludes only exact prevalidated public URL fields from the canonical private scan", () => {
-    expect(workflows[0].source).toContain("delete closedProvenanceForPrivacyScan.registry")
-    expect(workflows[0].source).toContain("delete closedProofForPrivacyScan.registry")
-    expect(workflows[1].source).toContain("delete reportForPrivacyScan.canonical_page_url")
-    expect(workflows[1].source).toContain(
+    expect(workflows[0].source).toContain("delete reportForPrivacyScan.canonical_page_url")
+    expect(workflows[0].source).toContain(
       "report.canonical_page_url !== process.env.CANONICAL_SOURCE_PAGE",
     )
   })
@@ -1730,23 +1896,244 @@ describe("workflow privacy alignment", () => {
   })
 })
 
-describe("privileged workflow job permissions", () => {
-  const jobs = [
-    ["promote-release.yml", "promote"],
-    ["rollback-release.yml", "rollback"],
-    ["client-evidence.yml", "ingest-actual-client-evidence"],
-    ["public-candidate-verify.yml", "verify-public-candidate"],
-  ] as const
+describe("static workflow least-privilege policy", () => {
+  const workflowDirectory = join(projectRoot, ".github/workflows")
+  const workflowFiles = readdirSync(workflowDirectory, { withFileTypes: true })
+    .filter((entry) => entry.isFile() && /\.ya?ml$/u.test(entry.name))
+    .map((entry) => entry.name)
+    .sort()
 
-  it.each(jobs)("%s grants %s only the inherited read permission explicitly", (file, jobName) => {
-    const source = readFileSync(join(projectRoot, ".github/workflows", file), "utf8")
-    const marker = `\n  ${jobName}:`
-    const jobStart = source.indexOf(marker)
+  it("enforces the policy across every workflow YAML file", () => {
+    expect(workflowFiles.length).toBeGreaterThan(0)
+    for (const fileName of workflowFiles) {
+      assertWorkflowPolicy(fileName, readFileSync(join(workflowDirectory, fileName), "utf8"))
+    }
+  })
 
-    expect(jobStart).toBeGreaterThan(0)
-    const jobBlock = source.slice(jobStart)
-    expect(jobBlock.match(/^    permissions:$/gmu)).toHaveLength(1)
-    expect(jobBlock).toMatch(/^    permissions:\n      contents: read$/mu)
+  it("rejects injected OIDC write authority", () => {
+    const source = workflowPolicyFixture("echo verified", [
+      "contents: read",
+      "id-token: write",
+    ])
+    expect(() => assertWorkflowPolicy("fixture.yml", source)).toThrow("forbidden id-token: write")
+  })
+
+  it.each(["NPM_RELEASE_TOKEN", "NODE_AUTH_TOKEN", "NPM_TOKEN", "_authToken", "always-auth", "registry-url"] as const)(
+    "rejects injected npm credential spelling %s",
+    (credential) => {
+      const source = workflowPolicyFixture(`echo "\${${credential}}"`)
+      expect(() => assertWorkflowPolicy("fixture.yml", source)).toThrow(
+        "forbidden npm credential material",
+      )
+    },
+  )
+
+  it.each([
+    ["publish", "npm publish ./package.tgz"],
+    ["dist-tag add", "npm dist-tag add academyinfo-mcp@0.1.0 latest"],
+    ["dist-tag rm", "npm dist-tag rm academyinfo-mcp@0.1.0 latest"],
+    ["deprecate", "npm deprecate academyinfo-mcp@0.1.0 unsafe"],
+    ["unpublish", "npm unpublish academyinfo-mcp@0.1.0"],
+    ["owner", "npm owner add operator academyinfo-mcp"],
+    ["access", "npm access set status=public academyinfo-mcp"],
+    ["token", "npm token revoke release-token"],
+    ["login", "npm login"],
+    ["adduser", "npm adduser"],
+  ] as const)("rejects injected npm %s mutation", (_operation, command) => {
+    expect(() => assertWorkflowPolicy("fixture.yml", workflowPolicyFixture(command))).toThrow(
+      "forbidden registry-mutating command",
+    )
+  })
+
+  it.each([
+    ["branch", "actions/checkout@main"],
+    ["short SHA", `actions/checkout@${"a".repeat(12)}`],
+    ["commented branch", "actions/checkout@main # mutable branch"],
+  ] as const)("rejects an action pinned to a %s reference", (_category, reference) => {
+    const source = workflowPolicyFixture("echo verified", ["contents: read"], "verify", reference)
+    expect(() => assertWorkflowPolicy("fixture.yml", source)).toThrow(
+      "action reference must use the canonical unquoted block form and be pinned to a full lowercase commit SHA",
+    )
+  })
+
+  it.each([
+    ["quoted mapping key", "", `      - "uses": actions/checkout@${"a".repeat(40)}`],
+    ["single-quoted mapping key", "", `      - 'uses': actions/checkout@${"a".repeat(40)}`],
+    ["escaped double-quoted mapping key", "", '      - "u\\u0073es": actions/checkout@main'],
+    ["quoted mapping value", "", `      - uses: "actions/checkout@${"a".repeat(40)}"`],
+    ["flow-style mapping", "", `      - { uses: actions/checkout@${"a".repeat(40)} }`],
+    ["comment-spoofed block scalar", "", "    # run: |\n      - uses: actions/checkout@main"],
+    [
+      "explicit escaped mapping key",
+      "",
+      '      - ? "u\\u0073es"\n        : actions/checkout@main',
+    ],
+    ["anchored mapping key", "", "      - &action-key uses: actions/checkout@main"],
+    [
+      "alias mapping key",
+      "action-key: &action-key uses\n",
+      "      - *action-key: actions/checkout@main",
+    ],
+    [
+      "merge mapping key",
+      "step-defaults: &step-defaults\n  name: inherited\n",
+      "      - <<: *step-defaults",
+    ],
+  ] as const)("rejects a %s action-reference bypass", (_category, preamble, actionLine) => {
+    const pinnedReference = `actions/checkout@${"a".repeat(40)}`
+    const fixture = workflowPolicyFixture(
+      "echo verified",
+      ["contents: read"],
+      "verify",
+      pinnedReference,
+    )
+    const source = `${preamble}${fixture.replace(
+      "      - run: |",
+      `${actionLine}\n      - run: |`,
+    )}`
+    expect(() => assertWorkflowPolicy("fixture.yml", source)).toThrow(
+      "action reference must use the canonical unquoted block form",
+    )
+  })
+
+  it("ignores quoted object keys inside an embedded run-script body", () => {
+    const pinnedReference = `actions/checkout@${"a".repeat(40)}`
+    const source = workflowPolicyFixture(
+      `node -e 'const payload = { "uses": "script data" }'`,
+      ["contents: read"],
+      "verify",
+      pinnedReference,
+    )
+    expect(() => assertWorkflowPolicy("fixture.yml", source)).not.toThrow()
+  })
+
+  it("parses a full-SHA action reference with a trailing YAML comment", () => {
+    const reference = `actions/checkout@${"a".repeat(40)} # immutable commit`
+    const source = workflowPolicyFixture("echo verified", ["contents: read"], "verify", reference)
+    expect(() => assertWorkflowPolicy("fixture.yml", source)).not.toThrow()
+  })
+
+  it.each([
+    [
+      "quoted job ID",
+      `  "bypass":
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps: []`,
+    ],
+    [
+      "flow-style inline job",
+      "  bypass: { runs-on: ubuntu-latest, permissions: write-all, steps: [] }",
+    ],
+  ] as const)("rejects a %s beside a valid job", (_category, bypassJob) => {
+    const source = `${workflowPolicyFixture("echo verified")}${bypassJob}\n`
+    expect(() => assertWorkflowPolicy("fixture.yml", source)).toThrow(
+      "jobs must use canonical unquoted block job declarations",
+    )
+  })
+
+  it("accepts only the two canonical ordinary workflow-level read defaults", () => {
+    expect(() =>
+      assertWorkflowPolicy("fixture.yml", workflowPolicyFixture("echo verified")),
+    ).not.toThrow()
+    expect(() =>
+      assertWorkflowPolicy(
+        "fixture.yml",
+        workflowPolicyFixture(
+          "echo verified",
+          ["contents: read"],
+          "verify",
+          null,
+          "permissions: { contents: read }",
+        ),
+      ),
+    ).not.toThrow()
+  })
+
+  it.each([
+    ["missing declaration", ""],
+    ["duplicate declaration", "permissions:\n  contents: read\npermissions: { contents: read }"],
+    ["quoted key", '"permissions": { contents: read }'],
+    ["quoted flow entry", 'permissions: { "contents": read }'],
+    ["quoted flow value", 'permissions: { contents: "read" }'],
+    ["empty ordinary default", "permissions: {}"],
+    ["workflow write grant", "permissions:\n  contents: write"],
+    ["flow-style workflow write grant", "permissions: { contents: write }"],
+    [
+      "comment-obscured workflow write grant",
+      "permissions:\n  contents: read\n# comment does not end the mapping\n  contents: write",
+    ],
+  ] as const)("rejects a %s at workflow level", (_category, workflowPermissions) => {
+    const source = workflowPolicyFixture(
+      "echo verified",
+      ["contents: read"],
+      "verify",
+      null,
+      workflowPermissions,
+    )
+    expect(() => assertWorkflowPolicy("fixture.yml", source)).toThrow("workflow-level permissions")
+  })
+
+  it("rejects workflow-level permissions declared after jobs", () => {
+    const source =
+      workflowPolicyFixture("echo verified").replace(
+        "permissions:\n  contents: read\njobs:",
+        "jobs:",
+      ) + "permissions: { contents: read }\n"
+    expect(() => assertWorkflowPolicy("fixture.yml", source)).toThrow(
+      "workflow-level permissions must precede jobs",
+    )
+  })
+
+  it("rejects missing or expanded ordinary job permissions", () => {
+    expect(() =>
+      assertWorkflowPolicy("fixture.yml", workflowPolicyFixture("echo verified", null)),
+    ).toThrow("expected one explicit permissions block")
+    expect(() =>
+      assertWorkflowPolicy(
+        "fixture.yml",
+        workflowPolicyFixture("echo verified", ["contents: read", "actions: read"]),
+      ),
+    ).toThrow("permissions are not the exact least-privilege policy")
+  })
+
+  it("allows repository and PR writes only for the exact refresh writer job", () => {
+    const permissions = ["actions: read", "contents: write", "pull-requests: write"]
+    const exactWriter = workflowPolicyFixture(
+      "echo verified",
+      permissions,
+      "write-pr",
+      null,
+      "permissions: {}",
+    )
+    const ordinaryWriter = workflowPolicyFixture("echo verified", permissions, "write-pr")
+
+    expect(() => assertWorkflowPolicy("refresh-write-pr.yml", exactWriter)).not.toThrow()
+    expect(() => assertWorkflowPolicy("other.yml", ordinaryWriter)).toThrow(
+      "permissions are not the exact least-privilege policy",
+    )
+    expect(() =>
+      assertWorkflowPolicy(
+        "refresh-write-pr.yml",
+        workflowPolicyFixture(
+          "echo verified",
+          permissions,
+          "renamed-writer",
+          null,
+          "permissions: {}",
+        ),
+      ),
+    ).toThrow("permissions are not the exact least-privilege policy")
+    expect(() => assertWorkflowPolicy("other.yml", exactWriter)).toThrow(
+      "workflow-level permissions must be exactly the canonical contents-read default",
+    )
+    expect(() =>
+      assertWorkflowPolicy(
+        "refresh-write-pr.yml",
+        workflowPolicyFixture("echo verified", permissions, "write-pr"),
+      ),
+    ).toThrow("workflow-level permissions must be exactly permissions: {}")
   })
 })
 

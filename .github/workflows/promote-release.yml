@@ -1,10 +1,10 @@
-name: Protected release promotion
+name: Promotion readiness evidence
 
 on:
   workflow_dispatch:
     inputs:
       version:
-        description: Exact candidate SemVer to promote
+        description: Exact candidate SemVer to verify for human promotion
         required: true
         type: string
       source_commit:
@@ -65,20 +65,19 @@ on:
         type: string
 
 concurrency:
-  group: academyinfo-mcp-registry-mutation
+  group: academyinfo-mcp-promotion-readiness
   cancel-in-progress: false
 
 permissions:
   contents: read
 
 jobs:
-  promote:
-    name: Join receipts and explicitly move latest (Node 22)
+  readiness:
+    name: Join receipts and verify human promotion readiness (Node 22)
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
       contents: read
-    environment: npm-promotion
     env:
       RELEASE_ADMINISTRATOR: ${{ vars.ACADEMYINFO_RELEASE_ADMINISTRATOR }}
       PACKAGE_NAME: academyinfo-mcp
@@ -154,7 +153,6 @@ jobs:
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: "22"
-          registry-url: https://registry.npmjs.org/
 
       - name: Validate repository origin and protected ancestry before consuming source or receipts
         shell: bash
@@ -476,6 +474,7 @@ jobs:
             value.trim() === value && /^[^\u0000-\u001f\u007f]+$/u.test(value);
           for (const [name, value] of Object.entries({
             package_integrity: process.env.CANDIDATE_PACKAGE_INTEGRITY,
+            candidate_authorization_receipt_digest: process.env.CANDIDATE_PREDECESSOR,
             event_id: freshnessPayload.event_id,
             release_data_digest: candidateReleaseDataDigest,
             predecessor_transition_digest: freshnessPayload.transition_digest,
@@ -488,10 +487,10 @@ jobs:
           }
           NODE
 
-      - name: Re-fetch registry state and accept only the authorized promotion boundary
+      - name: Observe anonymous public registry state at the authorized boundary
         id: registry
         env:
-          DEADLINE_AT: ${{ steps.receipts.outputs.deadline_at }}
+          EXPECTED_PACKAGE_INTEGRITY: ${{ steps.receipts.outputs.package_integrity }}
         shell: bash
         run: |
           set -euo pipefail
@@ -499,163 +498,185 @@ jobs:
           LATEST="$(npm view "$PACKAGE_NAME" dist-tags.latest --json | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>process.stdout.write(JSON.parse(s)))')"
           INTEGRITY="$(npm view "$PACKAGE_NAME@$VERSION" dist.integrity --json | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>process.stdout.write(JSON.parse(s)))')"
           test "$CANDIDATE" = "$VERSION"
-          test "$INTEGRITY" = "${{ steps.receipts.outputs.package_integrity }}"
-          case "$LATEST" in
-            "$EXPECTED_PREVIOUS_LATEST") PROMOTE_REQUIRED=true ;;
-            "$VERSION") PROMOTE_REQUIRED=false ;;
-            *) echo "Latest is neither the authorized predecessor nor exact promotion version" >&2; exit 1 ;;
-          esac
-          DEADLINE_AT="$DEADLINE_AT" node --input-type=module <<'NODE'
-          const canonicalUtc = (value) => {
-            if (typeof value !== "string" ||
-                !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(value)) return false;
-            const milliseconds = Date.parse(value);
-            return Number.isFinite(milliseconds) && new Date(milliseconds).toISOString() === value;
-          };
-          if (!canonicalUtc(process.env.DEADLINE_AT) ||
-              Date.now() > Date.parse(process.env.DEADLINE_AT)) {
-            throw new Error("Promotion authorization expired before registry state acceptance");
-          }
-          NODE
+          test "$LATEST" = "$EXPECTED_PREVIOUS_LATEST"
+          test "$INTEGRITY" = "$EXPECTED_PACKAGE_INTEGRITY"
+          OBSERVED_AT="$(node --input-type=module -e 'process.stdout.write(new Date().toISOString())')"
           {
-            echo "observed_latest=$LATEST"
-            echo "promote_required=$PROMOTE_REQUIRED"
+            echo "candidate=$CANDIDATE"
+            echo "latest=$LATEST"
+            echo "integrity=$INTEGRITY"
+            echo "observed_at=$OBSERVED_AT"
           } >> "$GITHUB_OUTPUT"
 
-      - name: Explicitly promote the exact version to latest
-        if: steps.registry.outputs.promote_required == 'true'
+      - name: Emit closed sanitized human-promotion readiness evidence
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_RELEASE_TOKEN }}
-          DEADLINE_AT: ${{ steps.receipts.outputs.deadline_at }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          test -n "$NODE_AUTH_TOKEN"
-          DEADLINE_AT="$DEADLINE_AT" node --input-type=module <<'NODE'
-          const canonicalUtc = (value) => {
-            if (typeof value !== "string" ||
-                !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(value)) return false;
-            const milliseconds = Date.parse(value);
-            return Number.isFinite(milliseconds) && new Date(milliseconds).toISOString() === value;
-          };
-          if (!canonicalUtc(process.env.DEADLINE_AT) ||
-              Date.now() > Date.parse(process.env.DEADLINE_AT)) {
-            throw new Error("Promotion authorization expired before registry mutation");
-          }
-          NODE
-          npm dist-tag add "$PACKAGE_NAME@$VERSION" latest
-
-      - name: Verify registry mutation, then create and verify PROMOTED_CLOSED completion
-        env:
-          EVENT_ID: ${{ steps.receipts.outputs.event_id }}
+          CANDIDATE_AUTHORIZATION_RECEIPT_DIGEST: ${{ steps.receipts.outputs.candidate_authorization_receipt_digest }}
+          EXPECTED_PACKAGE_INTEGRITY: ${{ steps.receipts.outputs.package_integrity }}
+          AUTHORIZATION_EVENT_ID: ${{ steps.receipts.outputs.event_id }}
           RELEASE_DATA_DIGEST: ${{ steps.receipts.outputs.release_data_digest }}
           PREDECESSOR_TRANSITION_DIGEST: ${{ steps.receipts.outputs.predecessor_transition_digest }}
-          FIRST_SEEN_AT: ${{ steps.receipts.outputs.first_seen_at }}
-          DEADLINE_AT: ${{ steps.receipts.outputs.deadline_at }}
+          AUTHORIZATION_FIRST_SEEN_AT: ${{ steps.receipts.outputs.first_seen_at }}
+          AUTHORIZATION_DEADLINE_AT: ${{ steps.receipts.outputs.deadline_at }}
           PROMOTION_APPROVED_AT: ${{ steps.receipts.outputs.promotion_approved_at }}
+          OBSERVED_CANDIDATE: ${{ steps.registry.outputs.candidate }}
+          OBSERVED_LATEST: ${{ steps.registry.outputs.latest }}
+          OBSERVED_INTEGRITY: ${{ steps.registry.outputs.integrity }}
+          OBSERVED_AT: ${{ steps.registry.outputs.observed_at }}
         shell: bash
         run: |
           set -euo pipefail
-          LATEST="$(npm view "$PACKAGE_NAME" dist-tags.latest --json | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>process.stdout.write(JSON.parse(s)))')"
-          INTEGRITY="$(npm view "$PACKAGE_NAME@$VERSION" dist.integrity --json | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>process.stdout.write(JSON.parse(s)))')"
-          test "$LATEST" = "$VERSION"
-          test "$INTEGRITY" = "${{ steps.receipts.outputs.package_integrity }}"
-          COMPLETION="$RUNNER_TEMP/promotion.v1.json"
-          COMPLETION="$COMPLETION" REGISTRY_INTEGRITY="$INTEGRITY" node --input-type=module <<'NODE'
-          import { writeFileSync, readFileSync } from "node:fs";
-          import { pathToFileURL } from "node:url";
-          const { canonicalizeJcs, parseJsonStrict, sha256Jcs } =
-            await import(pathToFileURL(process.env.PUBLIC_INSTALL_VERIFIER).href);
-          const exactKeys = (value, keys) => value !== null && typeof value === "object" && !Array.isArray(value) &&
+          READINESS="$RUNNER_TEMP/promotion-readiness.v1.json"
+          READINESS="$READINESS" node --input-type=module <<'NODE'
+          import { readFileSync, writeFileSync } from "node:fs";
+
+          const isRecord = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
+          const exactKeys = (value, keys) => isRecord(value) &&
             JSON.stringify(Object.keys(value).sort()) === JSON.stringify([...keys].sort());
-          const firstSeenMilliseconds = Date.parse(process.env.FIRST_SEEN_AT);
-          const promotionApprovedMilliseconds = Date.parse(process.env.PROMOTION_APPROVED_AT);
-          const deadlineMilliseconds = Date.parse(process.env.DEADLINE_AT);
-          const verifiedAt = new Date().toISOString();
-          const verifiedAtMilliseconds = Date.parse(verifiedAt);
+          const digest = /^[a-f0-9]{64}$/;
+          const commit = /^[a-f0-9]{40}$/;
+          const semver = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/;
+          const integrity = /^sha512-(?:[A-Za-z0-9+/]{4}){21}[A-Za-z0-9+/]{2}==$/;
           const canonicalUtc = (value) => typeof value === "string" &&
             /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(value) &&
-            Number.isFinite(Date.parse(value)) &&
-            new Date(Date.parse(value)).toISOString() === value;
-          if (!canonicalUtc(process.env.FIRST_SEEN_AT) ||
-              !canonicalUtc(process.env.PROMOTION_APPROVED_AT) ||
-              !canonicalUtc(process.env.DEADLINE_AT) ||
-              verifiedAtMilliseconds < firstSeenMilliseconds ||
-              verifiedAtMilliseconds < promotionApprovedMilliseconds ||
-              verifiedAtMilliseconds > deadlineMilliseconds) {
-            throw new Error("Promotion authorization expired before completion recovery or is not ordered");
-          }
-          const payload = {
-            schema_version: "promotion-completion-payload.v1",
-            transition: "PROMOTED_CLOSED",
-            event_id: process.env.EVENT_ID,
-            prior_transition_digest: process.env.PREDECESSOR_TRANSITION_DIGEST,
-            first_seen_at: process.env.FIRST_SEEN_AT,
-            deadline_at: process.env.DEADLINE_AT,
-            release_data_digest_v1: process.env.RELEASE_DATA_DIGEST,
-            package_name: process.env.PACKAGE_NAME,
-            package_version: process.env.VERSION,
-            package_integrity: process.env.REGISTRY_INTEGRITY,
-            source_commit: process.env.SOURCE_COMMIT,
-            previous_latest_version: process.env.EXPECTED_PREVIOUS_LATEST,
-            predecessor_receipt_digests: [process.env.CLIENT_RECEIPT_DIGEST, process.env.FRESHNESS_TRANSITION_DIGEST],
-            candidate_receipt_digest: process.env.CANDIDATE_RECEIPT_DIGEST,
-            authorization_receipt_digest: process.env.PROMOTION_AUTHORIZATION_DIGEST,
-          };
-          const payloadDigest = sha256Jcs(payload);
-          const registryVerification = {
-            registry: "https://registry.npmjs.org/",
-            latest_version: process.env.VERSION,
-            package_integrity: process.env.REGISTRY_INTEGRITY,
-            verified_at: verifiedAt,
-          };
-          const projection = {
-            receipt_schema_version: "promotion-completion-receipt.v1",
-            promotion_completion_payload_v1: payload,
-            promotion_completion_payload_digest_v1: payloadDigest,
-            registry_verification: registryVerification,
-          };
-          const receipt = { ...projection, receipt_digest_v1: sha256Jcs(projection) };
-          writeFileSync(process.env.COMPLETION, `${JSON.stringify(receipt, null, 2)}\n`, { mode: 0o600 });
+            Number.isFinite(Date.parse(value)) && new Date(Date.parse(value)).toISOString() === value;
 
-          const verified = parseJsonStrict(readFileSync(process.env.COMPLETION, "utf8"));
-          const { receipt_digest_v1: verifiedReceiptDigest, ...verifiedProjection } = verified;
-          if (!exactKeys(verified, [
-            "receipt_schema_version", "promotion_completion_payload_v1",
-            "promotion_completion_payload_digest_v1", "registry_verification", "receipt_digest_v1",
-          ]) || verified.receipt_schema_version !== "promotion-completion-receipt.v1" ||
-              !exactKeys(verified.promotion_completion_payload_v1, Object.keys(payload)) ||
-              canonicalizeJcs(verified.promotion_completion_payload_v1.predecessor_receipt_digests) !==
-                canonicalizeJcs([process.env.CLIENT_RECEIPT_DIGEST, process.env.FRESHNESS_TRANSITION_DIGEST]) ||
-              verified.promotion_completion_payload_v1.event_id !== process.env.EVENT_ID ||
-              verified.promotion_completion_payload_v1.release_data_digest_v1 !== process.env.RELEASE_DATA_DIGEST ||
-              verified.promotion_completion_payload_v1.prior_transition_digest !== process.env.PREDECESSOR_TRANSITION_DIGEST ||
-              verified.promotion_completion_payload_v1.package_integrity !== process.env.REGISTRY_INTEGRITY ||
-              sha256Jcs(verified.promotion_completion_payload_v1) !== verified.promotion_completion_payload_digest_v1 ||
-              !exactKeys(verified.registry_verification, ["registry", "latest_version", "package_integrity", "verified_at"]) ||
-              verified.registry_verification.registry !== "https://registry.npmjs.org/" ||
-              verified.registry_verification.latest_version !== process.env.VERSION ||
-              verified.registry_verification.package_integrity !== process.env.REGISTRY_INTEGRITY ||
-              !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(verified.registry_verification.verified_at) ||
-              new Date(Date.parse(verified.registry_verification.verified_at)).toISOString() !== verified.registry_verification.verified_at ||
-              sha256Jcs(verifiedProjection) !== verifiedReceiptDigest) {
-            throw new Error("PROMOTED_CLOSED completion verification failed");
+          const readiness = {
+            schema_version: "promotion-readiness.v1",
+            status: "READY_FOR_HUMAN_PROMOTION",
+            package_identity: {
+              name: process.env.PACKAGE_NAME,
+              version: process.env.VERSION,
+              source_commit: process.env.SOURCE_COMMIT,
+            },
+            receipt_identities: {
+              receipt_commit: process.env.RECEIPT_COMMIT,
+              candidate_authorization_receipt_digest: process.env.CANDIDATE_AUTHORIZATION_RECEIPT_DIGEST,
+              candidate_authorization_context_digest: process.env.CANDIDATE_AUTHORIZATION_CONTEXT_DIGEST,
+              candidate_receipt_digest: process.env.CANDIDATE_RECEIPT_DIGEST,
+              client_receipt_digest: process.env.CLIENT_RECEIPT_DIGEST,
+              macos_arm64_receipt_digest: process.env.MACOS_RECEIPT_DIGEST,
+              windows_x64_receipt_digest: process.env.WINDOWS_RECEIPT_DIGEST,
+              ubuntu_glibc_x64_receipt_digest: process.env.UBUNTU_RECEIPT_DIGEST,
+              actual_claude_receipt_digest: process.env.ACTUAL_CLAUDE_RECEIPT_DIGEST,
+              generic_stdio_journey_digest: process.env.GENERIC_STDIO_JOURNEY_DIGEST,
+              freshness_transition_digest: process.env.FRESHNESS_TRANSITION_DIGEST,
+              promotion_authorization_digest: process.env.PROMOTION_AUTHORIZATION_DIGEST,
+            },
+            verified_evidence_identity: {
+              authorization_event_id: process.env.AUTHORIZATION_EVENT_ID,
+              release_data_digest_v1: process.env.RELEASE_DATA_DIGEST,
+              predecessor_transition_digest: process.env.PREDECESSOR_TRANSITION_DIGEST,
+              authorization_first_seen_at: process.env.AUTHORIZATION_FIRST_SEEN_AT,
+              authorization_deadline_at: process.env.AUTHORIZATION_DEADLINE_AT,
+              promotion_approved_at: process.env.PROMOTION_APPROVED_AT,
+            },
+            expected_registry_state: {
+              registry: "https://registry.npmjs.org/",
+              candidate_dist_tag: process.env.VERSION,
+              latest_dist_tag: process.env.EXPECTED_PREVIOUS_LATEST,
+              package_integrity: process.env.EXPECTED_PACKAGE_INTEGRITY,
+            },
+            observed_registry_state: {
+              registry: "https://registry.npmjs.org/",
+              candidate_dist_tag: process.env.OBSERVED_CANDIDATE,
+              latest_dist_tag: process.env.OBSERVED_LATEST,
+              package_integrity: process.env.OBSERVED_INTEGRITY,
+              observed_at: process.env.OBSERVED_AT,
+            },
+            run_identity: {
+              repository: process.env.REPOSITORY,
+              workflow_commit: process.env.TRUSTED_POLICY_COMMIT,
+              run_id: process.env.GITHUB_RUN_ID,
+              run_attempt: process.env.GITHUB_RUN_ATTEMPT,
+            },
+            sanitized: true,
+          };
+
+          writeFileSync(process.env.READINESS, `${JSON.stringify(readiness, null, 2)}\n`, { mode: 0o644 });
+          const verified = JSON.parse(readFileSync(process.env.READINESS, "utf8"));
+          if (JSON.stringify(verified) !== JSON.stringify(readiness) || !exactKeys(verified, [
+            "schema_version", "status", "package_identity", "receipt_identities",
+            "verified_evidence_identity", "expected_registry_state", "observed_registry_state",
+            "run_identity", "sanitized",
+          ]) || !exactKeys(verified.package_identity, ["name", "version", "source_commit"]) ||
+              !exactKeys(verified.receipt_identities, [
+                "receipt_commit", "candidate_authorization_receipt_digest",
+                "candidate_authorization_context_digest", "candidate_receipt_digest",
+                "client_receipt_digest", "macos_arm64_receipt_digest", "windows_x64_receipt_digest",
+                "ubuntu_glibc_x64_receipt_digest", "actual_claude_receipt_digest",
+                "generic_stdio_journey_digest", "freshness_transition_digest",
+                "promotion_authorization_digest",
+              ]) || !exactKeys(verified.verified_evidence_identity, [
+                "authorization_event_id", "release_data_digest_v1", "predecessor_transition_digest",
+                "authorization_first_seen_at", "authorization_deadline_at", "promotion_approved_at",
+              ]) || !exactKeys(verified.expected_registry_state, [
+                "registry", "candidate_dist_tag", "latest_dist_tag", "package_integrity",
+              ]) || !exactKeys(verified.observed_registry_state, [
+                "registry", "candidate_dist_tag", "latest_dist_tag", "package_integrity", "observed_at",
+              ]) || !exactKeys(verified.run_identity, [
+                "repository", "workflow_commit", "run_id", "run_attempt",
+              ])) {
+            throw new Error("Promotion readiness fields are not closed");
+          }
+
+          const receiptDigests = Object.entries(verified.receipt_identities)
+            .filter(([key]) => key !== "receipt_commit");
+          if (verified.schema_version !== "promotion-readiness.v1" ||
+              verified.status !== "READY_FOR_HUMAN_PROMOTION" ||
+              verified.sanitized !== true ||
+              verified.package_identity.name !== process.env.PACKAGE_NAME ||
+              verified.package_identity.version !== process.env.VERSION ||
+              verified.package_identity.source_commit !== process.env.SOURCE_COMMIT ||
+              !commit.test(verified.package_identity.source_commit) ||
+              verified.receipt_identities.receipt_commit !== process.env.RECEIPT_COMMIT ||
+              !commit.test(verified.receipt_identities.receipt_commit) ||
+              receiptDigests.some(([, value]) => !digest.test(value)) ||
+              !digest.test(verified.verified_evidence_identity.release_data_digest_v1) ||
+              !digest.test(verified.verified_evidence_identity.predecessor_transition_digest) ||
+              !/^(?:source|acquisition|availability):v1:[a-f0-9]{64}$/.test(
+                verified.verified_evidence_identity.authorization_event_id
+              ) ||
+              !canonicalUtc(verified.verified_evidence_identity.authorization_first_seen_at) ||
+              !canonicalUtc(verified.verified_evidence_identity.authorization_deadline_at) ||
+              !canonicalUtc(verified.verified_evidence_identity.promotion_approved_at) ||
+              verified.expected_registry_state.registry !== "https://registry.npmjs.org/" ||
+              verified.observed_registry_state.registry !== "https://registry.npmjs.org/" ||
+              !semver.test(verified.expected_registry_state.candidate_dist_tag) ||
+              !semver.test(verified.expected_registry_state.latest_dist_tag) ||
+              verified.observed_registry_state.candidate_dist_tag !==
+                verified.expected_registry_state.candidate_dist_tag ||
+              verified.observed_registry_state.latest_dist_tag !==
+                verified.expected_registry_state.latest_dist_tag ||
+              !integrity.test(verified.expected_registry_state.package_integrity) ||
+              verified.observed_registry_state.package_integrity !==
+                verified.expected_registry_state.package_integrity ||
+              !canonicalUtc(verified.observed_registry_state.observed_at) ||
+              Date.parse(verified.observed_registry_state.observed_at) <
+                Date.parse(verified.verified_evidence_identity.promotion_approved_at) ||
+              Date.parse(verified.observed_registry_state.observed_at) >
+                Date.parse(verified.verified_evidence_identity.authorization_deadline_at) ||
+              verified.run_identity.repository !== process.env.REPOSITORY ||
+              verified.run_identity.workflow_commit !== process.env.TRUSTED_POLICY_COMMIT ||
+              !commit.test(verified.run_identity.workflow_commit) ||
+              verified.run_identity.run_id !== process.env.GITHUB_RUN_ID ||
+              verified.run_identity.run_attempt !== process.env.GITHUB_RUN_ATTEMPT ||
+              !/^[1-9]\d*$/.test(verified.run_identity.run_id) ||
+              !/^[1-9]\d*$/.test(verified.run_identity.run_attempt)) {
+            throw new Error("Promotion readiness identity or registry observation mismatch");
           }
           NODE
           {
-            echo "### Promotion transition"
-            if test "${{ steps.registry.outputs.promote_required }}" = "true"; then
-              echo "Explicitly moved \`latest\` from \`$EXPECTED_PREVIOUS_LATEST\` to \`$VERSION\` and reverified its receipt-controlled integrity."
-            else
-              echo "Recovered the already-promoted exact \`$VERSION\` state and reverified its receipt-controlled integrity without another registry mutation."
-            fi
-            echo "Created \`promotion.v1.json\` after exact registry verification and bound it to event \`${{ steps.receipts.outputs.event_id }}\`, release data \`${{ steps.receipts.outputs.release_data_digest }}\`, and predecessor \`${{ steps.receipts.outputs.predecessor_transition_digest }}\`."
+            echo "### Human promotion readiness"
+            echo "Immutable receipts and anonymous public npm state match for \`$PACKAGE_NAME@$VERSION\`."
+            echo "\`promotion-readiness.v1.json\` records \`READY_FOR_HUMAN_PROMOTION\`."
+            echo "No promotion occurred in this workflow; \`latest\` remains \`$EXPECTED_PREVIOUS_LATEST\`."
+            echo "Any npm registry write remains a human terminal ceremony."
           } >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Upload post-mutation promotion completion
+      - name: Upload sanitized promotion readiness evidence
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: promotion-${{ env.VERSION }}-${{ github.run_id }}-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/promotion.v1.json
+          name: promotion-readiness-${{ env.VERSION }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/promotion-readiness.v1.json
           if-no-files-found: error
           retention-days: 90
