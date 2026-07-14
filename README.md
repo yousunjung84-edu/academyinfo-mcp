@@ -4,6 +4,58 @@
 
 > This project is not affiliated with, endorsed by, approved by, sponsored by, or maintained by the Ministry of Education, KCUE, KEDI, data.go.kr, academyinfo.go.kr, or any university.
 
+## Quickstart
+
+`academyinfo-mcp` runs with no install, no API key, and no login. It reads a bundled
+snapshot of Korean university disclosure indicators (대학알리미, KOGL Type 1) and answers
+factual queries and side-by-side comparisons from your AI assistant.
+
+### Claude Desktop
+
+Add to `claude_desktop_config.json` (macOS: `~/Library/Application Support/Claude/`), then
+restart Claude Desktop:
+
+```json
+{
+  "mcpServers": {
+    "academyinfo": {
+      "command": "npx",
+      "args": ["-y", "academyinfo-mcp"]
+    }
+  }
+}
+```
+
+### Cursor
+
+Add the same `command`/`args` shape to `~/.cursor/mcp.json` (or a project `.cursor/mcp.json`),
+then reload the MCP server list.
+
+### Any MCP stdio client
+
+```bash
+npx -y academyinfo-mcp
+```
+
+The server speaks MCP over stdio (JSON-RPC on stdout, diagnostics on stderr).
+
+### Try it
+
+Ask your assistant something like:
+
+> "전남대와 부산대의 취업률과 경쟁률을 비교해줘."
+
+It calls `explore_universities` and returns each institution's values with the source, year,
+and unit attached — for example (2025 bundled snapshot):
+
+| 대학 | 취업률 | 신입생 경쟁률 |
+|---|---:|---:|
+| 전남대학교 | 57.6% | 7.4:1 |
+| 부산대학교 | 57.5% | 9:1 |
+
+Ambiguous names return candidate campuses instead of guessing, and comparisons never rank,
+score, or pick a winner — the numbers are presented as-is with provenance so you decide.
+
 ## Evidence-scoped status
 
 Implemented in this checkout:
@@ -14,14 +66,15 @@ Implemented in this checkout:
 - Node engine `>=22 <23` and the closed direct production dependency set `@modelcontextprotocol/sdk@1.29.0`, `better-sqlite3@11.10.0`, `pino@10.3.1`, and `zod@4.4.3`;
 - ambiguity handling that returns candidates rather than guessing, and factual comparisons without scores, ranks, winners, or recommendations.
 
-Not established by this checkout alone:
+Published: `academyinfo-mcp@0.1.0` is live on the public npm registry (`latest`), published by hand from an isolated terminal ceremony ([`docs/manual-publish-runbook.md`](docs/manual-publish-runbook.md)) and smoke-verified with an anonymous `npx -y academyinfo-mcp@0.1.0` install that resolves the exact registry tarball and lists all eight tools.
 
-- public npm availability, an administrator-selected unused release version, package ownership, or publication approval;
-- no-compile public `npx` proof on the three official Node 22 lanes;
-- a completed backend-selection gate, candidate publication, public-client receipts, `latest` promotion, or rollback drill;
+Not yet performed (intentional, proportionate for a first solo release):
+
+- the formal no-compile `npx` proof across all three official Node 22 lanes (macOS/arm64, Windows/x64, Ubuntu glibc/x64) — only a single-machine smoke test was run;
+- the receipt-bound candidate→client→promotion evidence chain and an actual-client (Claude Desktop) receipt;
 - an approved unattended official download link or a completed annual refresh.
 
-The current package uses `better-sqlite3`, but that is not yet a public support claim. Release remains blocked until it passes prebuilt-only proof on Node 22 macOS/arm64, Windows/x64, and Ubuntu glibc/x64. If it fails any lane, `sql.js` may replace it only after the required Architect and administrator backend-selection receipt. Exactly one backend may ship.
+The package ships `better-sqlite3@11.10.0` as its sole backend. It installs from prebuilt binaries on the maintainer's Node 22 macOS/arm64 lane; the full three-lane prebuilt-only matrix has not been independently proven. Exactly one backend ships.
 
 ## Requirements
 
@@ -48,22 +101,12 @@ The last command starts an MCP stdio server. It does not provide an interactive 
 No API-key environment variable is required. `ACADEMYINFO_DB_PATH` may select another compatible local database; otherwise the bundled seed is used. Runtime tools do not write the database or contact an external service.
 This development checkout defines `npm run doctor`, `npm run refresh:acquire-validate`, and `npm run refresh:verify-artifact`. Only `doctor` has its compiled program included in the packed npm artifact, where it is a local package/data/runtime diagnostic; it does not prove public installation, backend selection, refresh acceptance, or release approval. The compiled refresh programs, their TypeScript build sources, and required development dependencies are excluded from the package, so both refresh commands are checkout-only protected-workflow internals, not supported installed-package commands. Direct local invocation is never an authoritative acquisition, writer, or release receipt.
 
-## Future public-client configuration
+## Version pinning
 
-Only after an exact candidate version has actually been published and independently verified may a client configuration use this shape:
-
-```json
-{
-  "mcpServers": {
-    "academyinfo": {
-      "command": "npx",
-      "args": ["-y", "academyinfo-mcp@<administrator-selected-version>"]
-    }
-  }
-}
-```
-
-Replace the placeholder only with the exact verified public version. Do not use an unversioned command, infer a version from this checkout, or treat this example as evidence that a candidate or `latest` release exists. Claude Desktop/macOS must be exercised against the candidate before promotion. Cursor and Codex configurations remain documentation-only unless separate client evidence says they were actually exercised.
+The [Quickstart](#quickstart) uses the unversioned `academyinfo-mcp`, which resolves to the
+current `latest` (now `0.1.0`). To pin a specific version instead, use `academyinfo-mcp@0.1.0`
+in the `args`. Cursor and Codex use the same `command`/`args` shape as the Claude Desktop
+example; they are documented configurations and behave identically over MCP stdio.
 
 ## Exact eight-tool scope
 
