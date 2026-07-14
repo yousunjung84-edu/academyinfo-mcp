@@ -121,13 +121,15 @@ describe("Phase 1 scaffold", () => {
     expect(distIndex.startsWith("#!/usr/bin/env node\n")).toBe(true)
   })
 
-  it("documents from-source use as current and npx use as post-publish planned", async () => {
+  it("documents published npx use and from-source use", async () => {
     const readme = await readFile(join(projectRoot, "README.md"), "utf8")
 
     expect(readme).toContain("Use Node `>=22 <23`.")
     expect(readme).toContain("The implemented local behavior can be exercised from a checkout:")
-    expect(readme).toContain("Only after an exact candidate version has actually been published")
-    expect(readme).toContain("Do not use an unversioned command")
+    // 0.1.0 is published to npm (latest): the Quickstart documents unversioned npx use.
+    expect(readme).toContain("## Quickstart")
+    expect(readme).toContain("npx -y academyinfo-mcp")
+    expect(readme).toContain("academyinfo-mcp@0.1.0` is live on the public npm registry")
   })
 
   it("uses test/ consistently without creating tests/", () => {
