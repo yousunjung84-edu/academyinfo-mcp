@@ -556,6 +556,9 @@ describe("refresh worksheet and decimal authority", () => {
     ["1,000", "1000"],
     ["1,000.5000", "1000.5"],
     [" 12.3400 ", "12.34"],
+    [".5", "0.5"],
+    [".6", "0.6"],
+    [" .1 ", "0.1"],
   ])("accepts exact decimal grammar %j as %j", (rawText, canonicalValue) => {
     expect(parseDecimalCell(rawText)).toMatchObject({
       kind: "numeric",
@@ -571,7 +574,7 @@ describe("refresh worksheet and decimal authority", () => {
     "1,00",
     "01,000",
     "001,000",
-    ".5",
+    ".",
     "1.",
     "１２",
   ])("rejects text outside the exact decimal grammar: %j", (rawText) => {

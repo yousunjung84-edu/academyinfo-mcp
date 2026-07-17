@@ -12,8 +12,8 @@ export const compareUniversitiesInputSchema = z.object({
 })
 export const explainIndicatorInputSchema = z.object({ indicator: z.string().optional() })
 export const exploreUniversitiesRegisteredInputSchema = z.looseObject({
-  university_queries: z.unknown().optional(),
-  indicators: z.unknown().optional(),
+  university_queries: z.array(z.string()).optional(),
+  indicators: z.array(z.string()).optional(),
 })
 
 export type EmptyInput = z.infer<typeof emptyInputSchema>

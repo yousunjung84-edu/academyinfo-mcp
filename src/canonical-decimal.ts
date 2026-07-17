@@ -78,11 +78,17 @@ export function parseDecimalCell(rawText: string): DecimalParseResult {
   if (trimmedText === "-") {
     return { kind: "missing", marker: "dash", raw_text: rawText, trimmed_text: trimmedText }
   }
-  if (!plainDecimalPattern.test(trimmedText) && !groupedDecimalPattern.test(trimmedText)) {
+
+  // Source cells may record a sub-1.0 decimal without a leading zero (e.g. ".6"
+  // for a 0.6 competition rate). Restore the leading zero before grammar matching
+  // and canonicalization so these values parse to their exact numeric form.
+  const grammarText = trimmedText.replace(/^\.(?=[0-9])/u, "0.")
+
+  if (!plainDecimalPattern.test(grammarText) && !groupedDecimalPattern.test(grammarText)) {
     return { kind: "invalid", reason: "invalid_grammar", raw_text: rawText, trimmed_text: trimmedText }
   }
 
-  const canonicalValue = canonicalDecimal(trimmedText)
+  const canonicalValue = canonicalDecimal(grammarText)
   const value = Number(canonicalValue)
   if (!Number.isFinite(value) || value < 0) {
     return { kind: "invalid", reason: "not_finite", raw_text: rawText, trimmed_text: trimmedText }
