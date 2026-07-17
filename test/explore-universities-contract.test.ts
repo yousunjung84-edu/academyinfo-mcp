@@ -264,8 +264,8 @@ describe("explore_universities registered boundary", () => {
       $schema: "http://json-schema.org/draft-07/schema#",
       type: "object",
       properties: {
-        university_queries: {},
-        indicators: {},
+        university_queries: { type: "array", items: { type: "string" } },
+        indicators: { type: "array", items: { type: "string" } },
       },
       additionalProperties: {},
     })
@@ -416,8 +416,8 @@ describe("explore_universities registered boundary", () => {
         $schema: "http://json-schema.org/draft-07/schema#",
         type: "object",
         properties: {
-          university_queries: {},
-          indicators: {},
+          university_queries: { type: "array", items: { type: "string" } },
+          indicators: { type: "array", items: { type: "string" } },
         },
         additionalProperties: {},
       })
