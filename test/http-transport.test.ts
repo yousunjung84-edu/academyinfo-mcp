@@ -109,11 +109,13 @@ describe("streamable HTTP transport", () => {
     ])
   })
 
-  it("serves a plain-text health check", async () => {
-    const response = await fetch(`${baseUrl}/healthz`)
+  it("serves a plain-text health check on /healthz and /health", async () => {
+    for (const path of ["/healthz", "/health"] as const) {
+      const response = await fetch(`${baseUrl}${path}`)
 
-    expect(response.status).toBe(200)
-    expect(await response.text()).toBe("ok")
+      expect(response.status).toBe(200)
+      expect(await response.text()).toBe("ok")
+    }
   })
 
   it("returns 404 for paths outside /healthz and /mcp", async () => {

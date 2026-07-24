@@ -58,7 +58,9 @@ async function handleHttpRequest(
   response: ServerResponse,
   options: HttpRuntimeOptions,
 ): Promise<void> {
-  if (request.url === "/healthz") {
+  // Google Frontend consumes the literal /healthz path on run.app domains
+  // before it reaches the container, so /health serves the same probe publicly.
+  if (request.url === "/healthz" || request.url === "/health") {
     response.writeHead(200, { "content-type": "text/plain" })
     response.end("ok")
     return

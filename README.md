@@ -130,7 +130,9 @@ PORT=8080 ALLOWED_HOSTS=<public-host> npm run start:http
 - `POST /mcp` accepts one JSON-RPC MCP request per call and answers a JSON response; GET
   (SSE streams) and DELETE (sessions) are not served because every request runs on a fresh
   server instance.
-- `GET /healthz` answers `200 ok` for deployment health checks.
+- `GET /healthz` and `GET /health` answer `200 ok` for deployment health checks (on
+  Cloud Run `run.app` domains the Google frontend consumes the literal `/healthz` path,
+  so external probes must use `/health`).
 - `ALLOWED_HOSTS` (comma-separated) enables DNS rebinding protection; leave it unset only
   behind a trusted proxy.
 - `dist/src/http.js` is excluded from the npm package, so installed `npx academyinfo-mcp`
