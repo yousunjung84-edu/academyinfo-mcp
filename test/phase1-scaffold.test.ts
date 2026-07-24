@@ -100,7 +100,7 @@ describe("Phase 1 scaffold", () => {
 
     expect(packageJson.files).toEqual([...expectedPackageFiles])
     expect(packageJson.bin).toEqual({ "academyinfo-mcp": "dist/src/index.js" })
-    expect(packageJson.version).toBe("0.1.1")
+    expect(packageJson.version).toBe("0.1.2")
     expect(packageJson.license).toBe("MIT")
     expect(packageJson.engines?.node).toBe(">=22 <23")
     expect(packageJson.dependencies?.["@modelcontextprotocol/sdk"]).toBe("1.29.0")
@@ -123,13 +123,19 @@ describe("Phase 1 scaffold", () => {
 
   it("documents published npx use and from-source use", async () => {
     const readme = await readFile(join(projectRoot, "README.md"), "utf8")
+    const packageJson = await readPackageJson()
 
     expect(readme).toContain("Use Node `>=22 <23`.")
     expect(readme).toContain("The implemented local behavior can be exercised from a checkout:")
-    // 0.1.0 is published to npm (latest): the Quickstart documents unversioned npx use.
+    // The published/latest claims in the README must track package.json so a release
+    // bump cannot leave stale version prose behind (the 0.1.1 release shipped a README
+    // still describing 0.1.0 as latest).
     expect(readme).toContain("## Quickstart")
     expect(readme).toContain("npx -y academyinfo-mcp")
-    expect(readme).toContain("academyinfo-mcp@0.1.0` is live on the public npm registry")
+    expect(readme).toContain(
+      `academyinfo-mcp@${packageJson.version ?? ""}\` is live on the public npm registry`,
+    )
+    expect(readme).toContain(`current \`latest\` (now \`${packageJson.version ?? ""}\`)`)
   })
 
   it("uses test/ consistently without creating tests/", () => {
@@ -143,5 +149,30 @@ describe("Phase 1 scaffold", () => {
     const { createAcademyinfoServer } = await import("../src/server.ts")
     expect(createAcademyinfoServer()).toBeDefined()
     expect(serverSource).not.toContain("console.log")
+  }, 20_000)
+
+  it("reports the package.json version as serverInfo.version over initialize", async () => {
+    const packageJson = await readPackageJson()
+    const serverSource = await readFile(join(projectRoot, "src", "server.ts"), "utf8")
+    const { createAcademyinfoServer } = await import("../src/server.ts")
+    const { Client } = await import("@modelcontextprotocol/sdk/client/index.js")
+    const { InMemoryTransport } = await import("@modelcontextprotocol/sdk/inMemory.js")
+
+    // package.json is the single source of truth: no literal version may be
+    // hardcoded in the server factory (0.1.1 shipped still reporting 0.1.0).
+    expect(serverSource).not.toMatch(/version:\s*"/)
+
+    const server = createAcademyinfoServer()
+    const client = new Client({ name: "phase1-scaffold-probe", version: "0.0.1" })
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair()
+    await Promise.all([server.connect(serverTransport), client.connect(clientTransport)])
+
+    expect(client.getServerVersion()).toEqual({
+      name: "academyinfo-mcp",
+      version: packageJson.version,
+    })
+
+    await client.close()
+    await server.close()
   }, 20_000)
 })
