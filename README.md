@@ -45,16 +45,30 @@ Ask your assistant something like:
 
 > "전남대와 부산대의 취업률과 경쟁률을 비교해줘."
 
-It calls `explore_universities` and returns each institution's values with the source, year,
+The server never guesses an ambiguous name. "전남대학교" matches two campuses, so the first
+`explore_universities` call returns `status: "ambiguous"` with the candidates instead of a table:
+
+```text
+전남대학교 → 2 candidates
+    전남대학교 / 본교       (국립, 광주)
+    전남대학교 / 제2캠퍼스  (국립, 전남)
+```
+
+Pick a campus and ask again (assistants usually do this follow-up on their own):
+
+> "전남대학교 본교와 부산대학교로 비교해줘."
+
+The second call returns `status: "ok"` with each institution's values and the source, year,
 and unit attached — for example (2025 bundled snapshot):
 
 | 대학 | 취업률 | 신입생 경쟁률 |
 |---|---:|---:|
-| 전남대학교 | 57.6% | 7.4:1 |
+| 전남대학교 본교 | 57.6% | 7.4:1 |
 | 부산대학교 | 57.5% | 9:1 |
 
-Ambiguous names return candidate campuses instead of guessing, and comparisons never rank,
-score, or pick a winner — the numbers are presented as-is with provenance so you decide.
+This two-step flow is the designed behavior, not a failure: ambiguous names return candidate
+campuses instead of guessing, and comparisons never rank, score, or pick a winner — the
+numbers are presented as-is with provenance so you decide.
 
 ## Evidence-scoped status
 
@@ -66,15 +80,15 @@ Implemented in this checkout:
 - Node engine `>=22 <23` and the closed direct production dependency set `@modelcontextprotocol/sdk@1.29.0`, `better-sqlite3@11.10.0`, `pino@10.3.1`, and `zod@4.4.3`;
 - ambiguity handling that returns candidates rather than guessing, and factual comparisons without scores, ranks, winners, or recommendations.
 
-Published: `academyinfo-mcp@0.1.0` is live on the public npm registry (`latest`), published by hand from an isolated terminal ceremony ([`docs/manual-publish-runbook.md`](docs/manual-publish-runbook.md)) and smoke-verified with an anonymous `npx -y academyinfo-mcp@0.1.0` install that resolves the exact registry tarball and lists all eight tools.
+Published: `academyinfo-mcp@0.1.2` is live on the public npm registry (`latest`), published by hand from an isolated terminal ceremony ([`docs/manual-publish-runbook.md`](docs/manual-publish-runbook.md)). The initial `0.1.0` release was smoke-verified with an anonymous `npx -y academyinfo-mcp@0.1.0` install that resolves the exact registry tarball and lists all eight tools; `0.1.1` and `0.1.2` follow the same runbook.
 
 Not yet performed (intentional, proportionate for a first solo release):
 
-- the formal no-compile `npx` proof across all three official Node 22 lanes (macOS/arm64, Windows/x64, Ubuntu glibc/x64) — only a single-machine smoke test was run;
+- the formal no-compile `npx` proof across all three official Node 22 lanes (macOS/arm64, Windows/x64, Ubuntu glibc/x64) — only a single-machine smoke test was run. Separately, a one-off manual run (2026-07-24, outside CI) on Ubuntu 24.04 glibc/x64 with Node 22 installed `academyinfo-mcp@0.1.1` anonymously, resolved `better-sqlite3` from prebuilt binaries without compiling, and verified initialize, all eight tools, and an `explore_universities` call with JSON-RPC-only stdout; this is recorded observation, not the formal lane proof, and macOS/arm64 and Windows/x64 remain unverified;
 - the receipt-bound candidate→client→promotion evidence chain and an actual-client (Claude Desktop) receipt;
 - an approved unattended official download link or a completed annual refresh.
 
-The package ships `better-sqlite3@11.10.0` as its sole backend. It installs from prebuilt binaries on the maintainer's Node 22 macOS/arm64 lane; the full three-lane prebuilt-only matrix has not been independently proven. Exactly one backend ships.
+The package ships `better-sqlite3@11.10.0` as its sole backend. It installs from prebuilt binaries on the maintainer's Node 22 macOS/arm64 lane and, in the one-off manual run above, on Ubuntu 24.04 glibc/x64; the full three-lane prebuilt-only matrix has not been independently proven. Exactly one backend ships.
 
 ## Requirements
 
@@ -104,7 +118,7 @@ This development checkout defines `npm run doctor`, `npm run refresh:acquire-val
 ## Version pinning
 
 The [Quickstart](#quickstart) uses the unversioned `academyinfo-mcp`, which resolves to the
-current `latest` (now `0.1.0`). To pin a specific version instead, use `academyinfo-mcp@0.1.0`
+current `latest` (now `0.1.2`). To pin a specific version instead, use `academyinfo-mcp@0.1.2`
 in the `args`. Cursor and Codex use the same `command`/`args` shape as the Claude Desktop
 example; they are documented configurations and behave identically over MCP stdio.
 
