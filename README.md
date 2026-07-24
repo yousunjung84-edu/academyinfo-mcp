@@ -1,5 +1,7 @@
 # academyinfo-mcp
 
+> 한국어 안내: [docs/README.ko.md](docs/README.ko.md)
+
 `academyinfo-mcp` is an independent, read-only MCP server for factual queries and side-by-side comparison of Korean university disclosure indicators. It uses a bundled local snapshot: no API key and no runtime network connection are required.
 
 > This project is not affiliated with, endorsed by, approved by, sponsored by, or maintained by the Ministry of Education, KCUE, KEDI, data.go.kr, academyinfo.go.kr, or any university.
