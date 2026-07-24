@@ -286,6 +286,7 @@ describe("explore_universities registered boundary", () => {
         name: "list_sources",
         config: {
           title: "List Sources",
+          annotations: { title: "List Sources", readOnlyHint: true, openWorldHint: false },
           description: "List bundled file-first academyinfo sources available in v0.1.",
           inputSchema: emptyInputSchema,
         },
@@ -295,6 +296,7 @@ describe("explore_universities registered boundary", () => {
         name: "list_indicators",
         config: {
           title: "List Indicators",
+          annotations: { title: "List Indicators", readOnlyHint: true, openWorldHint: false },
           description: "List v0.1 file-first indicators enabled by default.",
           inputSchema: emptyInputSchema,
         },
@@ -304,6 +306,7 @@ describe("explore_universities registered boundary", () => {
         name: "search_university",
         config: {
           title: "Search University",
+          annotations: { title: "Search University", readOnlyHint: true, openWorldHint: false },
           description: "Search local file-first university records without guessing ambiguous matches.",
           inputSchema: searchUniversityInputSchema,
         },
@@ -313,6 +316,7 @@ describe("explore_universities registered boundary", () => {
         name: "get_university_metrics",
         config: {
           title: "Get University Metrics",
+          annotations: { title: "Get University Metrics", readOnlyHint: true, openWorldHint: false },
           description: "Return verified local metrics for one university when available.",
           inputSchema: getUniversityMetricsInputSchema,
         },
@@ -322,6 +326,7 @@ describe("explore_universities registered boundary", () => {
         name: "compare_universities",
         config: {
           title: "Compare Universities",
+          annotations: { title: "Compare Universities", readOnlyHint: true, openWorldHint: false },
           description: "Compare verified local metrics for multiple universities when available.",
           inputSchema: compareUniversitiesInputSchema,
         },
@@ -331,6 +336,7 @@ describe("explore_universities registered boundary", () => {
         name: "explain_indicator",
         config: {
           title: "Explain Indicator",
+          annotations: { title: "Explain Indicator", readOnlyHint: true, openWorldHint: false },
           description: "Explain a v0.1 indicator with source metadata and verification status.",
           inputSchema: explainIndicatorInputSchema,
         },
@@ -340,6 +346,7 @@ describe("explore_universities registered boundary", () => {
         name: "validate_source_coverage",
         config: {
           title: "Validate Source Coverage",
+          annotations: { title: "Validate Source Coverage", readOnlyHint: true, openWorldHint: false },
           description: "Validate v0.1 source coverage, key policy, and bundled data boundaries.",
           inputSchema: emptyInputSchema,
         },
@@ -349,6 +356,7 @@ describe("explore_universities registered boundary", () => {
         name: "explore_universities",
         config: {
           title: "Explore Universities",
+          annotations: { title: "Explore Universities", readOnlyHint: true, openWorldHint: false },
           description: "Resolve universities and return factual side-by-side local indicator data.",
           inputSchema: exploreUniversitiesRegisteredInputSchema,
         },
