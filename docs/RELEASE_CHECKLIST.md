@@ -50,7 +50,7 @@ Do not copy local paths, credentials, signed URLs, or private runner details int
 
 ## 3. Catalog, package, license, and privacy gate
 
-- [ ] Confirm `data/seed/indicators.json` is the sole packaged source-derived catalog, closed-schema version 1, KOGL-attributed, and contains exactly five indicators.
+- [ ] Confirm `data/seed/indicators.json` is the sole packaged source-derived catalog, closed-schema version 1, KOGL-attributed, and contains exactly seventeen indicators.
 - [ ] Confirm runtime catalog loading is package-relative, validated, frozen/fail-closed, and has no hard-coded or executable generated fallback.
 - [ ] Independently cross-check catalog, logical database tables, and manifest.
 - [ ] Confirm code MIT terms and bundled-data KOGL Type 1 attribution remain separate.
@@ -76,13 +76,13 @@ Release only `better-sqlite3` `11.10.0`. No alternate backend, dual-backend pack
 - [ ] Confirm the report omits the raw workbook, signed query strings, credentials, and private paths.
 - [ ] Compute SHA-256 only after download and record it as integrity/change/audit evidence, not authenticity or approval.
 - [ ] Confirm one exact blank predicate: absent or Node 22 ECMAScript-trim-empty raw text.
-- [ ] Confirm exactly one header row, unique required identity/response headers, and one mapping for each of five logical indicators.
+- [ ] Confirm exactly one header row, unique required identity/response headers, and one mapping for each of seventeen logical indicators.
 - [ ] Confirm nonblank preamble/footer/hidden rows become source candidates and any nonblank beyond-width cell blocks.
 - [ ] Preserve indexed cells with unmodified raw text; confirm source rows = raw rows = institutions and classifications = rows × 5.
 - [ ] Confirm missing is only trimmed empty or ASCII `-`.
 - [ ] Confirm exact decimal grammar, valid grouping, canonical text, finite nonnegative Number, exact shortest-Number/plain-decimal round trip, and no rounding. Verify `001,000` rejects and `1,000` becomes `1000`.
 - [ ] Confirm unique natural keys, fixed verified units, nondecreasing integer years, numeric/missing domains, and exact coverage.
-- [ ] Confirm normal changes—including checksum, 23/25/other unrelated columns, institution set, values, and allowed missingness—are audit diffs rather than independent blockers after semantic gates pass.
+- [ ] Confirm normal changes—including checksum, 24/26/other unrelated columns, institution set, values, and allowed missingness—are audit diffs rather than independent blockers after semantic gates pass.
 - [ ] Independently reproduce source-model, seed-logical, catalog, manifest-semantic, and release-data JCS/SHA-256 digests with canonical decimals and self-excluding projections.
 
 ## 6. Fixed-path refresh writer

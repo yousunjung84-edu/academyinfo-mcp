@@ -34,7 +34,7 @@ The first seven contracts remain backward compatible. `explore_universities` is 
 
 - Dataset `15118998` is the only bundled source.
 - `data/seed/indicators.json` is the sole packaged source-derived catalog. It is closed-schema, KOGL-attributed JSON data, not generated executable TypeScript or JavaScript and not backed by a hard-coded fallback.
-- The catalog contains exactly five logical indicators: `competition_rate`, `fill_rate`, `employment_rate`, `scholarship_per_student`, and `avg_tuition`.
+- The catalog contains exactly seventeen logical indicators: `competition_rate`, `fill_rate`, `employment_rate`, `scholarship_per_student`, `avg_tuition`, `admission_quota`, `graduates_count`, `fulltime_faculty_count`, `enrolled_students`, `international_students`, `students_per_fulltime_faculty`, `fulltime_faculty_ratio_quota`, `fulltime_faculty_ratio_enrolled`, `fulltime_faculty_lecture_ratio`, `education_expense_per_student`, `dormitory_capacity_rate`, and `books_per_student`.
 - `employment_rate` is the school-level value from `15118998` only.
 - Dataset `15139279` and all granular, per-department, or health-insurance-linked employment data remain excluded from package artifacts and default runtime behavior.
 - Code remains MIT licensed; bundled data remains separately attributed under KOGL Type 1.
@@ -43,14 +43,14 @@ The first seven contracts remain backward compatible. `explore_universities` is 
 
 Refresh acceptance is semantic, not a frozen-file or fixed-shape comparison:
 
-- require one unique identity mapping and one unique mapping for each of the five logical indicators;
-- preserve indexed raw cells and map every source row exactly once to one raw row, one institution, and five numeric-or-missing classifications;
+- require one unique identity mapping and one unique mapping for each of the seventeen logical indicators;
+- preserve indexed raw cells and map every source row exactly once to one raw row, one institution, and seventeen numeric-or-missing classifications;
 - keep verified units fixed and years as nondecreasing integers;
 - treat only trimmed empty text and ASCII `-` as missing;
 - parse only the approved nonnegative decimal grammars, preserve canonical decimal text as semantic authority, require exact JavaScript Number round-trip safety, and never round;
 - treat post-download SHA-256 as integrity, change-detection, and audit evidence only—not source authenticity or approval.
 
-A matching prior checksum does not approve a source, and a changed checksum does not reject it. A changed institution set, values, allowed missingness, unrelated columns, row count, or worksheet width is an administrator-reviewed diff rather than an independent pass/fail rule. Valid 23-column, 25-column, or other annual shapes may pass when every semantic invariant passes.
+A matching prior checksum does not approve a source, and a changed checksum does not reject it. A changed institution set, values, allowed missingness, unrelated columns, row count, or worksheet width is an administrator-reviewed diff rather than an independent pass/fail rule. Valid 24-column, 26-column, or other annual shapes may pass when every semantic invariant passes.
 
 ## Remaining gated sequence
 

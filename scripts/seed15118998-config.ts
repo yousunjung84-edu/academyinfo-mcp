@@ -87,6 +87,18 @@ export const indicatorSpecs: readonly IndicatorSpec[] = [
   { indicator_id: "employment_rate", label_ko: "취업률", source_column: "취업률\n(2025,%)", year: 2025, unit: "%", note: "School-level employment rate from dataset 15118998." },
   { indicator_id: "scholarship_per_student", label_ko: "학생 1인당 연간 장학금", source_column: "학생 1인당 연간 장학금\n(2025,원)", year: 2025, unit: "원" },
   { indicator_id: "avg_tuition", label_ko: "평균 등록금", source_column: "평균 등록금\n(2026,천원)", year: 2026, unit: "천원" },
+  { indicator_id: "admission_quota", label_ko: "입학정원", source_column: "입학정원\n(2025,명)", year: 2025, unit: "명" },
+  { indicator_id: "graduates_count", label_ko: "졸업생수", source_column: "졸업생수\n(2025,명)", year: 2025, unit: "명" },
+  { indicator_id: "fulltime_faculty_count", label_ko: "전임교원수(학부+대학원)", source_column: "전임교원수(학부+대학원)\n(2025,명)", year: 2025, unit: "명" },
+  { indicator_id: "enrolled_students", label_ko: "재학생", source_column: "재학생\n(2025,명)", year: 2025, unit: "명" },
+  { indicator_id: "international_students", label_ko: "외국인 학생 수", source_column: "외국인 학생 수\n(2025,명)", year: 2025, unit: "명" },
+  { indicator_id: "students_per_fulltime_faculty", label_ko: "전임교원 1인당 학생 수(학생정원기준)(학부+대학원)", source_column: "전임교원 1인당 학생 수(학생정원기준)(학부+대학원)\n(2025,명)", year: 2025, unit: "명" },
+  { indicator_id: "fulltime_faculty_ratio_quota", label_ko: "전임교원 확보율(학생정원기준)(학부+대학원)", source_column: "전임교원 확보율(학생정원기준)(학부+대학원)\n(2025,%)", year: 2025, unit: "%" },
+  { indicator_id: "fulltime_faculty_ratio_enrolled", label_ko: "전임 교원 확보율(재학생 기준)(학부+대학원)", source_column: "전임 교원 확보율(재학생 기준)(학부+대학원)\n(2025,%)", year: 2025, unit: "%" },
+  { indicator_id: "fulltime_faculty_lecture_ratio", label_ko: "전임교원 강의 담당 비율", source_column: "전임교원 강의 담당 비율\n(2025,%)", year: 2025, unit: "%" },
+  { indicator_id: "education_expense_per_student", label_ko: "학생 1인당 교육비(학부+대학원)", source_column: "학생 1인당 교육비(학부+대학원)\n(2025,천원)", year: 2025, unit: "천원" },
+  { indicator_id: "dormitory_capacity_rate", label_ko: "기숙사 수용율(학부+대학원)", source_column: "기숙사 수용율(학부+대학원)\n(2025,%)", year: 2025, unit: "%" },
+  { indicator_id: "books_per_student", label_ko: "학생 1인당 도서 자료 수(학부+대학원)", source_column: "학생 1인당 도서 자료 수(학부+대학원)\n(2025,권)", year: 2025, unit: "권" },
 ]
 
 export const institutionColumns = {

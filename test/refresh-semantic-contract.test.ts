@@ -95,13 +95,9 @@ const stableManifest: JsonObject = {
   source_file_private_path_excluded: true,
   per_indicator_year_unit: true,
   indicators: [],
-  observation_counts: {
-    competition_rate: 0,
-    fill_rate: 0,
-    employment_rate: 0,
-    scholarship_per_student: 0,
-    avg_tuition: 0,
-  },
+  observation_counts: Object.fromEntries(
+    indicatorSpecs.map((spec) => [spec.indicator_id, 0]),
+  ),
   warnings: ["fixture warning"],
 }
 
@@ -429,14 +425,14 @@ describe("refresh worksheet and decimal authority", () => {
     expect(worksheetBlankV1(" \t\r\n\u00a0")).toBe(true)
     expect(worksheetBlankV1("-")).toBe(false)
 
-    const headers = [...headersAtWidth(23)]
+    const headers = [...headersAtWidth(26)]
     headers[0] = `\uFEFF${headers[0]}`
     const indicatorIndex = Object.values(institutionColumns).length
     headers[indicatorIndex] = headers[indicatorIndex]?.replace("\n", "\r\n") ?? ""
     const validation = validateDefaultIndicatorHeaders(headers, 7)
 
     expect(validation.ok).toBe(true)
-    expect(validation.parsedHeaders).toHaveLength(23)
+    expect(validation.parsedHeaders).toHaveLength(26)
     expect(validation.parsedHeaders.every((header) => header.worksheet_row === 7)).toBe(true)
     expect(validation.parsedHeaders[0]?.column_ref).toBe("A7")
   })
@@ -533,11 +529,11 @@ describe("refresh worksheet and decimal authority", () => {
     expect("expectedHeaderCount" in refreshConfig).toBe(false)
   })
 
-  it.each([23, 25])("accepts %i columns when every semantic mapping is exact", (width) => {
+  it.each([24, 26])("accepts %i columns when every semantic mapping is exact", (width) => {
     const validation = validateDefaultIndicatorHeaders(headersAtWidth(width), 3)
     expect(validation.ok).toBe(true)
     if (validation.ok) {
-      expect(validation.indicatorColumns.size).toBe(5)
+      expect(validation.indicatorColumns.size).toBe(17)
       expect(validation.identityColumns.size).toBe(7)
     }
   })

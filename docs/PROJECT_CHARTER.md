@@ -46,15 +46,27 @@ The first seven registrations and response behavior remain backward compatible. 
 
 ## Data and catalog contract
 
-Dataset `15118998` is the only bundled source. Its five logical indicators are:
+Dataset `15118998` is the only bundled source. Its seventeen logical indicators are:
 
 - `competition_rate`;
 - `fill_rate`;
 - `employment_rate` (school-level only);
 - `scholarship_per_student`;
-- `avg_tuition`.
+- `avg_tuition`;
+- `admission_quota`;
+- `graduates_count`;
+- `fulltime_faculty_count`;
+- `enrolled_students`;
+- `international_students`;
+- `students_per_fulltime_faculty`;
+- `fulltime_faculty_ratio_quota`;
+- `fulltime_faculty_ratio_enrolled`;
+- `fulltime_faculty_lecture_ratio`;
+- `education_expense_per_student`;
+- `dormitory_capacity_rate`;
+- `books_per_student`.
 
-`data/seed/indicators.json` is the sole packaged source-derived catalog. It is KOGL-attributed JSON data with catalog schema version 1, source/license metadata, and exactly those five indicators. A closed static schema validates it; runtime loading is package-relative and fails closed. There is no hard-coded fallback or generated executable TypeScript/JavaScript catalog. The database logical tables, manifest, and catalog are independently cross-checked.
+`data/seed/indicators.json` is the sole packaged source-derived catalog. It is KOGL-attributed JSON data with catalog schema version 1, source/license metadata, and exactly those seventeen indicators. A closed static schema validates it; runtime loading is package-relative and fails closed. There is no hard-coded fallback or generated executable TypeScript/JavaScript catalog. The database logical tables, manifest, and catalog are independently cross-checked.
 
 Dataset `15139279`, granular/per-department/health-insurance-linked employment data, live OpenAPI behavior, and scraping are excluded. No raw, normalized, seed, sample, fixture, SQLite, CSV, JSON, or derived artifact from that dataset may enter the package or default runtime behavior.
 
@@ -66,13 +78,13 @@ Annual refresh is governed by meaning, not frozen bytes or a fixed worksheet sha
 
 `worksheet_blank_v1` is true only for an absent cell or decoded raw text whose Node 22 ECMAScript `String.prototype.trim()` is empty. That one predicate governs header discovery, last populated row, padding/trailer handling, beyond-header cells, and source-row membership. Header matching alone removes a leading BOM and converts CRLF to LF; it does not normalize Unicode, translate, or apply aliases. There must be exactly one header row and exactly one mapping for every required identity/response header and each logical indicator. Any nonblank row is a source candidate; nonblank cells beyond header width block refresh.
 
-Every retained cell has `worksheet_row`, `column_index`, `column_ref`, and unmodified `raw_text`. One source row maps exactly once to a raw row and institution, plus five numeric-or-missing classifications. Therefore source-row, raw-row, and institution counts agree, and classification count is source rows multiplied by five.
+Every retained cell has `worksheet_row`, `column_index`, `column_ref`, and unmodified `raw_text`. One source row maps exactly once to a raw row and institution, plus seventeen numeric-or-missing classifications. Therefore source-row, raw-row, and institution counts agree, and classification count is source rows multiplied by seventeen.
 
 After ECMAScript trim, only empty text and ASCII `-` are missing. Numeric text must match either `[0-9]+(?:\.[0-9]+)?` or `[1-9][0-9]{0,2}(?:,[0-9]{3})+(?:\.[0-9]+)?`. Signs, exponent notation, internal whitespace, decimal commas, malformed grouping, Unicode digits, NaN, and infinity are rejected. Commas are removed only after valid grouping; integer leading zeros and fractional trailing zeros are removed; zero is `0`. `001,000` is invalid, while `1,000` canonicalizes to `1000`. A canonical decimal must produce a finite nonnegative JavaScript Number and survive exact shortest-Number-to-plain-decimal round trip. Precision loss blocks refresh; values are never rounded.
 
 Canonical decimal text is semantic authority; any legacy REAL value must equal `Number(canonical_value)` on read and pass the independent round trip. Blocking invariants are official source/workbook/license identity, unique headers and natural key, unique logical mappings, fixed units, nondecreasing integer years, exact numeric/missing domains, and complete row coverage.
 
-Post-download SHA-256 and physical hashes are change/integrity/audit evidence, not authenticity or approval. A matching prior checksum does not approve a source. A changed checksum does not reject it. Row or column counts, institution-set changes, values, unrelated columns, and allowed missingness are reviewed diffs but do not independently approve or block. Valid 23-column, 25-column, and other annual shapes may pass the semantic gates.
+Post-download SHA-256 and physical hashes are change/integrity/audit evidence, not authenticity or approval. A matching prior checksum does not approve a source. A changed checksum does not reject it. Row or column counts, institution-set changes, values, unrelated columns, and allowed missingness are reviewed diffs but do not independently approve or block. Valid 24-column, 26-column, and other annual shapes may pass the semantic gates.
 
 Semantic release identity uses closed RFC 8785 JCS/SHA-256 projections with stable order and canonical decimals: source model, seed logical model, full catalog, semantic manifest, then release data. Each digest projection excludes its own digest and nonsemantic physical/workflow/time fields. Physical hashes remain separate.
 

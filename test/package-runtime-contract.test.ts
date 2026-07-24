@@ -66,6 +66,18 @@ describe("published package runtime contract", () => {
       { indicator_id: "employment_rate", unit: "%" },
       { indicator_id: "scholarship_per_student", unit: "원" },
       { indicator_id: "avg_tuition", unit: "천원" },
+      { indicator_id: "admission_quota", unit: "명" },
+      { indicator_id: "graduates_count", unit: "명" },
+      { indicator_id: "fulltime_faculty_count", unit: "명" },
+      { indicator_id: "enrolled_students", unit: "명" },
+      { indicator_id: "international_students", unit: "명" },
+      { indicator_id: "students_per_fulltime_faculty", unit: "명" },
+      { indicator_id: "fulltime_faculty_ratio_quota", unit: "%" },
+      { indicator_id: "fulltime_faculty_ratio_enrolled", unit: "%" },
+      { indicator_id: "fulltime_faculty_lecture_ratio", unit: "%" },
+      { indicator_id: "education_expense_per_student", unit: "천원" },
+      { indicator_id: "dormitory_capacity_rate", unit: "%" },
+      { indicator_id: "books_per_student", unit: "권" },
     ])
 
     const wrongIdCatalog = structuredClone(canonicalCatalog)
