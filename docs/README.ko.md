@@ -1,6 +1,8 @@
 # academyinfo-mcp (한국어 안내)
 
-> English (canonical): [README.md](../README.md) — 내용이 어긋나는 경우 영어 원문이 우선합니다.
+[English](../README.md) | **한국어**
+
+> 영어 원문([README.md](../README.md))이 규범(canonical)입니다 — 내용이 어긋나는 경우 영어 원문이 우선합니다.
 
 `academyinfo-mcp`는 한국 대학 공시 지표를 사실 그대로 조회·비교하는 **독립·읽기 전용 MCP 서버**입니다.
 번들된 로컬 스냅샷을 사용하므로 **API 키도, 실행 중 네트워크 연결도 필요 없습니다.**
