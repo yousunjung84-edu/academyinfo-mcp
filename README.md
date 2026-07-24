@@ -78,9 +78,10 @@ Implemented in this checkout:
 - exactly eight registered MCP tools (the seven legacy tools plus `explore_universities`);
 - a schema-validated, KOGL-attributed data-only indicator catalog at `data/seed/indicators.json`;
 - Node engine `>=22 <23` and the closed direct production dependency set `@modelcontextprotocol/sdk@1.29.0`, `better-sqlite3@11.10.0`, `pino@10.3.1`, and `zod@4.4.3`;
-- ambiguity handling that returns candidates rather than guessing, and factual comparisons without scores, ranks, winners, or recommendations.
+- ambiguity handling that returns candidates rather than guessing, and factual comparisons without scores, ranks, winners, or recommendations;
+- a checkout-only stateless Streamable HTTP entry point (`dist/src/http.js`, POST-only, excluded from the npm package) alongside the packaged stdio entry point, with `readOnlyHint`/`openWorldHint` annotations on all eight tools.
 
-Published: `academyinfo-mcp@0.1.2` is live on the public npm registry (`latest`), published by hand from an isolated terminal ceremony ([`docs/manual-publish-runbook.md`](docs/manual-publish-runbook.md)). The initial `0.1.0` release was smoke-verified with an anonymous `npx -y academyinfo-mcp@0.1.0` install that resolves the exact registry tarball and lists all eight tools; `0.1.1` and `0.1.2` follow the same runbook.
+Published: `academyinfo-mcp@0.2.0` is live on the public npm registry (`latest`), published by hand from an isolated terminal ceremony ([`docs/manual-publish-runbook.md`](docs/manual-publish-runbook.md)). The initial `0.1.0` release was smoke-verified with an anonymous `npx -y academyinfo-mcp@0.1.0` install that resolves the exact registry tarball and lists all eight tools; later releases (`0.1.1`, `0.1.2`, `0.2.0`) follow the same runbook.
 
 Not yet performed (intentional, proportionate for a first solo release):
 
@@ -115,10 +116,35 @@ The last command starts an MCP stdio server. It does not provide an interactive 
 No API-key environment variable is required. `ACADEMYINFO_DB_PATH` may select another compatible local database; otherwise the bundled seed is used. Runtime tools do not write the database or contact an external service.
 This development checkout defines `npm run doctor`, `npm run refresh:acquire-validate`, and `npm run refresh:verify-artifact`. Only `doctor` has its compiled program included in the packed npm artifact, where it is a local package/data/runtime diagnostic; it does not prove public installation, backend selection, refresh acceptance, or release approval. The compiled refresh programs, their TypeScript build sources, and required development dependencies are excluded from the package, so both refresh commands are checkout-only protected-workflow internals, not supported installed-package commands. Direct local invocation is never an authoritative acquisition, writer, or release receipt.
 
+## Remote endpoint (Streamable HTTP, checkout-only)
+
+The npm package remains stdio-only. A checkout (or a container image built from it) also
+provides a stateless Streamable HTTP entry point for remote MCP clients such as claude.ai
+custom connectors:
+
+```bash
+npm run build
+PORT=8080 ALLOWED_HOSTS=<public-host> npm run start:http
+```
+
+- `POST /mcp` accepts one JSON-RPC MCP request per call and answers a JSON response; GET
+  (SSE streams) and DELETE (sessions) are not served because every request runs on a fresh
+  server instance.
+- `GET /healthz` answers `200 ok` for deployment health checks.
+- `ALLOWED_HOSTS` (comma-separated) enables DNS rebinding protection; leave it unset only
+  behind a trusted proxy.
+- `dist/src/http.js` is excluded from the npm package, so installed `npx academyinfo-mcp`
+  behavior is unchanged.
+
+A remote deployment serves the same bundled point-in-time snapshot under the same
+attribution and disclaimer boundaries: it is not a live feed and does not guarantee the
+latest data, and the operator remains unaffiliated with the Ministry of Education, KCUE,
+KEDI, data.go.kr, academyinfo.go.kr, or any university.
+
 ## Version pinning
 
 The [Quickstart](#quickstart) uses the unversioned `academyinfo-mcp`, which resolves to the
-current `latest` (now `0.1.2`). To pin a specific version instead, use `academyinfo-mcp@0.1.2`
+current `latest` (now `0.2.0`). To pin a specific version instead, use `academyinfo-mcp@0.2.0`
 in the `args`. Cursor and Codex use the same `command`/`args` shape as the Claude Desktop
 example; they are documented configurations and behave identically over MCP stdio.
 

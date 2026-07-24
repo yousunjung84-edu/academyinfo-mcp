@@ -12,6 +12,10 @@ const projectRoot = fileURLToPath(new URL("..", import.meta.url))
 
 const expectedPackageFiles = [
   "dist/src/**",
+  "!dist/src/http.js",
+  "!dist/src/http.js.map",
+  "!dist/src/http.d.ts",
+  "!dist/src/http.d.ts.map",
   "dist/scripts/doctor.js",
   "data/seed/academyinfo_15118998.sqlite",
   "data/seed/academyinfo_15118998.manifest.json",
