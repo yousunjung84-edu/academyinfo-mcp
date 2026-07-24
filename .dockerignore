@@ -1,0 +1,8 @@
+.git
+node_modules
+evidence
+docs
+test
+src
+scripts
+*.md
