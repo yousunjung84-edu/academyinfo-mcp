@@ -100,6 +100,18 @@ const indicatorIds = [
   "employment_rate",
   "scholarship_per_student",
   "avg_tuition",
+  "admission_quota",
+  "graduates_count",
+  "fulltime_faculty_count",
+  "enrolled_students",
+  "international_students",
+  "students_per_fulltime_faculty",
+  "fulltime_faculty_ratio_quota",
+  "fulltime_faculty_ratio_enrolled",
+  "fulltime_faculty_lecture_ratio",
+  "education_expense_per_student",
+  "dormitory_capacity_rate",
+  "books_per_student",
 ] as const
 
 type MetricRepositoryFixture = {
@@ -843,13 +855,7 @@ describe("explore_universities batch outcomes", () => {
     expect(response.status).toBe("missing_db")
     expect(response.query).toEqual({
       university_queries: ["전남대학교 본교"],
-      indicators: [
-        "competition_rate",
-        "fill_rate",
-        "employment_rate",
-        "scholarship_per_student",
-        "avg_tuition",
-      ],
+      indicators: [...indicatorIds],
     })
     expect(response.data.error).toEqual({
       code: "missing_db",

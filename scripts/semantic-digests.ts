@@ -140,6 +140,18 @@ const observationCountKeys = [
   "employment_rate",
   "scholarship_per_student",
   "avg_tuition",
+  "admission_quota",
+  "graduates_count",
+  "fulltime_faculty_count",
+  "enrolled_students",
+  "international_students",
+  "students_per_fulltime_faculty",
+  "fulltime_faculty_ratio_quota",
+  "fulltime_faculty_ratio_enrolled",
+  "fulltime_faculty_lecture_ratio",
+  "education_expense_per_student",
+  "dormitory_capacity_rate",
+  "books_per_student",
 ] as const
 const semanticProjectionInputKeys = [
   "source_model_digest_v1",

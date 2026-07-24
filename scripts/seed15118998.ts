@@ -42,15 +42,21 @@ import {
   requireSourceChecksum,
   validateDefaultIndicatorHeaders,
 } from "./seed15118998-validate.js"
-import { readXlsxSheet } from "./xlsx.js"
+import { readXlsxSheet, type XlsxSheet } from "./xlsx.js"
 
 export function buildSeed15118998(): void {
   debugStep("recording source checksum")
   const sourceChecksum = requireSourceChecksum()
   debugStep("reading xlsx")
   const sheet = readXlsxSheet(rawFilePath, expectedSheetName)
+  buildSeed15118998FromSheet(sheet, sourceChecksum)
+}
 
-
+export function buildSeed15118998FromSheet(
+  sheet: XlsxSheet,
+  sourceChecksum: string,
+  sourceDownloadedAtOverride?: string,
+): void {
   debugStep("validating headers")
   const validation = validateDefaultIndicatorHeaders(sheet.headers, sheet.headerRowNumber)
 
@@ -124,6 +130,7 @@ export function buildSeed15118998(): void {
       seedChecksum,
       observationCounts,
       semanticProjectionInputs,
+      sourceDownloadedAtOverride,
     ),
     "manifest",
   )
@@ -141,11 +148,17 @@ export function buildSeed15118998(): void {
     manifest: manifestWithoutDigests,
   })
   const manifest = { ...manifestWithoutDigests, semantic_digests: semanticDigests }
+  // The packaged manifest stays slim: the projection inputs are
+  // deterministically recomputable from the seed database and these scripts,
+  // and the digest DAG already pins their semantics, so only the digests ship.
+  const packagedManifest = Object.fromEntries(
+    Object.entries(manifest).filter(([key]) => key !== "semantic_digest_projection_inputs"),
+  )
 
   writeJson(headerSnapshotPath, headerSnapshot)
   writeJson(sampleRowsPath, buildSampleRows(sheet.headers, sheet.rows))
   writeJson(indicatorJsonPath, catalog)
-  writeJson(manifestPath, manifest)
+  writeJson(manifestPath, packagedManifest)
   writeJson(checksumsPath, {
     dataset_id: datasetId,
     source_file_name: sourceFileName,

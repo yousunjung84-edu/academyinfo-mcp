@@ -400,9 +400,10 @@ export function buildManifest(
   seedChecksum: string,
   observationCounts: ObservationCountMap,
   semanticDigestInputs: SemanticDigestProjectionInputs,
+  sourceDownloadedAtOverride?: string,
 ): Record<string, unknown> {
-  const stats = statSync(rawFilePath)
-  const sourceDownloadedAt = stats.mtime.toISOString()
+  const sourceDownloadedAt =
+    sourceDownloadedAtOverride ?? statSync(rawFilePath).mtime.toISOString()
   const seedBuiltAt = new Date().toISOString()
 
   return {

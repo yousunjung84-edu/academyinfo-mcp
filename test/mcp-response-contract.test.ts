@@ -360,14 +360,14 @@ describe("MCP response contract", () => {
           const data = z
             .object({
               raw_rows: z.literal(488),
-              observations: z.literal(2350),
+              observations: z.literal(8206),
             })
             .parse(response.data)
 
           expect(response.status).toBe("ok")
           expectFactualDataOnly(response.data)
           expect(data.raw_rows).toBe(488)
-          expect(data.observations).toBe(2350)
+          expect(data.observations).toBe(8206)
         },
         { cwd: externalCwd },
       )

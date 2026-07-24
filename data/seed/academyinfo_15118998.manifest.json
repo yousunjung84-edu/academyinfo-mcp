@@ -8,13 +8,13 @@
   "bundled": true,
   "source_file_name": "대학주요정보.xlsx",
   "source_downloaded_at": "2026-07-01T03:37:59.560Z",
-  "seed_built_at": "2026-07-02T08:56:58.198Z",
+  "seed_built_at": "2026-07-24T08:30:29.170Z",
   "source_file_downloaded_at": "2026-07-01T03:37:59.560Z",
   "source_file_modified_or_observed_at": "2026-07-01T03:37:59.560Z",
-  "source_page_observed_at": "2026-07-02T08:56:58.198Z",
+  "source_page_observed_at": "2026-07-24T08:30:29.170Z",
   "source_file_checksum_sha256": "53f7e7fbb446206a47fab1adc622d551ba88ba7f3c25ae0cdc8e41cddc637621",
-  "header_snapshot_checksum_sha256": "9327383d74cc5d0ce90069974fd42b1736481d739366e20526fb1bc55c88f117",
-  "seed_db_checksum_sha256": "5030949cef62c46a235ee8047f184328e32512f8c1cbcd08cffc9904e3038bae",
+  "header_snapshot_checksum_sha256": "4541a811157908354cb5f9eb2d3a5248d09a65651e9e1bdb1fad89f059a50ebb",
+  "seed_db_checksum_sha256": "d55ef5b8eaf55d1093569feda61790d0d5f7fa21b4e5bfd3fcf117e2f31c451b",
   "seed_is_latest_claim": false,
   "api_key_required": false,
   "source_file_private_path_excluded": true,
@@ -26,6 +26,7 @@
       "source_column": "신입생 경쟁률\n(2025,:1)",
       "year": 2025,
       "unit": ":1",
+      "note": null,
       "source_dataset_id": "15118998",
       "source_column_verified": true,
       "enabled_by_default": true
@@ -36,6 +37,7 @@
       "source_column": "신입생 충원율\n(2025,%)",
       "year": 2025,
       "unit": "%",
+      "note": null,
       "source_dataset_id": "15118998",
       "source_column_verified": true,
       "enabled_by_default": true
@@ -57,6 +59,7 @@
       "source_column": "학생 1인당 연간 장학금\n(2025,원)",
       "year": 2025,
       "unit": "원",
+      "note": null,
       "source_dataset_id": "15118998",
       "source_column_verified": true,
       "enabled_by_default": true
@@ -67,6 +70,139 @@
       "source_column": "평균 등록금\n(2026,천원)",
       "year": 2026,
       "unit": "천원",
+      "note": null,
+      "source_dataset_id": "15118998",
+      "source_column_verified": true,
+      "enabled_by_default": true
+    },
+    {
+      "indicator_id": "admission_quota",
+      "label_ko": "입학정원",
+      "source_column": "입학정원\n(2025,명)",
+      "year": 2025,
+      "unit": "명",
+      "note": null,
+      "source_dataset_id": "15118998",
+      "source_column_verified": true,
+      "enabled_by_default": true
+    },
+    {
+      "indicator_id": "graduates_count",
+      "label_ko": "졸업생수",
+      "source_column": "졸업생수\n(2025,명)",
+      "year": 2025,
+      "unit": "명",
+      "note": null,
+      "source_dataset_id": "15118998",
+      "source_column_verified": true,
+      "enabled_by_default": true
+    },
+    {
+      "indicator_id": "fulltime_faculty_count",
+      "label_ko": "전임교원수(학부+대학원)",
+      "source_column": "전임교원수(학부+대학원)\n(2025,명)",
+      "year": 2025,
+      "unit": "명",
+      "note": null,
+      "source_dataset_id": "15118998",
+      "source_column_verified": true,
+      "enabled_by_default": true
+    },
+    {
+      "indicator_id": "enrolled_students",
+      "label_ko": "재학생",
+      "source_column": "재학생\n(2025,명)",
+      "year": 2025,
+      "unit": "명",
+      "note": null,
+      "source_dataset_id": "15118998",
+      "source_column_verified": true,
+      "enabled_by_default": true
+    },
+    {
+      "indicator_id": "international_students",
+      "label_ko": "외국인 학생 수",
+      "source_column": "외국인 학생 수\n(2025,명)",
+      "year": 2025,
+      "unit": "명",
+      "note": null,
+      "source_dataset_id": "15118998",
+      "source_column_verified": true,
+      "enabled_by_default": true
+    },
+    {
+      "indicator_id": "students_per_fulltime_faculty",
+      "label_ko": "전임교원 1인당 학생 수(학생정원기준)(학부+대학원)",
+      "source_column": "전임교원 1인당 학생 수(학생정원기준)(학부+대학원)\n(2025,명)",
+      "year": 2025,
+      "unit": "명",
+      "note": null,
+      "source_dataset_id": "15118998",
+      "source_column_verified": true,
+      "enabled_by_default": true
+    },
+    {
+      "indicator_id": "fulltime_faculty_ratio_quota",
+      "label_ko": "전임교원 확보율(학생정원기준)(학부+대학원)",
+      "source_column": "전임교원 확보율(학생정원기준)(학부+대학원)\n(2025,%)",
+      "year": 2025,
+      "unit": "%",
+      "note": null,
+      "source_dataset_id": "15118998",
+      "source_column_verified": true,
+      "enabled_by_default": true
+    },
+    {
+      "indicator_id": "fulltime_faculty_ratio_enrolled",
+      "label_ko": "전임 교원 확보율(재학생 기준)(학부+대학원)",
+      "source_column": "전임 교원 확보율(재학생 기준)(학부+대학원)\n(2025,%)",
+      "year": 2025,
+      "unit": "%",
+      "note": null,
+      "source_dataset_id": "15118998",
+      "source_column_verified": true,
+      "enabled_by_default": true
+    },
+    {
+      "indicator_id": "fulltime_faculty_lecture_ratio",
+      "label_ko": "전임교원 강의 담당 비율",
+      "source_column": "전임교원 강의 담당 비율\n(2025,%)",
+      "year": 2025,
+      "unit": "%",
+      "note": null,
+      "source_dataset_id": "15118998",
+      "source_column_verified": true,
+      "enabled_by_default": true
+    },
+    {
+      "indicator_id": "education_expense_per_student",
+      "label_ko": "학생 1인당 교육비(학부+대학원)",
+      "source_column": "학생 1인당 교육비(학부+대학원)\n(2025,천원)",
+      "year": 2025,
+      "unit": "천원",
+      "note": null,
+      "source_dataset_id": "15118998",
+      "source_column_verified": true,
+      "enabled_by_default": true
+    },
+    {
+      "indicator_id": "dormitory_capacity_rate",
+      "label_ko": "기숙사 수용율(학부+대학원)",
+      "source_column": "기숙사 수용율(학부+대학원)\n(2025,%)",
+      "year": 2025,
+      "unit": "%",
+      "note": null,
+      "source_dataset_id": "15118998",
+      "source_column_verified": true,
+      "enabled_by_default": true
+    },
+    {
+      "indicator_id": "books_per_student",
+      "label_ko": "학생 1인당 도서 자료 수(학부+대학원)",
+      "source_column": "학생 1인당 도서 자료 수(학부+대학원)\n(2025,권)",
+      "year": 2025,
+      "unit": "권",
+      "note": null,
       "source_dataset_id": "15118998",
       "source_column_verified": true,
       "enabled_by_default": true
@@ -77,11 +213,54 @@
     "fill_rate": 488,
     "employment_rate": 488,
     "scholarship_per_student": 443,
-    "avg_tuition": 488
+    "avg_tuition": 488,
+    "admission_quota": 488,
+    "graduates_count": 488,
+    "fulltime_faculty_count": 488,
+    "enrolled_students": 488,
+    "international_students": 488,
+    "students_per_fulltime_faculty": 488,
+    "fulltime_faculty_ratio_quota": 488,
+    "fulltime_faculty_ratio_enrolled": 488,
+    "fulltime_faculty_lecture_ratio": 488,
+    "education_expense_per_student": 488,
+    "dormitory_capacity_rate": 488,
+    "books_per_student": 488
+  },
+  "audit_evidence": {
+    "source_file_checksum_sha256": "53f7e7fbb446206a47fab1adc622d551ba88ba7f3c25ae0cdc8e41cddc637621",
+    "header_snapshot_checksum_sha256": "4541a811157908354cb5f9eb2d3a5248d09a65651e9e1bdb1fad89f059a50ebb",
+    "seed_db_checksum_sha256": "d55ef5b8eaf55d1093569feda61790d0d5f7fa21b4e5bfd3fcf117e2f31c451b",
+    "observation_counts": {
+      "competition_rate": 443,
+      "fill_rate": 488,
+      "employment_rate": 488,
+      "scholarship_per_student": 443,
+      "avg_tuition": 488,
+      "admission_quota": 488,
+      "graduates_count": 488,
+      "fulltime_faculty_count": 488,
+      "enrolled_students": 488,
+      "international_students": 488,
+      "students_per_fulltime_faculty": 488,
+      "fulltime_faculty_ratio_quota": 488,
+      "fulltime_faculty_ratio_enrolled": 488,
+      "fulltime_faculty_lecture_ratio": 488,
+      "education_expense_per_student": 488,
+      "dormitory_capacity_rate": 488,
+      "books_per_student": 488
+    }
   },
   "warnings": [
     "The bundled seed DB is a normalized derivative of dataset 15118998, not a raw source file.",
     "seed_is_latest_claim=false; this seed does not claim to be the latest source unless separately verified.",
     "Dataset 15139279 remains non-bundled v0.3 backlog data and is absent from this seed."
-  ]
+  ],
+  "semantic_digests": {
+    "source_model_digest_v1": "8b896d435636c90f38da82ecd9c5f7a936fe3ff8c9bea865f0c93c5594edc987",
+    "seed_logical_digest_v1": "2f4a8a447c875e9b7be8f33dceeb9bd12fd0debbc4cecafa98501b2e75242ca7",
+    "catalog_digest_v1": "0ecd94f2ed9f2031d2b55d7f17f4492596d1e73cf5bc218bac0e0c6f14b2afe7",
+    "manifest_semantic_digest_v1": "521e6c03257db697777bc72d72d2b9ed02c2b4087e521acb46f0de728a1c99a3",
+    "release_data_digest_v1": "be4cfee780359eed356226c27c77db2e26f41bc5d46a8179c64e870fb1ace954"
+  }
 }
