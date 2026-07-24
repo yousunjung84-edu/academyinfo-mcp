@@ -51,7 +51,7 @@ Administrator-controlled prerequisites are npm identity/history and ownership, a
   ```
 
   It deliberately has no `required` keyword; `university_queries`, `indicators`, and `additionalProperties` each have an empty schema. The handler separately applies strict internal validation: `university_queries` is required; unknown top-level fields reject; queries are 1–10 unique trimmed strings of 1–120 Unicode code points; optional `indicators` contains at most five unique supported nonempty IDs; and invalid input fails before evaluation.
-- Catalog: `data/seed/indicators.json`, schema version 1, KOGL-attributed JSON data, exactly five indicators.
+- Catalog: `data/seed/indicators.json`, schema version 1, KOGL-attributed JSON data, exactly seventeen indicators.
 - Freshness deadline: seven days, exactly `604800000` ms from immutable first-seen time.
 - Runtime remains offline, read-only, no-key, stdout-clean, and recommendation/ranking-free.
 - `better-sqlite3` `11.10.0` is the only authorized SQLite backend; no alternate or runtime fallback ships.
@@ -150,12 +150,12 @@ Store canonical decimal text as semantic authority. The legacy REAL must equal `
 
 Block on source origin/workbook/license failure, nonunique identity/header/mapping, unexpected unit, decreasing/noninteger year, invalid numeric/missing domain, incomplete coverage, precision loss, or semantic inconsistency.
 
-Do not independently block or approve on checksum, row/column count, institution set, values, unrelated columns, or allowed missingness. A valid 23-column or 25-column workbook can pass. Record all normal changes in the diff for administrator review.
+Do not independently block or approve on checksum, row/column count, institution set, values, unrelated columns, or allowed missingness. A valid 24-column or 26-column workbook can pass. Record all normal changes in the diff for administrator review.
 
 ## D. Deterministic candidate generation
 
 1. Generate database, manifest, catalog, header/checksum/sample evidence, and refresh audit from the validated source model.
-2. Keep `data/seed/indicators.json` as the only packaged source-derived catalog. Validate the closed schema, KOGL attribution, schema version 1, and exactly five indicators. Never generate executable catalog source or use a hard-coded fallback.
+2. Keep `data/seed/indicators.json` as the only packaged source-derived catalog. Validate the closed schema, KOGL attribution, schema version 1, and exactly seventeen indicators. Never generate executable catalog source or use a hard-coded fallback.
 3. Independently compare database logical tables, manifest, and catalog.
 4. Build stable RFC 8785 JCS/SHA-256 projections in this order:
    1. `source_model_digest_v1` over stable source/license and indexed source semantics;

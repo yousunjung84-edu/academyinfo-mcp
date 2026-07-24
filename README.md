@@ -83,7 +83,7 @@ Implemented in this checkout:
 - ambiguity handling that returns candidates rather than guessing, and factual comparisons without scores, ranks, winners, or recommendations;
 - a checkout-only stateless Streamable HTTP entry point (`dist/src/http.js`, POST-only, excluded from the npm package) alongside the packaged stdio entry point, with `readOnlyHint`/`openWorldHint` annotations on all eight tools.
 
-Published: `academyinfo-mcp@0.2.0` is live on the public npm registry (`latest`), published by hand from an isolated terminal ceremony ([`docs/manual-publish-runbook.md`](docs/manual-publish-runbook.md)). The initial `0.1.0` release was smoke-verified with an anonymous `npx -y academyinfo-mcp@0.1.0` install that resolves the exact registry tarball and lists all eight tools; later releases (`0.1.1`, `0.1.2`, `0.2.0`) follow the same runbook.
+Published: `academyinfo-mcp@0.3.0` is live on the public npm registry (`latest`), published by hand from an isolated terminal ceremony ([`docs/manual-publish-runbook.md`](docs/manual-publish-runbook.md)). The initial `0.1.0` release was smoke-verified with an anonymous `npx -y academyinfo-mcp@0.1.0` install that resolves the exact registry tarball and lists all eight tools; later releases (`0.1.1`, `0.1.2`, `0.2.0`, `0.3.0`) follow the same runbook.
 
 Not yet performed (intentional, proportionate for a first solo release):
 
@@ -148,7 +148,7 @@ KEDI, data.go.kr, academyinfo.go.kr, or any university.
 ## Version pinning
 
 The [Quickstart](#quickstart) uses the unversioned `academyinfo-mcp`, which resolves to the
-current `latest` (now `0.2.0`). To pin a specific version instead, use `academyinfo-mcp@0.2.0`
+current `latest` (now `0.3.0`). To pin a specific version instead, use `academyinfo-mcp@0.3.0`
 in the `args`. Cursor and Codex use the same `command`/`args` shape as the Claude Desktop
 example; they are documented configurations and behave identically over MCP stdio.
 
@@ -185,7 +185,7 @@ Every successful value or explanation retains source and license information, ye
 
 ## Indicators and data boundary
 
-The catalog contains exactly five indicators from bundled dataset `15118998`:
+The catalog contains exactly seventeen indicators from bundled dataset `15118998`:
 
 | indicator | label | snapshot year | unit |
 |---|---|---:|---|
@@ -194,6 +194,18 @@ The catalog contains exactly five indicators from bundled dataset `15118998`:
 | `employment_rate` | 취업률 | 2025 | `%` |
 | `scholarship_per_student` | 학생 1인당 연간 장학금 | 2025 | `원` |
 | `avg_tuition` | 평균 등록금 | 2026 | `천원` |
+| `admission_quota` | 입학정원 | 2025 | `명` |
+| `graduates_count` | 졸업생수 | 2025 | `명` |
+| `fulltime_faculty_count` | 전임교원수(학부+대학원) | 2025 | `명` |
+| `enrolled_students` | 재학생 | 2025 | `명` |
+| `international_students` | 외국인 학생 수 | 2025 | `명` |
+| `students_per_fulltime_faculty` | 전임교원 1인당 학생 수(학생정원기준)(학부+대학원) | 2025 | `명` |
+| `fulltime_faculty_ratio_quota` | 전임교원 확보율(학생정원기준)(학부+대학원) | 2025 | `%` |
+| `fulltime_faculty_ratio_enrolled` | 전임 교원 확보율(재학생 기준)(학부+대학원) | 2025 | `%` |
+| `fulltime_faculty_lecture_ratio` | 전임교원 강의 담당 비율 | 2025 | `%` |
+| `education_expense_per_student` | 학생 1인당 교육비(학부+대학원) | 2025 | `천원` |
+| `dormitory_capacity_rate` | 기숙사 수용율(학부+대학원) | 2025 | `%` |
+| `books_per_student` | 학생 1인당 도서 자료 수(학부+대학원) | 2025 | `권` |
 
 These dates describe the currently bundled point-in-time snapshot, not a live feed or latest-data guarantee. The catalog is JSON data, validated by a closed static schema and packaged under the data license; it is not generated executable source. The database, manifest, and catalog are independently cross-checked.
 
@@ -204,13 +216,13 @@ Dataset `15139279` is not bundled, enabled, sampled, normalized, or used for def
 Refresh approval is semantic, not based on a frozen checksum or fixed column count. Acquisition is read-only and separate from the fixed-path repository writer. A refresh must preserve indexed raw cells and prove:
 
 - official source, workbook, and license identity;
-- one unique identity mapping and one unique mapping for each of the five logical indicators;
+- one unique identity mapping and one unique mapping for each of the seventeen logical indicators;
 - fixed verified units and nondecreasing integer years;
-- exact row coverage: every source row maps once, with five numeric-or-missing classifications;
+- exact row coverage: every source row maps once, with seventeen numeric-or-missing classifications;
 - missing values only for trimmed empty text or ASCII `-`;
 - exact nonnegative decimal parsing and round-trip safety, with no rounding.
 
-A post-download SHA-256 is integrity, change, and audit evidence only. A changed checksum, institution set, values, allowed missingness, unrelated columns, or a valid 23/25-column workbook can pass when all semantic invariants pass. A prior-checksum match does not authenticate a source. See [`docs/refresh-release-runbook.md`](docs/refresh-release-runbook.md).
+A post-download SHA-256 is integrity, change, and audit evidence only. A changed checksum, institution set, values, allowed missingness, unrelated columns, or a valid 24/26-column workbook can pass when all semantic invariants pass. A prior-checksum match does not authenticate a source. See [`docs/refresh-release-runbook.md`](docs/refresh-release-runbook.md).
 
 ## Freshness and release behavior
 

@@ -46,7 +46,7 @@ Successful values and explanations retain source/license, year or base year, uni
 
 ## Catalog and indicator audit surface
 
-The data-only catalog contains exactly five indicators from `15118998`:
+The data-only catalog contains exactly seventeen indicators from `15118998`:
 
 | Indicator | Year | Unit | Data boundary |
 | --- | ---: | --- | --- |
@@ -55,6 +55,18 @@ The data-only catalog contains exactly five indicators from `15118998`:
 | `employment_rate` | 2025 | `%` | School-level bundled `15118998` only |
 | `scholarship_per_student` | 2025 | `원` | Bundled `15118998` |
 | `avg_tuition` | 2026 | `천원` | Bundled `15118998` |
+| `admission_quota` | 2025 | `명` | Bundled `15118998` |
+| `graduates_count` | 2025 | `명` | Bundled `15118998` |
+| `fulltime_faculty_count` | 2025 | `명` | Bundled `15118998` |
+| `enrolled_students` | 2025 | `명` | Bundled `15118998` |
+| `international_students` | 2025 | `명` | Bundled `15118998` |
+| `students_per_fulltime_faculty` | 2025 | `명` | Bundled `15118998` |
+| `fulltime_faculty_ratio_quota` | 2025 | `%` | Bundled `15118998` |
+| `fulltime_faculty_ratio_enrolled` | 2025 | `%` | Bundled `15118998` |
+| `fulltime_faculty_lecture_ratio` | 2025 | `%` | Bundled `15118998` |
+| `education_expense_per_student` | 2025 | `천원` | Bundled `15118998` |
+| `dormitory_capacity_rate` | 2025 | `%` | Bundled `15118998` |
+| `books_per_student` | 2025 | `권` | Bundled `15118998` |
 
 The catalog, logical database tables, and manifest must be independently cross-checked. Source-derived executable TypeScript/JavaScript, hard-coded catalog fallback, and any `15139279` default behavior are prohibited.
 
@@ -62,14 +74,14 @@ The catalog, logical database tables, and manifest must be independently cross-c
 
 Refresh acceptance is based on semantic invariants:
 
-- exactly one header row, one natural-key mapping, and one mapping for each of the five logical indicators;
-- preserved indexed raw-cell text and exact coverage from each source row to one raw row, one institution, and five numeric-or-missing classifications;
+- exactly one header row, one natural-key mapping, and one mapping for each of the seventeen logical indicators;
+- preserved indexed raw-cell text and exact coverage from each source row to one raw row, one institution, and seventeen numeric-or-missing classifications;
 - verified fixed units and nondecreasing integer years;
 - missing values limited to trimmed empty text or ASCII `-`;
 - exact approved nonnegative decimal grammar and grouping;
 - canonical decimal text as semantic authority, finite nonnegative JavaScript Number conversion, and exact shortest-Number/plain-decimal round trip with no rounding.
 
-Post-download SHA-256 is transport integrity, change-detection, and audit evidence only. It does not authenticate an official source or grant approval. A prior-checksum match is not a pass, and a changed checksum is not a failure. Row/column counts, institution-set changes, values, unrelated columns, and allowed missingness are reviewed diffs, not independent acceptance rules. There is no fixed 24-column contract: valid 23-column, 25-column, or other annual shapes may pass all semantic gates.
+Post-download SHA-256 is transport integrity, change-detection, and audit evidence only. It does not authenticate an official source or grant approval. A prior-checksum match is not a pass, and a changed checksum is not a failure. Row/column counts, institution-set changes, values, unrelated columns, and allowed missingness are reviewed diffs, not independent acceptance rules. There is no fixed exact-width contract: valid 24-column, 26-column, or other annual shapes may pass all semantic gates.
 
 Semantic source, seed, catalog, manifest, and release-data identities use closed, self-excluding RFC 8785 JCS/SHA-256 projections with canonical decimals. Physical file hashes remain separate from semantic authority.
 

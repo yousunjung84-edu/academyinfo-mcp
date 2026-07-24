@@ -105,7 +105,7 @@ describe("Phase 1 scaffold", () => {
 
     expect(packageJson.files).toEqual([...expectedPackageFiles])
     expect(packageJson.bin).toEqual({ "academyinfo-mcp": "dist/src/index.js" })
-    expect(packageJson.version).toBe("0.2.0")
+    expect(packageJson.version).toBe("0.3.0")
     expect(packageJson.license).toBe("MIT")
     expect(packageJson.engines?.node).toBe(">=22 <23")
     expect(packageJson.dependencies?.["@modelcontextprotocol/sdk"]).toBe("1.29.0")
