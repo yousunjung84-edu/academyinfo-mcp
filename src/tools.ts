@@ -26,6 +26,7 @@ export function registerAcademyinfoTools(server: McpServer): void {
     "list_sources",
     {
       title: "List Sources",
+      annotations: { title: "List Sources", readOnlyHint: true, openWorldHint: false },
       description: "List bundled file-first academyinfo sources available in v0.1.",
       inputSchema: emptyInputSchema,
     },
@@ -36,6 +37,7 @@ export function registerAcademyinfoTools(server: McpServer): void {
     "list_indicators",
     {
       title: "List Indicators",
+      annotations: { title: "List Indicators", readOnlyHint: true, openWorldHint: false },
       description: "List v0.1 file-first indicators enabled by default.",
       inputSchema: emptyInputSchema,
     },
@@ -46,6 +48,7 @@ export function registerAcademyinfoTools(server: McpServer): void {
     "search_university",
     {
       title: "Search University",
+      annotations: { title: "Search University", readOnlyHint: true, openWorldHint: false },
       description: "Search local file-first university records without guessing ambiguous matches.",
       inputSchema: searchUniversityInputSchema,
     },
@@ -56,6 +59,7 @@ export function registerAcademyinfoTools(server: McpServer): void {
     "get_university_metrics",
     {
       title: "Get University Metrics",
+      annotations: { title: "Get University Metrics", readOnlyHint: true, openWorldHint: false },
       description: "Return verified local metrics for one university when available.",
       inputSchema: getUniversityMetricsInputSchema,
     },
@@ -66,6 +70,7 @@ export function registerAcademyinfoTools(server: McpServer): void {
     "compare_universities",
     {
       title: "Compare Universities",
+      annotations: { title: "Compare Universities", readOnlyHint: true, openWorldHint: false },
       description: "Compare verified local metrics for multiple universities when available.",
       inputSchema: compareUniversitiesInputSchema,
     },
@@ -76,6 +81,7 @@ export function registerAcademyinfoTools(server: McpServer): void {
     "explain_indicator",
     {
       title: "Explain Indicator",
+      annotations: { title: "Explain Indicator", readOnlyHint: true, openWorldHint: false },
       description: "Explain a v0.1 indicator with source metadata and verification status.",
       inputSchema: explainIndicatorInputSchema,
     },
@@ -86,6 +92,7 @@ export function registerAcademyinfoTools(server: McpServer): void {
     "validate_source_coverage",
     {
       title: "Validate Source Coverage",
+      annotations: { title: "Validate Source Coverage", readOnlyHint: true, openWorldHint: false },
       description: "Validate v0.1 source coverage, key policy, and bundled data boundaries.",
       inputSchema: emptyInputSchema,
     },
@@ -96,6 +103,7 @@ export function registerAcademyinfoTools(server: McpServer): void {
     "explore_universities",
     {
       title: "Explore Universities",
+      annotations: { title: "Explore Universities", readOnlyHint: true, openWorldHint: false },
       description: "Resolve universities and return factual side-by-side local indicator data.",
       inputSchema: exploreUniversitiesRegisteredInputSchema,
     },

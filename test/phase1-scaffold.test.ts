@@ -26,12 +26,17 @@ const requiredScripts = [
   "test",
   "lint",
   "doctor",
+  "start:http",
   "package:check",
   "prepublishOnly",
 ] as const
 
 const expectedPackageFiles = [
   "dist/src/**",
+  "!dist/src/http.js",
+  "!dist/src/http.js.map",
+  "!dist/src/http.d.ts",
+  "!dist/src/http.d.ts.map",
   "dist/scripts/doctor.js",
   "data/seed/academyinfo_15118998.sqlite",
   "data/seed/academyinfo_15118998.manifest.json",
@@ -100,7 +105,7 @@ describe("Phase 1 scaffold", () => {
 
     expect(packageJson.files).toEqual([...expectedPackageFiles])
     expect(packageJson.bin).toEqual({ "academyinfo-mcp": "dist/src/index.js" })
-    expect(packageJson.version).toBe("0.1.2")
+    expect(packageJson.version).toBe("0.2.0")
     expect(packageJson.license).toBe("MIT")
     expect(packageJson.engines?.node).toBe(">=22 <23")
     expect(packageJson.dependencies?.["@modelcontextprotocol/sdk"]).toBe("1.29.0")

@@ -4,6 +4,10 @@ import { dirname, join, resolve } from "node:path"
 
 export const REQUIRED_PACKAGE_FILES = [
   "dist/src/**",
+  "!dist/src/http.js",
+  "!dist/src/http.js.map",
+  "!dist/src/http.d.ts",
+  "!dist/src/http.d.ts.map",
   "dist/scripts/doctor.js",
   "data/seed/academyinfo_15118998.sqlite",
   "data/seed/academyinfo_15118998.manifest.json",

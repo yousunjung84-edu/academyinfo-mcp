@@ -1,6 +1,6 @@
 {
   "name": "academyinfo-mcp",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "license": "MIT",
   "type": "module",
   "bin": {
@@ -11,6 +11,10 @@
   },
   "files": [
     "dist/src/**",
+    "!dist/src/http.js",
+    "!dist/src/http.js.map",
+    "!dist/src/http.d.ts",
+    "!dist/src/http.d.ts.map",
     "dist/scripts/doctor.js",
     "data/seed/academyinfo_15118998.sqlite",
     "data/seed/academyinfo_15118998.manifest.json",
@@ -26,6 +30,7 @@
     "test": "node node_modules/vitest/vitest.mjs run",
     "lint": "node node_modules/typescript/bin/tsc -p tsconfig.json --noEmit",
     "doctor": "node dist/scripts/doctor.js",
+    "start:http": "node dist/src/http.js",
     "refresh:acquire-validate": "npm run build && node dist/scripts/refresh-acquire-validate.js",
     "refresh:verify-artifact": "npm run build && node dist/scripts/refresh-verify-artifact.js",
     "package:check": "npm run build && node dist/scripts/package-check.js",
