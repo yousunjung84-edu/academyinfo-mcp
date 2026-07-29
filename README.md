@@ -224,6 +224,8 @@ Refresh approval is semantic, not based on a frozen checksum or fixed column cou
 
 A post-download SHA-256 is integrity, change, and audit evidence only. A changed checksum, institution set, values, allowed missingness, unrelated columns, or a valid 24/26-column workbook can pass when all semantic invariants pass. A prior-checksum match does not authenticate a source. See [`docs/refresh-release-runbook.md`](docs/refresh-release-runbook.md).
 
+Automated acquisition currently stops at `DOWNLOAD_LINK_MISSING`: the reviewed canonical page is reachable and its license verifies, but it exposes no anonymously fetchable download link, and policy forbids guessing an endpoint or scraping a replacement. Refresh is therefore performed manually — see [`docs/manual-refresh.md`](docs/manual-refresh.md).
+
 ## Freshness and release behavior
 
 A refresh incident has an immutable first-seen time and a seven-day (`604800000` ms) deadline; metadata, ETag, or repeated-failure drift does not reset it. Invalid official timestamps do not become trusted times.

@@ -1,9 +1,13 @@
 name: Refresh acquisition and validation
 
 on:
+  # Manual dispatch only. The weekly schedule was removed on 2026-07-28 after run
+  # 30367427230 reached the canonical page (HTTP 200, KOGL-1 observed) but classified
+  # DOWNLOAD_LINK_MISSING: the reviewed page exposes no anonymously fetchable download
+  # link, and policy forbids guessing an endpoint or scraping a replacement. Until an
+  # administrator-reviewed download path exists, refresh is manual
+  # (see docs/manual-refresh.md). Restore the schedule when acquisition can succeed.
   workflow_dispatch:
-  schedule:
-    - cron: "17 3 * * 1"
 
 concurrency:
   group: refresh-acquire-validate
