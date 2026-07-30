@@ -1,6 +1,12 @@
 {
   "name": "academyinfo-mcp",
   "version": "0.3.0",
+  "mcpName": "io.github.yousunjung84-edu/academyinfo",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yousunjung84-edu/academyinfo-mcp.git"
+  },
+  "homepage": "https://github.com/yousunjung84-edu/academyinfo-mcp#readme",
   "license": "MIT",
   "type": "module",
   "bin": {

@@ -1,0 +1,27 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.yousunjung84-edu/academyinfo",
+  "title": "Korean University Disclosure Indicators (대학알리미)",
+  "description": "Read-only MCP server for Korean university disclosure indicators. Compare 488 institutions across 17 indicators from a bundled snapshot of data.go.kr dataset 15118998 (KOGL Type 1). No API key, no login, no runtime network access.",
+  "version": "0.3.0",
+  "repository": {
+    "url": "https://github.com/yousunjung84-edu/academyinfo-mcp",
+    "source": "github"
+  },
+  "packages": [
+    {
+      "registryType": "npm",
+      "identifier": "academyinfo-mcp",
+      "version": "0.3.0",
+      "transport": {
+        "type": "stdio"
+      }
+    }
+  ],
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://academyinfo-mcp-433006350023.asia-northeast3.run.app/mcp"
+    }
+  ]
+}
