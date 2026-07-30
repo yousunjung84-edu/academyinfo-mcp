@@ -252,6 +252,18 @@ The proof must record the installed application and the complete direct producti
 
 Before candidate publication, an administrator must establish npm package identity/history and ownership, select an unused SemVer, confirm 2FA/trusted-publishing and provenance readiness, configure exactly the protected environments `refresh-pr-writer`, `npm-candidate`, `public-candidate-proof`, `claude-desktop-client-proof`, `npm-promotion`, and `npm-rollback` with required approvals and artifact retention, define protected `ACADEMYINFO_RELEASE_ADMINISTRATOR` as the exact receipt-authority identity, and define `ACADEMYINFO_PUBLIC_INSTALL_VERIFIER_SHA256` plus `ACADEMYINFO_RELEASE_RECEIPT_VERIFIER_SHA256` from the reviewed current verifier policy. The administrator must resolve the single-backend gate and approve the immutable candidate, client-proof, promotion, and any rollback receipts at their separate privilege boundaries. Every protected verifier call binds the configured authority and reviewed verifier bytes; neither receipt-provided identity nor caller-selected historical code is authority. No repository document selects a version or grants those approvals.
 
+## Support
+
+This project is published as-is, without support. Issues, questions, and feature
+requests are not monitored and will generally not receive a reply, and there is no
+service level for availability, data freshness, or response time. It is a personal
+open-source project maintained on a best-effort basis by one person and is not
+operated by any institution.
+
+You are welcome to use it under the licenses below, and to fork it if you need changes.
+Do not depend on it for anything where an unanswered question or an unpatched defect
+would matter.
+
 ## License and privacy boundaries
 
 - Code is MIT licensed (`LICENSE`).
