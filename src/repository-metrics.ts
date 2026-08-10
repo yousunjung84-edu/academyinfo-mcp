@@ -332,6 +332,38 @@ function isMetricRow(
   return value !== undefined
 }
 
+/**
+ * Indicators that are raw headcounts, where zero is a value an institution can
+ * genuinely have — a school may enrol no international students.
+ *
+ * Membership follows what the indicator measures, not its unit: `books_per_student`
+ * is counted in 권 and `students_per_fulltime_faculty` in 명, but both are
+ * per-capita ratios, so a zero in either is as implausible as a zero rate.
+ */
+const HEADCOUNT_INDICATORS: ReadonlySet<string> = new Set([
+  "admission_quota",
+  "graduates_count",
+  "fulltime_faculty_count",
+  "enrolled_students",
+  "international_students",
+])
+
+/**
+ * A rate, ratio, or per-student amount of exactly zero is not something an
+ * operating institution produces, so the number is worth checking against the
+ * source before it enters an average. This states the observation only; the
+ * cause is not knowable from the bundle and is not asserted here.
+ */
+function zeroWarnings(value: number, indicatorId: string): readonly string[] {
+  if (value !== 0 || HEADCOUNT_INDICATORS.has(indicatorId)) {
+    return []
+  }
+
+  return [
+    "Zero in a rate or amount indicator: the source records 0 here, which this server reports unchanged. Verify against the source before aggregating.",
+  ]
+}
+
 function metricValueFromRow(row: ReturnType<typeof metricRowSchema.parse>): MetricValue {
   const indicator = validateObservation(row)
   const source = sourceForIndicator(indicator)
@@ -340,12 +372,16 @@ function metricValueFromRow(row: ReturnType<typeof metricRowSchema.parse>): Metr
     label_ko: row.label_ko,
     value: row.value,
     raw_value: row.raw_value,
+    value_status: row.value === 0 ? "reported_zero" : "reported",
     year: row.year,
     base_year: String(row.year),
     unit: row.unit,
     source_column: row.source_column,
     source,
-    warnings: ["Value is from the normalized bundled 15118998 derivative seed DB."],
+    warnings: [
+      "Value is from the normalized bundled 15118998 derivative seed DB.",
+      ...zeroWarnings(row.value, row.indicator_id),
+    ],
   }
 }
 
