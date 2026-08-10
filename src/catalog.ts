@@ -103,6 +103,37 @@ export const defaultIndicatorSources: readonly SourceMetadata[] = Object.freeze(
   defaultIndicators.map(sourceForIndicator),
 )
 
+/**
+ * Source metadata for the indicators a caller actually asked for.
+ *
+ * Returning the whole catalog on every response made the metadata dwarf the
+ * data: a four-indicator comparison shipped seventeen source blocks. An absent
+ * or empty selection still means "all", which is what an unfiltered request
+ * asks for.
+ */
+export function indicatorSourcesFor(
+  indicatorNames: readonly string[] | undefined,
+): readonly SourceMetadata[] {
+  const selected = selectIndicators(indicatorNames)
+  return selected === undefined ? defaultIndicatorSources : selected.map(sourceForIndicator)
+}
+
+/**
+ * Resolve requested indicator names to definitions, or `undefined` when the
+ * request does not narrow the catalog. Unknown names resolve to nothing here;
+ * they are reported separately as an invalid request.
+ */
+export function selectIndicators(
+  indicatorNames: readonly string[] | undefined,
+): readonly IndicatorDefinition[] | undefined {
+  if (indicatorNames === undefined || indicatorNames.length === 0) {
+    return undefined
+  }
+
+  const requested = new Set(indicatorNames.map((indicatorName) => indicatorName.trim()))
+  return defaultIndicators.filter((indicator) => requested.has(indicator.indicator))
+}
+
 export function commonWarnings(extraWarnings: readonly string[]): readonly string[] {
   return [
     "v0.1 runs in file-first mode and does not require reserved API-key environment variables.",

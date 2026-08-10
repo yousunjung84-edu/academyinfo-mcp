@@ -48,7 +48,12 @@ const expectedToolStatuses: Record<ToolName, string> = {
 
 const expectedDataKeys: Record<ToolName, readonly string[]> = {
   list_sources: ["bundled_dataset_ids", "non_bundled_datasets", "sources"],
-  list_indicators: ["default_indicator_count", "indicators", "per_indicator_year_unit"],
+  list_indicators: [
+    "default_indicator_count",
+    "indicators",
+    "per_indicator_year_unit",
+    "time_series_supported",
+  ],
   search_university: [
     "candidates",
     "error",

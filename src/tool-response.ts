@@ -3,11 +3,13 @@ import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js"
 import {
   bundledSource,
   commonWarnings,
+  selectIndicators,
   sourceForIndicator,
   defaultIndicators,
   type SourceMetadata,
 } from "./catalog.js"
 import { getDatabaseStatus } from "./database-status.js"
+import { datasetProvenance } from "./dataset-provenance.js"
 
 type ToolResponseInput = {
   readonly tool: string
@@ -29,8 +31,14 @@ export type MetricContract = {
   readonly warnings: readonly string[]
 }
 
-export function compareMetricContracts(): readonly MetricContract[] {
-  return defaultIndicators.map((indicator) => ({
+/**
+ * Contracts for the indicators a caller asked for. An absent or empty
+ * selection still means the whole catalog.
+ */
+export function compareMetricContracts(
+  indicatorNames?: readonly string[],
+): readonly MetricContract[] {
+  return (selectIndicators(indicatorNames) ?? defaultIndicators).map((indicator) => ({
     indicator: indicator.indicator,
     dataset_id: indicator.dataset_id,
     source_column: indicator.source_column,
@@ -73,6 +81,9 @@ export function toolResponse(input: ToolResponseInput): CallToolResult {
     status: finalStatus,
     tool: input.tool,
     query: input.query,
+    // Snapshot identity. `generated_at` below is call time; this is the bundle
+    // a caller must cite to make a number reproducible.
+    dataset: datasetProvenance,
     sources: input.sources ?? [bundledSource],
     data: finalData,
     warnings: finalWarnings,
