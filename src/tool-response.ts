@@ -2,7 +2,6 @@ import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js"
 
 import {
   bundledSource,
-  commonWarnings,
   selectIndicators,
   sourceForIndicator,
   defaultIndicators,
@@ -45,9 +44,12 @@ export function compareMetricContracts(
     base_year: indicator.base_year,
     unit: indicator.unit,
     source: sourceForIndicator(indicator),
-    warnings: commonWarnings([
+    // Contract-specific only. The file-first, derivative-seed, and header-policy
+    // notes apply to the whole response and are already carried once at the top
+    // level; repeating them per contract multiplied them by the catalog size.
+    warnings: [
       "Metric values are served from the normalized bundled 15118998 derivative seed DB when available.",
-    ]),
+    ],
   }))
 }
 
