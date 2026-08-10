@@ -1,6 +1,6 @@
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js"
 
-import { commonWarnings, defaultIndicatorSources, invalidIndicatorNames } from "./catalog.js"
+import { commonWarnings, indicatorSourcesFor, invalidIndicatorNames } from "./catalog.js"
 import {
   comparisonForQuery,
   metricsForInstitution,
@@ -111,10 +111,10 @@ export function handleGetUniversityMetrics(query: GetUniversityMetricsInput): Ca
         university_name: universityName.length === 0 ? "NotProvided" : universityName,
         metrics: [],
         missing_metrics: [],
-        metric_contracts: compareMetricContracts(),
+        metric_contracts: compareMetricContracts(query.indicators),
       }),
       warnings: commonWarnings(["Metric lookup failed closed."]),
-      sources: defaultIndicatorSources,
+      sources: indicatorSourcesFor(query.indicators),
     })
   }
 
@@ -134,12 +134,12 @@ export function handleGetUniversityMetrics(query: GetUniversityMetricsInput): Ca
           university_name: universityName.length === 0 ? "NotProvided" : universityName,
           metrics: [],
           missing_metrics: [],
-          metric_contracts: compareMetricContracts(),
+          metric_contracts: compareMetricContracts(query.indicators),
           ...institutionResult.data,
         },
       ),
       warnings: commonWarnings(["No institution is guessed for ambiguous queries."]),
-      sources: defaultIndicatorSources,
+      sources: indicatorSourcesFor(query.indicators),
     })
   }
 
@@ -155,11 +155,11 @@ export function handleGetUniversityMetrics(query: GetUniversityMetricsInput): Ca
         campus_name: institutionResult.value.campus_name,
         metrics: [],
         missing_metrics: [],
-        metric_contracts: compareMetricContracts(),
+        metric_contracts: compareMetricContracts(query.indicators),
         ...metricsResult.data,
       },
       warnings: commonWarnings(["Metric lookup failed closed."]),
-      sources: defaultIndicatorSources,
+      sources: indicatorSourcesFor(query.indicators),
     })
   }
 
@@ -172,10 +172,10 @@ export function handleGetUniversityMetrics(query: GetUniversityMetricsInput): Ca
       campus_name: institutionResult.value.campus_name,
       metrics: metricsResult.value.metrics,
       missing_metrics: metricsResult.value.missingMetrics,
-      metric_contracts: compareMetricContracts(),
+      metric_contracts: compareMetricContracts(query.indicators),
     },
     warnings: commonWarnings(["Metric values are returned from the bundled seed DB."]),
-    sources: defaultIndicatorSources,
+    sources: indicatorSourcesFor(query.indicators),
   })
 }
 
@@ -192,10 +192,10 @@ export function handleCompareUniversities(query: CompareUniversitiesInput): Call
       data: invalidIndicatorErrorData(invalidIndicators, {
         university_names: names,
         comparisons,
-        metric_contracts: compareMetricContracts(),
+        metric_contracts: compareMetricContracts(query.indicators),
       }),
       warnings: commonWarnings(["Comparison requests fail closed when an indicator is unknown."]),
-      sources: defaultIndicatorSources,
+      sources: indicatorSourcesFor(query.indicators),
     })
   }
 
@@ -206,7 +206,7 @@ export function handleCompareUniversities(query: CompareUniversitiesInput): Call
       {
         university_names: names,
         comparisons,
-        metric_contracts: compareMetricContracts(),
+        metric_contracts: compareMetricContracts(query.indicators),
       },
     )
 
@@ -216,7 +216,7 @@ export function handleCompareUniversities(query: CompareUniversitiesInput): Call
       status: "invalid_request",
       data,
       warnings: commonWarnings(["Comparison requests fail closed when no university names are provided."]),
-      sources: defaultIndicatorSources,
+      sources: indicatorSourcesFor(query.indicators),
     })
   }
 
@@ -238,7 +238,7 @@ export function handleCompareUniversities(query: CompareUniversitiesInput): Call
           {
             university_name: universityName,
             comparisons: [],
-            metric_contracts: compareMetricContracts(),
+            metric_contracts: compareMetricContracts(query.indicators),
             ...comparisonResult.data,
           },
         ),
@@ -246,7 +246,7 @@ export function handleCompareUniversities(query: CompareUniversitiesInput): Call
           "The tool does not produce official rankings.",
           "No institution is guessed for ambiguous comparison queries.",
         ]),
-        sources: defaultIndicatorSources,
+        sources: indicatorSourcesFor(query.indicators),
       })
     }
 
@@ -260,12 +260,12 @@ export function handleCompareUniversities(query: CompareUniversitiesInput): Call
     data: {
       university_names: names,
       comparisons,
-      metric_contracts: compareMetricContracts(),
+      metric_contracts: compareMetricContracts(query.indicators),
     },
     warnings: commonWarnings([
       "The tool does not produce official rankings.",
       "Comparison values are returned from the bundled seed DB.",
     ]),
-    sources: defaultIndicatorSources,
+    sources: indicatorSourcesFor(query.indicators),
   })
 }

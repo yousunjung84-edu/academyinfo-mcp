@@ -27,6 +27,7 @@ export const PACKED_RUNTIME_MODULES = [
   "config/index",
   "database-paths",
   "database-status",
+  "dataset-provenance",
   "explore-universities-handler",
   "freshness-events",
   "index",

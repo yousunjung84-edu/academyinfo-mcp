@@ -48,6 +48,9 @@ export function handleListIndicators(_query: EmptyInput): CallToolResult {
       indicators: defaultIndicators,
       default_indicator_count: defaultIndicators.length,
       per_indicator_year_unit: true,
+      // No tool accepts a year argument: every indicator carries one snapshot
+      // year, so a caller cannot derive a trend from this catalog.
+      time_series_supported: false,
     },
     warnings: commonWarnings([
       "employment_rate is enabled by default only when sourced from bundled dataset 15118998.",
