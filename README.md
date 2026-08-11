@@ -83,7 +83,7 @@ Implemented in this checkout:
 - ambiguity handling that returns candidates rather than guessing, and factual comparisons without scores, ranks, winners, or recommendations;
 - a checkout-only stateless Streamable HTTP entry point (`dist/src/http.js`, POST-only, excluded from the npm package) alongside the packaged stdio entry point, with `readOnlyHint`/`openWorldHint` annotations on all eight tools.
 
-Published: `academyinfo-mcp@0.3.1` is live on the public npm registry (`latest`), published by hand from an isolated terminal ceremony ([`docs/manual-publish-runbook.md`](docs/manual-publish-runbook.md)). The initial `0.1.0` release was smoke-verified with an anonymous `npx -y academyinfo-mcp@0.1.0` install that resolves the exact registry tarball and lists all eight tools; later releases (`0.1.1`, `0.1.2`, `0.2.0`, `0.3.0`, `0.3.1`) follow the same runbook.
+Published: `academyinfo-mcp@0.4.0` is live on the public npm registry (`latest`), published by hand from an isolated terminal ceremony ([`docs/manual-publish-runbook.md`](docs/manual-publish-runbook.md)). The initial `0.1.0` release was smoke-verified with an anonymous `npx -y academyinfo-mcp@0.1.0` install that resolves the exact registry tarball and lists all eight tools; later releases (`0.1.1`, `0.1.2`, `0.2.0`, `0.3.0`, `0.3.1`, `0.4.0`) follow the same runbook.
 
 Not yet performed (intentional, proportionate for a first solo release):
 
@@ -148,7 +148,7 @@ KEDI, data.go.kr, academyinfo.go.kr, or any university.
 ## Version pinning
 
 The [Quickstart](#quickstart) uses the unversioned `academyinfo-mcp`, which resolves to the
-current `latest` (now `0.3.1`). To pin a specific version instead, use `academyinfo-mcp@0.3.1`
+current `latest` (now `0.4.0`). To pin a specific version instead, use `academyinfo-mcp@0.4.0`
 in the `args`. Cursor and Codex use the same `command`/`args` shape as the Claude Desktop
 example; they are documented configurations and behave identically over MCP stdio.
 
