@@ -45,9 +45,24 @@ export type MetricValue = {
   readonly warnings: readonly string[]
 }
 
+/**
+ * Why a requested indicator carries no usable number.
+ *
+ * `blank_in_source` is a cell the source left as `-`.
+ *
+ * `zero_not_aggregatable` is a cell containing `0` in an indicator that cannot
+ * produce one. The bundle shows the zeros are structural rather than measured:
+ * every non-branch secondary campus reports 0 for per-student education spend
+ * and library holdings (31 of 31), while every legally separate branch reports
+ * a real figure (0 of 5), and the campuses carrying those zeros report ordinary
+ * enrolment and faculty counts. Serving such a cell as `0` lets it enter an
+ * average unnoticed, so the value is withheld and the source text kept.
+ */
+export type MissingMetricReason = "blank_in_source" | "zero_not_aggregatable"
+
 export type MissingMetric = {
   readonly indicator: string
-  readonly reason: "blank_in_source"
+  readonly reason: MissingMetricReason
   readonly value: null
   readonly raw_value: string
   readonly source_column: string

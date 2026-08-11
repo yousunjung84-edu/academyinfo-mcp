@@ -160,19 +160,22 @@ export function metricsForInstitution(
     const rawRow = rawRowForInstitution(dbResult.value, institution)
     validateInstitutionEvidence(rawRow, rowsByIndicator)
 
-    const metrics = rows
-      .filter((row) => requested.length === 0 || requested.includes(row.indicator_id))
-      .map(metricValueFromRow)
+    const { metrics, withheldZeros } = partitionMetricRows(
+      rows.filter((row) => requested.length === 0 || requested.includes(row.indicator_id)),
+    )
+    const accountedFor = new Set([
+      ...metrics.map((metric) => metric.indicator),
+      ...withheldZeros.map((zero) => zero.indicator),
+    ])
 
     return {
       ok: true,
       value: {
         metrics,
-        missingMetrics: missingMetricsFromRawRow(
-          requestedIndicators,
-          new Set(metrics.map((metric) => metric.indicator)),
-          rawRow,
-        ),
+        missingMetrics: [
+          ...withheldZeros,
+          ...missingMetricsFromRawRow(requestedIndicators, accountedFor, rawRow),
+        ],
       },
     }
   } catch (error) {
@@ -279,23 +282,27 @@ export function metricsForInstitutions(
 
   return institutions.map((institution) => {
     const institutionRows = rowsByInstitution.get(institution.id)
-    const metrics = requestedIndicators
-      .map((indicator) => institutionRows?.get(indicator.indicator))
-      .filter(isMetricRow)
-      .map(metricValueFromRow)
+    const { metrics, withheldZeros } = partitionMetricRows(
+      requestedIndicators
+        .map((indicator) => institutionRows?.get(indicator.indicator))
+        .filter(isMetricRow),
+    )
     const rawRow = requiredRawRow(rawRows, institution)
     validateInstitutionEvidence(
       rawRow,
       observationsByInstitution.get(institution.id) ?? new Map(),
     )
+    const accountedFor = new Set([
+      ...metrics.map((metric) => metric.indicator),
+      ...withheldZeros.map((zero) => zero.indicator),
+    ])
 
     return {
       metrics,
-      missingMetrics: missingMetricsFromRawRow(
-        requestedIndicators,
-        new Set(metrics.map((metric) => metric.indicator)),
-        rawRow,
-      ),
+      missingMetrics: [
+        ...withheldZeros,
+        ...missingMetricsFromRawRow(requestedIndicators, accountedFor, rawRow),
+      ],
     }
   })
 }
@@ -349,18 +356,27 @@ const HEADCOUNT_INDICATORS: ReadonlySet<string> = new Set([
 ])
 
 /**
- * A rate, ratio, or per-student amount of exactly zero is not something an
- * operating institution produces, so the number is worth checking against the
- * source before it enters an average. This states the observation only; the
- * cause is not knowable from the bundle and is not asserted here.
+ * An exact zero in a rate, ratio, or per-student amount, which an operating
+ * institution cannot produce. Such a cell is withheld from `metrics` and
+ * reported through `missing_metrics` instead, so it cannot silently enter an
+ * average. The source text is preserved on the missing entry.
  */
-function zeroWarnings(value: number, indicatorId: string): readonly string[] {
-  if (value !== 0 || HEADCOUNT_INDICATORS.has(indicatorId)) {
+function isNotAggregatableZero(value: number, indicatorId: string): boolean {
+  return value === 0 && !HEADCOUNT_INDICATORS.has(indicatorId)
+}
+
+/**
+ * A zero that survives into `metrics` is a headcount, which an institution can
+ * genuinely have. It is still worth a second look: several rows report zero
+ * faculty alongside a positive enrolment.
+ */
+function zeroWarnings(value: number): readonly string[] {
+  if (value !== 0) {
     return []
   }
 
   return [
-    "Zero in a rate or amount indicator: the source records 0 here, which this server reports unchanged. Verify against the source before aggregating.",
+    "Exact zero headcount as recorded in the source. A zero count is representable, but confirm it against the source before treating it as measured.",
   ]
 }
 
@@ -380,9 +396,41 @@ function metricValueFromRow(row: ReturnType<typeof metricRowSchema.parse>): Metr
     source,
     warnings: [
       "Value is from the normalized bundled 15118998 derivative seed DB.",
-      ...zeroWarnings(row.value, row.indicator_id),
+      ...zeroWarnings(row.value),
     ],
   }
+}
+
+/**
+ * Split observation rows into values that may be served and zeros that must not
+ * be aggregated. Both paths — single lookup and batch comparison — go through
+ * here so the two cannot drift apart.
+ */
+function partitionMetricRows(
+  rows: readonly ReturnType<typeof metricRowSchema.parse>[],
+): {
+  readonly metrics: readonly MetricValue[]
+  readonly withheldZeros: readonly MissingMetric[]
+} {
+  const metrics: MetricValue[] = []
+  const withheldZeros: MissingMetric[] = []
+
+  for (const row of rows) {
+    if (isNotAggregatableZero(row.value, row.indicator_id)) {
+      withheldZeros.push({
+        indicator: row.indicator_id,
+        reason: "zero_not_aggregatable",
+        value: null,
+        raw_value: row.raw_value,
+        source_column: row.source_column,
+      })
+      continue
+    }
+
+    metrics.push(metricValueFromRow(row))
+  }
+
+  return { metrics, withheldZeros }
 }
 
 function missingMetricsFromRawRow(

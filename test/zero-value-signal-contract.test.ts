@@ -4,9 +4,7 @@ import { reservedKeyOverrides } from "./mcp-contract-helpers.ts"
 import { withMcpServer } from "./support/mcp-stdio-harness.ts"
 
 type Response = Record<string, unknown>
-type Metric = Record<string, unknown>
-
-const ZERO_NOTE = "Zero in a rate or amount indicator"
+type Entry = Record<string, unknown>
 
 /** Notes that describe the whole response, not one metric. */
 const RESPONSE_WIDE_NOTES = [
@@ -15,26 +13,20 @@ const RESPONSE_WIDE_NOTES = [
   "15118998 indicator source columns, years, and units follow the verified header policy.",
 ]
 
-function metricsOf(structuredContent: unknown): readonly Metric[] {
-  const data = (structuredContent as Response)["data"] as Response
-  return data["metrics"] as readonly Metric[]
+function dataOf(structuredContent: unknown): Response {
+  return (structuredContent as Response)["data"] as Response
 }
 
-function byIndicator(metrics: readonly Metric[], indicator: string): Metric {
-  const found = metrics.find((metric) => metric["indicator"] === indicator)
-  expect(found, `expected a metric for ${indicator}`).toBeDefined()
-  return found as Metric
+function find(entries: readonly Entry[], indicator: string): Entry | undefined {
+  return entries.find((entry) => entry["indicator"] === indicator)
 }
 
-function hasZeroNote(metric: Metric): boolean {
-  return (metric["warnings"] as readonly string[]).some((warning) => warning.includes(ZERO_NOTE))
-}
-
-describe("zero values are signalled without asserting a cause", () => {
-  it("marks an exact zero and flags it only where zero is implausible", async () => {
+describe("zeros that cannot be aggregated are withheld, not served", () => {
+  it("withholds a per-student zero and keeps the source text", async () => {
     await withMcpServer(reservedKeyOverrides("", ""), async (harness) => {
       const result = await harness.callTool("get_university_metrics", {
-        // This campus reports 0 for two per-student indicators while operating.
+        // An operating campus: 2,808 enrolled and 137 faculty, yet the source
+        // records 0 for both per-student indicators.
         university_name: "전남대학교 제2캠퍼스",
         indicators: [
           "education_expense_per_student",
@@ -44,39 +36,71 @@ describe("zero values are signalled without asserting a cause", () => {
         ],
       })
 
-      const metrics = metricsOf(result.structuredContent)
-      const expense = byIndicator(metrics, "education_expense_per_student")
-      const books = byIndicator(metrics, "books_per_student")
-      const employment = byIndicator(metrics, "employment_rate")
+      const data = dataOf(result.structuredContent)
+      const metrics = data["metrics"] as readonly Entry[]
+      const missing = data["missing_metrics"] as readonly Entry[]
 
-      expect(expense["value"]).toBe(0)
-      expect(expense["value_status"]).toBe("reported_zero")
-      expect(hasZeroNote(expense)).toBe(true)
+      for (const indicator of ["education_expense_per_student", "books_per_student"]) {
+        expect(find(metrics, indicator), `${indicator} must not be served`).toBeUndefined()
 
-      // Counted in 권 but a per-student ratio, so a zero is as implausible as a
-      // zero rate: classification follows the measure, not the unit.
-      expect(books["value_status"]).toBe("reported_zero")
-      expect(hasZeroNote(books)).toBe(true)
+        const withheld = find(missing, indicator)
+        expect(withheld?.["value"]).toBeNull()
+        expect(withheld?.["reason"]).toBe("zero_not_aggregatable")
+        // The source text survives so a caller can still see what was recorded.
+        expect(withheld?.["raw_value"]).toBe("0")
+      }
 
-      expect(employment["value_status"]).toBe("reported")
-      expect(hasZeroNote(employment)).toBe(false)
+      // Ordinary values are unaffected.
+      expect(find(metrics, "employment_rate")?.["value"]).toBe(59.2)
+      expect(find(metrics, "international_students")?.["value"]).toBe(149)
     })
   }, 30_000)
 
-  it("reports the source value unchanged and leaves missing_metrics alone", async () => {
+  it("still serves a genuine headcount of zero, with a note", async () => {
     await withMcpServer(reservedKeyOverrides("", ""), async (harness) => {
+      // 1,285 enrolled students and a recorded faculty count of 0.
       const result = await harness.callTool("get_university_metrics", {
-        university_name: "전남대학교 제2캠퍼스",
+        university_name: "경남과학기술대학교",
+        indicators: ["fulltime_faculty_count", "enrolled_students"],
+      })
+
+      const data = dataOf(result.structuredContent)
+      const faculty = find(data["metrics"] as readonly Entry[], "fulltime_faculty_count")
+
+      // A headcount of zero is representable, so it is served rather than
+      // withheld — but it no longer passes without comment.
+      expect(faculty?.["value"]).toBe(0)
+      expect(faculty?.["value_status"]).toBe("reported_zero")
+      expect((faculty?.["warnings"] as readonly string[]).join(" ")).toContain(
+        "Exact zero headcount",
+      )
+    })
+  }, 30_000)
+
+  it("withholds the same zeros on the comparison path", async () => {
+    await withMcpServer(reservedKeyOverrides("", ""), async (harness) => {
+      const result = await harness.callTool("compare_universities", {
+        university_names: ["전남대학교 제2캠퍼스", "전남대학교 본교"],
         indicators: ["education_expense_per_student"],
       })
 
-      const data = (result.structuredContent as Response)["data"] as Response
-      const expense = byIndicator(metricsOf(result.structuredContent), "education_expense_per_student")
+      const comparisons = dataOf(result.structuredContent)["comparisons"] as readonly Response[]
+      const secondary = comparisons.find((entry) => entry["campus_name"] === "제2캠퍼스")
+      const main = comparisons.find((entry) => entry["campus_name"] === "본교")
 
-      // A zero is a value the source asserts; it is not a missing cell, which
-      // the source writes as `-` and which is reported separately.
-      expect(expense["raw_value"]).toBe("0")
-      expect(data["missing_metrics"]).toEqual([])
+      expect(
+        find(secondary?.["metrics"] as readonly Entry[], "education_expense_per_student"),
+      ).toBeUndefined()
+      expect(
+        find(secondary?.["missing_metrics"] as readonly Entry[], "education_expense_per_student")?.[
+          "reason"
+        ],
+      ).toBe("zero_not_aggregatable")
+
+      // The main campus reports a real figure and is untouched.
+      expect(
+        find(main?.["metrics"] as readonly Entry[], "education_expense_per_student")?.["value"],
+      ).toBe(26483.1)
     })
   }, 30_000)
 
@@ -88,8 +112,7 @@ describe("zero values are signalled without asserting a cause", () => {
       })
 
       const response = result.structuredContent as Response
-      const data = response["data"] as Response
-      const contracts = data["metric_contracts"] as readonly Response[]
+      const contracts = dataOf(response)["metric_contracts"] as readonly Response[]
       const topLevel = response["warnings"] as readonly string[]
 
       for (const note of RESPONSE_WIDE_NOTES) {
