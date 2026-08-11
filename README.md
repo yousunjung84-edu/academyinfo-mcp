@@ -209,6 +209,8 @@ The catalog contains exactly seventeen indicators from bundled dataset `15118998
 
 These dates describe the currently bundled point-in-time snapshot, not a live feed or latest-data guarantee. The catalog is JSON data, validated by a closed static schema and packaged under the data license; it is not generated executable source. The database, manifest, and catalog are independently cross-checked.
 
+An exact `0` in a rate, ratio, or per-student indicator is not served as a value. It arrives in `missing_metrics` as `zero_not_aggregatable` with the source text preserved, because such a cell cannot be distinguished from a placeholder and would otherwise enter an average unnoticed. Headcount zeros are served with a note, since an institution can genuinely have none. The evidence and the open question are in [`docs/zero-values.md`](docs/zero-values.md).
+
 Dataset `15139279` is not bundled, enabled, sampled, normalized, or used for default employment results. Live OpenAPI access, scraping, and granular employment behavior are outside this release.
 
 ## Refresh safety summary

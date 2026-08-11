@@ -57,6 +57,9 @@ export type MetricValue = {
  * a real figure (0 of 5), and the campuses carrying those zeros report ordinary
  * enrolment and faculty counts. Serving such a cell as `0` lets it enter an
  * average unnoticed, so the value is withheld and the source text kept.
+ *
+ * The publisher states no coding rule for `0`, so the reason names an observable
+ * property rather than a cause. Evidence and the open question: docs/zero-values.md
  */
 export type MissingMetricReason = "blank_in_source" | "zero_not_aggregatable"
 
