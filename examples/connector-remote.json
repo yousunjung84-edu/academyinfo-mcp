@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "academyinfo": {
+      "description": "Korean university disclosure indicators (대학알리미) — 488 institutions, 17 indicators",
+      "url": "https://academyinfo-mcp-433006350023.asia-northeast3.run.app/mcp"
+    }
+  }
+}

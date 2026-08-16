@@ -41,6 +41,8 @@ npx -y academyinfo-mcp
 
 The server speaks MCP over stdio (JSON-RPC on stdout, diagnostics on stderr).
 
+For clients that take a pasted `mcpServers` object, [`examples/`](examples/) has ready-made entries for the local (`npx`) and hosted (Streamable HTTP) forms.
+
 ### Try it
 
 Ask your assistant something like:
