@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "academyinfo": {
+      "type": "http",
+      "url": "https://academyinfo-mcp-433006350023.asia-northeast3.run.app/mcp"
+    }
+  }
+}

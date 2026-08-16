@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "academyinfo": {
+      "command": "npx",
+      "args": ["-y", "academyinfo-mcp"]
+    }
+  }
+}
