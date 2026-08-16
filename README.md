@@ -41,7 +41,26 @@ npx -y academyinfo-mcp
 
 The server speaks MCP over stdio (JSON-RPC on stdout, diagnostics on stderr).
 
-For clients that take a pasted `mcpServers` object, [`examples/`](examples/) has ready-made entries for the local (`npx`) and hosted (Streamable HTTP) forms.
+### Hosted endpoint (nothing installed)
+
+For a client that registers connectors by URL, or one that cannot run a local process:
+
+```json
+{
+  "mcpServers": {
+    "academyinfo": {
+      "description": "대학알리미 공시데이터 — 488개 대학 17개 지표 비교",
+      "url": "https://academyinfo-mcp-433006350023.asia-northeast3.run.app/mcp"
+    }
+  }
+}
+```
+
+No credentials, so no `headers`. Same bundled snapshot and same eight tools as the local form.
+
+This is a personal deployment offered as-is: it can go away without notice, and it is not covered by any availability guarantee (see [Support](#support)). For work you need to reproduce, prefer the local form and pin a version — `academyinfo-mcp@0.4.0`.
+
+More on the pasted-object format, including the transport field that does *not* belong in it, is in [`examples/`](examples/).
 
 ### Try it
 

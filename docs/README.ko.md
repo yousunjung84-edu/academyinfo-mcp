@@ -79,6 +79,31 @@ npm 패키지 자체는 stdio 전용입니다. 웹/모바일 클라이언트에�
 이미지)의 Streamable HTTP 진입점을 공개 HTTPS로 호스팅해야 합니다 — 자세한 것은 영어 원문의
 [Remote endpoint 절](../README.md#remote-endpoint-streamable-http-checkout-only)을 참고하세요.
 
+### 공개 호스팅 엔드포인트
+
+제작자가 운영 중인 공개 엔드포인트가 있어, 직접 호스팅하지 않아도 바로 붙일 수 있습니다.
+`mcpServers` 객체를 붙여넣는 방식의 클라이언트라면 이대로 넣으면 됩니다:
+
+```json
+{
+  "mcpServers": {
+    "academyinfo": {
+      "description": "대학알리미 공시데이터 — 488개 대학 17개 지표 비교",
+      "url": "https://academyinfo-mcp-433006350023.asia-northeast3.run.app/mcp"
+    }
+  }
+}
+```
+
+인증이 없으므로 `headers`는 넣지 않습니다. 전송 방식은 `url` 키의 존재로 판별되므로 별도
+transport 필드를 넣지 마세요 — 자세한 형식 설명은 [`examples/`](../examples/)에 있습니다.
+
+⚠️ **개인이 운영하는 배포본이며 무보증(as-is)입니다.** 예고 없이 중단될 수 있고 가용성을
+보장하지 않습니다. 나중에 재현해야 하는 작업이라면 아래 `npx` 방식으로 버전을 고정
+(`academyinfo-mcp@0.4.0`)하는 편이 안전합니다.
+
+### 직접 호스팅했거나 다른 URL을 받은 경우
+
 호스팅된 엔드포인트 URL(`https://<도메인>/mcp`)을 받았다면:
 
 - **claude.ai (웹/모바일)**: 설정 → 커넥터 → **커스텀 커넥터 추가** → URL에 `https://<도메인>/mcp` 입력.
