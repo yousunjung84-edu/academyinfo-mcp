@@ -1,0 +1,131 @@
+{
+ "claim": "Cross-channel encoding of 전남대학교 제2캠퍼스 · 학생 1인당 교육비 in the publisher's indicator-trend channel",
+ "measured_at": "2026-08-17",
+ "school_code": "0000024",
+ "indicator": "education_expense_per_student",
+ "source_channel": "academyinfo.go.kr 공시데이터 추이 (main0830/FileDown.do)",
+ "source_file": {
+  "name": "9-나. 학생 1인당 교육비 산정 근거_대학_학생 1인당 교육비.xlsx",
+  "physical": "CMN81_073.xlsx",
+  "sha256": "8eb7d3949e79469cf73a4346b7f055fba7b7bd3351ce742d2f4d2d020b075a5c",
+  "file_created": "2026-08-14",
+  "fetched_at": "2026-08-17T00:55:30"
+ },
+ "encoding_layers": {
+  "literal_zero": [
+   2012,
+   2013,
+   2014,
+   2015,
+   2018,
+   2019,
+   2020
+  ],
+  "no_row_at_all": [
+   2016,
+   2017
+  ],
+  "blank_missing": [
+   2021,
+   2022,
+   2023,
+   2024,
+   2025
+  ]
+ },
+ "no_row_context": {
+  "schools_with_row_that_year": {
+   "2016": 216,
+   "2017": 215
+  },
+  "note": "the gap is specific to this campus, not to the file"
+ },
+ "observations": [
+  {
+   "disclosure_year": 2012,
+   "reference_year": 2011,
+   "value": 0.0,
+   "raw_value": "0",
+   "value_status": "reported_zero"
+  },
+  {
+   "disclosure_year": 2013,
+   "reference_year": 2012,
+   "value": 0.0,
+   "raw_value": "0",
+   "value_status": "reported_zero"
+  },
+  {
+   "disclosure_year": 2014,
+   "reference_year": 2013,
+   "value": 0.0,
+   "raw_value": "0",
+   "value_status": "reported_zero"
+  },
+  {
+   "disclosure_year": 2015,
+   "reference_year": 2014,
+   "value": 0.0,
+   "raw_value": "0",
+   "value_status": "reported_zero"
+  },
+  {
+   "disclosure_year": 2018,
+   "reference_year": 2017,
+   "value": 0.0,
+   "raw_value": "0",
+   "value_status": "reported_zero"
+  },
+  {
+   "disclosure_year": 2019,
+   "reference_year": 2018,
+   "value": 0.0,
+   "raw_value": "0",
+   "value_status": "reported_zero"
+  },
+  {
+   "disclosure_year": 2020,
+   "reference_year": 2019,
+   "value": 0.0,
+   "raw_value": "0",
+   "value_status": "reported_zero"
+  },
+  {
+   "disclosure_year": 2021,
+   "reference_year": 2020,
+   "value": null,
+   "raw_value": "",
+   "value_status": "missing"
+  },
+  {
+   "disclosure_year": 2022,
+   "reference_year": 2021,
+   "value": null,
+   "raw_value": "",
+   "value_status": "missing"
+  },
+  {
+   "disclosure_year": 2023,
+   "reference_year": 2022,
+   "value": null,
+   "raw_value": "",
+   "value_status": "missing"
+  },
+  {
+   "disclosure_year": 2024,
+   "reference_year": 2023,
+   "value": null,
+   "raw_value": "",
+   "value_status": "missing"
+  },
+  {
+   "disclosure_year": 2025,
+   "reference_year": 2024,
+   "value": null,
+   "raw_value": "",
+   "value_status": "missing"
+  }
+ ],
+ "books_per_student": "NOT provided by the trend channel at all — no cross-channel claim is possible for it",
+ "reproduce": "~/projects/academyinfo-timeseries: python3 src/etl.py 후 data/timeseries.sqlite에서 school_code=0000024 조회. 원본 xlsx는 ~/projects/academyinfo-archive/trend/ (sha256 manifest 포함)"
+}
