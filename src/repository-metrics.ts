@@ -423,6 +423,10 @@ function partitionMetricRows(
         value: null,
         raw_value: row.raw_value,
         source_column: row.source_column,
+        // The rationale must reach API consumers, not just readers of the repo:
+        // a calling model summarising this entry otherwise reports only the enum.
+        note:
+          "The publisher's indicator-trend channel records cells like this as blank (missing) from the 2021 disclosure onward. Evidence: docs/zero-values.md (cross-channel evidence).",
       })
       continue
     }

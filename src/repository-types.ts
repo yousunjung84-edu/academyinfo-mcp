@@ -69,6 +69,12 @@ export type MissingMetric = {
   readonly value: null
   readonly raw_value: string
   readonly source_column: string
+  /**
+   * Why the entry is withheld, in words an API consumer can relay. Present on
+   * `zero_not_aggregatable` entries; `blank_in_source` needs no explanation
+   * beyond its reason.
+   */
+  readonly note?: string
 }
 
 export type MetricLookup = {

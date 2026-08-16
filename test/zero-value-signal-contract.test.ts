@@ -48,6 +48,8 @@ describe("zeros that cannot be aggregated are withheld, not served", () => {
         expect(withheld?.["reason"]).toBe("zero_not_aggregatable")
         // The source text survives so a caller can still see what was recorded.
         expect(withheld?.["raw_value"]).toBe("0")
+        // The rationale reaches API consumers, not just repo readers.
+        expect(withheld?.["note"]).toContain("docs/zero-values.md")
       }
 
       // Ordinary values are unaffected.

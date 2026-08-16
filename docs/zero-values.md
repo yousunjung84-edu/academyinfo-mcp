@@ -89,25 +89,34 @@ applies by hand.
 ## Cross-channel evidence
 
 The publisher runs a second official channel — the 공시데이터 추이 (indicator trend)
-download on academyinfo.go.kr — that covers the same indicators as multi-year
-series. Measured 2026-08-17, the two channels encode the very cell this document
-opened with differently:
+download on academyinfo.go.kr — that provides most of these indicators as
+multi-year series (not `books_per_student`, which the trend service does not
+offer, so no cross-channel statement is possible for it). Measured 2026-08-17
+against archived trend files, the two channels encode the cell examined in
+"One row in full" above differently:
 
 | channel | 전남대학교 제2캠퍼스 · 학생 1인당 교육비 |
 |---|---|
 | dataset `15118998` (this server's bundle, 2025 disclosure) | literal `0` |
-| indicator trend file (`9-나 … 학생 1인당 교육비`) | **blank (missing)** for disclosure years 2021 onward; literal `0` for 2012–2020 |
+| indicator trend file (`9-나 … 학생 1인당 교육비`) | three layers: literal `0` for 2012–2015 and 2018–2020 · **no row at all** for 2016–2017 (215–216 other schools do have rows those years) · **blank (missing)** for 2021 onward |
 
 The trend series shows the same campus reporting ordinary figures for enrolment,
-scholarship, tuition, and dormitory capacity across those years — only the two
-institution-level indicators are blank. So the trend channel switched its
-missing-value encoding from `0` to blank around the 2021 disclosure, while the
-`15118998` extract still writes `0`.
+scholarship, tuition, and dormitory capacity across those years, while this
+indicator is never a positive number. From the 2021 disclosure on, the trend
+channel records it as blank where the `15118998` extract still writes `0` — which
+*reads as* an encoding change on the trend side, though that is an inference from
+the values, not a documented change.
 
-This is the strongest evidence yet for withholding: **the publisher's own other
-channel treats these cells as missing, not as measured zeros.** It is still not a
-written coding rule, so the reason code below continues to name the observable
+This is strong support for withholding: **for 2021 onward, the publisher's own
+other channel treats these cells as missing, not as measured zeros.** It is still
+not a written coding rule, so `zero_not_aggregatable` keeps naming the observable
 property rather than a cause.
+
+Evidence artifact: [`evidence/cross-channel/0000024-education-expense.json`](../evidence/cross-channel/0000024-education-expense.json)
+— the full observation series with the source trend file's name, SHA-256, fetch
+date, and reproduction steps. The measurement lives in the sibling
+`academyinfo-timeseries` project (which builds from the same archived files);
+re-measurements should update both.
 
 ## The decision
 
@@ -134,6 +143,8 @@ zeros are served with the note.
 The publisher's own rule is still unconfirmed in writing. Resolving it means asking
 대학정보공시센터 (02-6919-3881) whether a secondary campus reporting `0` for
 per-student education spend means a measured zero or a figure aggregated to the
-main campus. The cross-channel evidence above makes the aggregation reading far
-more likely, but an answer would still be what lets the reason code become more
-specific than "not aggregatable".
+main campus. The cross-channel evidence shows these cells are not measured zeros;
+which *reason* applies — aggregation to the main campus, suppression, or
+non-collection — is suggested by the accounting-structure pattern in "One row in
+full", not settled by it. An answer would still be what lets the reason code
+become more specific than "not aggregatable".
