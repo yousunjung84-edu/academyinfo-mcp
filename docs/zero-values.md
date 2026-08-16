@@ -86,6 +86,29 @@ KISTEP, reanalysing this dataset, excludes such zeros rather than averaging them
 The judgement this server applies is the one a public research institute already
 applies by hand.
 
+## Cross-channel evidence
+
+The publisher runs a second official channel — the 공시데이터 추이 (indicator trend)
+download on academyinfo.go.kr — that covers the same indicators as multi-year
+series. Measured 2026-08-17, the two channels encode the very cell this document
+opened with differently:
+
+| channel | 전남대학교 제2캠퍼스 · 학생 1인당 교육비 |
+|---|---|
+| dataset `15118998` (this server's bundle, 2025 disclosure) | literal `0` |
+| indicator trend file (`9-나 … 학생 1인당 교육비`) | **blank (missing)** for disclosure years 2021 onward; literal `0` for 2012–2020 |
+
+The trend series shows the same campus reporting ordinary figures for enrolment,
+scholarship, tuition, and dormitory capacity across those years — only the two
+institution-level indicators are blank. So the trend channel switched its
+missing-value encoding from `0` to blank around the 2021 disclosure, while the
+`15118998` extract still writes `0`.
+
+This is the strongest evidence yet for withholding: **the publisher's own other
+channel treats these cells as missing, not as measured zeros.** It is still not a
+written coding rule, so the reason code below continues to name the observable
+property rather than a cause.
+
 ## The decision
 
 An exact zero is withheld where the indicator cannot produce one, and served where
@@ -108,8 +131,9 @@ zeros are served with the note.
 
 ## Open
 
-The publisher's own rule is still unconfirmed. Resolving it means asking
+The publisher's own rule is still unconfirmed in writing. Resolving it means asking
 대학정보공시센터 (02-6919-3881) whether a secondary campus reporting `0` for
 per-student education spend means a measured zero or a figure aggregated to the
-main campus. An answer would let the reason code become more specific than
-"not aggregatable".
+main campus. The cross-channel evidence above makes the aggregation reading far
+more likely, but an answer would still be what lets the reason code become more
+specific than "not aggregatable".
