@@ -37,7 +37,8 @@ that requires credentials.
 ## This server
 
 Paste one of these, not both: they share the key `academyinfo`, so pasting both
-would register the server twice.
+duplicates the name — depending on the client that means two registrations or a
+silent last-one-wins overwrite.
 
 **Hosted, nothing to install** ([`connector-remote.json`](connector-remote.json)):
 
@@ -45,7 +46,7 @@ would register the server twice.
 {
   "mcpServers": {
     "academyinfo": {
-      "description": "대학알리미 공시데이터 — 488개 대학 17개 지표 비교",
+      "description": "대학알리미 공시데이터 — 488개 대학·캠퍼스 17개 지표 비교",
       "url": "https://academyinfo-mcp-433006350023.asia-northeast3.run.app/mcp"
     }
   }
@@ -74,11 +75,20 @@ This follows `latest`. To hold a version, use `academyinfo-mcp@0.4.0` in `args`.
 
 Both serve the same bundled point-in-time snapshot and the same eight tools.
 
-The local form has no external dependency and lets you pin a version, which suits
-analysis you need to reproduce later. The hosted form needs nothing installed,
-which suits trying the server out or a client that cannot run local processes — but
-it is a personal deployment offered as-is, with no availability guarantee. See
-[Support](../README.md#support).
+The local form lets you pin a version, which suits analysis you need to reproduce
+later, and once installed it has no runtime network dependency — though the first
+`npx` run does download the package from the npm registry. The hosted form needs
+nothing installed, which suits trying the server out or a client that cannot run
+local processes — but it is a personal deployment offered as-is, with no
+availability guarantee. See [Support](../README.md#support).
 
-If a client accepts the entry but no tools appear, the configuration is not the
-problem: check whether the network allows outbound connections to the endpoint.
+If a client accepts the entry but no tools appear, the pasted JSON itself is the
+least likely cause. Check, in order:
+
+- **hosted** — whether the endpoint is up (`GET …/health` should answer `200 ok`;
+  it is an as-is deployment and can be down), and whether the network allows
+  outbound connections to it;
+- **local** — whether the client's environment runs Node `>=22 <23`. A different
+  major version fails at startup because `better-sqlite3` binds to the Node it
+  was installed under;
+- and whether the client needs a restart or reload before new servers appear.
