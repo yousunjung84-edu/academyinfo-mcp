@@ -12,6 +12,12 @@ you want to run it — not both, or the tools appear twice.
 The local form pins nothing, so it follows `latest`. To hold a version, use
 `academyinfo-mcp@0.4.0` in the `args` array.
 
+A client decides the transport from which key is present — `command` for stdio,
+`url` for HTTP — so neither file declares a transport field. Claude Code writes
+its own `.mcp.json` entries with an explicit `"type": "http"`; adding that key
+here is unnecessary and some connector dialogs reject it. The hosted endpoint
+needs no credentials, so no `headers` are set.
+
 Both serve the same bundled point-in-time snapshot. The hosted endpoint is a
 personal deployment offered as-is with no availability guarantee; the local form
 does not depend on it. See [Support](../README.md#support).
