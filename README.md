@@ -43,13 +43,20 @@ The server speaks MCP over stdio (JSON-RPC on stdout, diagnostics on stderr).
 
 ### Hosted endpoint (nothing installed)
 
-For a client that registers connectors by URL, or one that cannot run a local process:
+For a client that cannot run a local process. A client that registers connectors by a
+**URL field** (for example claude.ai custom connectors) takes just the address:
+
+```text
+https://academyinfo-mcp-433006350023.asia-northeast3.run.app/mcp
+```
+
+A client that takes a **pasted `mcpServers` object** takes this entry:
 
 ```json
 {
   "mcpServers": {
     "academyinfo": {
-      "description": "대학알리미 공시데이터 — 488개 대학 17개 지표 비교",
+      "description": "대학알리미 공시데이터 — 488개 대학·캠퍼스 17개 지표 비교",
       "url": "https://academyinfo-mcp-433006350023.asia-northeast3.run.app/mcp"
     }
   }
