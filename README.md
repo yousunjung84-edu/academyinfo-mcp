@@ -56,7 +56,7 @@ A client that takes a **pasted `mcpServers` object** takes this entry:
 {
   "mcpServers": {
     "academyinfo": {
-      "description": "대학알리미 공시데이터 — 488개 대학·캠퍼스 17개 지표 비교",
+      "description": "대학알리미 공시데이터 — 487개 대학·캠퍼스 17개 지표 비교",
       "url": "https://academyinfo-mcp-433006350023.asia-northeast3.run.app/mcp"
     }
   }
@@ -89,11 +89,11 @@ Pick a campus and ask again (assistants usually do this follow-up on their own):
 > "전남대학교 본교와 부산대학교로 비교해줘."
 
 The second call returns `status: "ok"` with each institution's values and the source, year,
-and unit attached — for example (2025 bundled snapshot):
+and unit attached — for example (bundled snapshot: employment rate 2025 disclosure, competition rate 2026):
 
 | 대학 | 취업률 | 신입생 경쟁률 |
 |---|---:|---:|
-| 전남대학교 본교 | 57.6% | 7.4:1 |
+| 전남대학교 본교 | 57.6% | 7.3:1 |
 | 부산대학교 | 57.5% | 9:1 |
 
 This two-step flow is the designed behavior, not a failure: ambiguous names return candidate
@@ -217,23 +217,23 @@ The catalog contains exactly seventeen indicators from bundled dataset `15118998
 
 | indicator | label | snapshot year | unit |
 |---|---|---:|---|
-| `competition_rate` | 신입생 경쟁률 | 2025 | `:1` |
-| `fill_rate` | 신입생 충원율 | 2025 | `%` |
+| `competition_rate` | 신입생 경쟁률 | 2026 | `:1` |
+| `fill_rate` | 신입생 충원율 | 2026 | `%` |
 | `employment_rate` | 취업률 | 2025 | `%` |
-| `scholarship_per_student` | 학생 1인당 연간 장학금 | 2025 | `원` |
+| `scholarship_per_student` | 학생 1인당 연간 장학금 | 2026 | `원` |
 | `avg_tuition` | 평균 등록금 | 2026 | `천원` |
-| `admission_quota` | 입학정원 | 2025 | `명` |
-| `graduates_count` | 졸업생수 | 2025 | `명` |
-| `fulltime_faculty_count` | 전임교원수(학부+대학원) | 2025 | `명` |
-| `enrolled_students` | 재학생 | 2025 | `명` |
-| `international_students` | 외국인 학생 수 | 2025 | `명` |
-| `students_per_fulltime_faculty` | 전임교원 1인당 학생 수(학생정원기준)(학부+대학원) | 2025 | `명` |
-| `fulltime_faculty_ratio_quota` | 전임교원 확보율(학생정원기준)(학부+대학원) | 2025 | `%` |
-| `fulltime_faculty_ratio_enrolled` | 전임 교원 확보율(재학생 기준)(학부+대학원) | 2025 | `%` |
-| `fulltime_faculty_lecture_ratio` | 전임교원 강의 담당 비율 | 2025 | `%` |
-| `education_expense_per_student` | 학생 1인당 교육비(학부+대학원) | 2025 | `천원` |
-| `dormitory_capacity_rate` | 기숙사 수용율(학부+대학원) | 2025 | `%` |
-| `books_per_student` | 학생 1인당 도서 자료 수(학부+대학원) | 2025 | `권` |
+| `admission_quota` | 입학정원 | 2026 | `명` |
+| `graduates_count` | 졸업생수 | 2026 | `명` |
+| `fulltime_faculty_count` | 전임교원수(학부+대학원) | 2026 | `명` |
+| `enrolled_students` | 재학생 | 2026 | `명` |
+| `international_students` | 외국인 학생 수 | 2026 | `명` |
+| `students_per_fulltime_faculty` | 전임교원 1인당 학생 수(학생정원기준)(학부+대학원) | 2026 | `명` |
+| `fulltime_faculty_ratio_quota` | 전임교원 확보율(학생정원기준)(학부+대학원) | 2026 | `%` |
+| `fulltime_faculty_ratio_enrolled` | 전임 교원 확보율(재학생 기준)(학부+대학원) | 2026 | `%` |
+| `fulltime_faculty_lecture_ratio` | 전임교원 강의 담당 비율 | 2026 | `%` |
+| `education_expense_per_student` | 학생 1인당 교육비(학부+대학원) | 2026 | `천원` |
+| `dormitory_capacity_rate` | 기숙사 수용률(학부+대학원) | 2026 | `%` |
+| `books_per_student` | 학생 1인당 도서 자료 수(학부+대학원) | 2026 | `권` |
 
 These dates describe the currently bundled point-in-time snapshot, not a live feed or latest-data guarantee. The catalog is JSON data, validated by a closed static schema and packaged under the data license; it is not generated executable source. The database, manifest, and catalog are independently cross-checked.
 

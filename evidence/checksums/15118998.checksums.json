@@ -1,24 +1,24 @@
 {
   "dataset_id": "15118998",
   "source_file_name": "대학주요정보.xlsx",
-  "source_file_checksum_sha256": "53f7e7fbb446206a47fab1adc622d551ba88ba7f3c25ae0cdc8e41cddc637621",
-  "header_snapshot_checksum_sha256": "4541a811157908354cb5f9eb2d3a5248d09a65651e9e1bdb1fad89f059a50ebb",
-  "seed_db_checksum_sha256": "d55ef5b8eaf55d1093569feda61790d0d5f7fa21b4e5bfd3fcf117e2f31c451b",
-  "manifest_checksum_sha256": "0fa86dda9958c021af84d83840d8bc71f8193cc41ba3f40f9573f363241fd26b",
-  "indicator_dictionary_checksum_sha256": "f54562aa79aeeb45f35ffded4626de767241b1c393eb44f54fa268389e03a02e",
+  "source_file_checksum_sha256": "f7a46ba50efaab59aa152644f794e220d9d40df405f66320b0f859e74ba886a0",
+  "header_snapshot_checksum_sha256": "b2e3c576cb41d7c7aca0c451e3301bc44056ec47f0fd7567b72e220790409457",
+  "seed_db_checksum_sha256": "9e997fb552332d25947731c291ebc6a2b750c3f5dba1f25326a2917c93837d29",
+  "manifest_checksum_sha256": "ec421c431f5991c5b047c58c9ed9120a94ee8bc6f54aebb44ac3809f89183020",
+  "indicator_dictionary_checksum_sha256": "605c491194d84d764f44d1d8627a46cabdd6b9162f111f4ca1acb59da5e2e707",
   "semantic_digests": {
-    "source_model_digest_v1": "8b896d435636c90f38da82ecd9c5f7a936fe3ff8c9bea865f0c93c5594edc987",
-    "seed_logical_digest_v1": "2f4a8a447c875e9b7be8f33dceeb9bd12fd0debbc4cecafa98501b2e75242ca7",
-    "catalog_digest_v1": "0ecd94f2ed9f2031d2b55d7f17f4492596d1e73cf5bc218bac0e0c6f14b2afe7",
-    "manifest_semantic_digest_v1": "521e6c03257db697777bc72d72d2b9ed02c2b4087e521acb46f0de728a1c99a3",
-    "release_data_digest_v1": "be4cfee780359eed356226c27c77db2e26f41bc5d46a8179c64e870fb1ace954"
+    "source_model_digest_v1": "05b9ac36d38526dd5e4b01c60b5da6f59a02a3ed0f327e0e4d0e6c368896c04a",
+    "seed_logical_digest_v1": "98ce8b47e905ec695df832a053911949684bd17a111b8e1900f4d5df30ed22dc",
+    "catalog_digest_v1": "376c9d774543d9fd24c18bf3c803e306a9f49e54e6a089029f349499b45e2eca",
+    "manifest_semantic_digest_v1": "96480ec0b207daf1c5fc9c88ae9d13b4bedf01a4de267484f234ea55f1c3b062",
+    "release_data_digest_v1": "a3045f78d3e1ed952daa7255666320ed6ddcb03b05bad8411be474c86eb3ba96"
   },
   "audit_evidence": {
     "prior_source_file_checksum_sha256": "53f7e7fbb446206a47fab1adc622d551ba88ba7f3c25ae0cdc8e41cddc637621",
-    "source_checksum_changed": false,
+    "source_checksum_changed": true,
     "prior_header_count": 24,
     "observed_header_count": 24,
     "header_count_changed": false
   },
-  "observed_at": "2026-07-24T08:30:29.989Z"
+  "observed_at": "2026-11-03T02:19:29.605Z"
 }

@@ -61,7 +61,7 @@ describe("indicator selection filters response metadata", () => {
       expect(sourcesOf(narrowed.structuredContent)).toHaveLength(1)
       expect(metrics).toHaveLength(1)
       expect(metrics[0]?.["indicator"]).toBe("competition_rate")
-      expect(metrics[0]?.["value"]).toBe(0.6)
+      expect(metrics[0]?.["value"]).toBe(0.5)
     })
   }, 30_000)
 })
