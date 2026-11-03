@@ -24,7 +24,7 @@ Do not copy local paths, credentials, signed URLs, or private runner details int
 ## 2. Scope and dependency gate
 
 - [ ] Confirm `engines.node` is exactly `>=22 <23` in the packed candidate.
-- [ ] Confirm the complete direct production dependency map is exact and closed: `@modelcontextprotocol/sdk` `1.29.0`, `pino` `10.3.1`, `zod` `4.4.3`, and the sole backend `better-sqlite3` `11.10.0`, without caret, tilde, tag, alternate registry, override, alternate backend, or controlling second runtime copy.
+- [ ] Confirm the complete direct production dependency map is exact and closed: `@modelcontextprotocol/sdk` `1.32.2`, `pino` `10.3.1`, `zod` `4.6.7`, and the sole backend `better-sqlite3` `11.10.0`, without caret, tilde, tag, alternate registry, override, alternate backend, or controlling second runtime copy.
 - [ ] Confirm the lockfile root, installed package identities, public registry tarball URLs, and SHA-512 integrities match that complete map.
 - [ ] Confirm exactly eight tools are registered: `list_sources`, `list_indicators`, `search_university`, `get_university_metrics`, `compare_universities`, `explain_indicator`, `validate_source_coverage`, and `explore_universities`.
 - [ ] Confirm all seven legacy registrations/default response behavior remain unchanged.

@@ -51,7 +51,7 @@ The catalog is exposed through an exactly eight-tool read-only server:
 
 `list_sources`, `list_indicators`, `search_university`, `get_university_metrics`, `compare_universities`, `explain_indicator`, `validate_source_coverage`, and `explore_universities`.
 
-The runtime contract is Node `>=22 <23` only, with exact `@modelcontextprotocol/sdk` `1.29.0` and `zod` `4.4.3` requirements. Node 24+ is not supported or claimed. The currently integrated SQLite backend remains provisional until the protected single-backend gate passes; release state remains `BLOCKED_PENDING_BACKEND_SELECTION`.
+The runtime contract is Node `>=22 <23` only, with exact `@modelcontextprotocol/sdk` `1.32.2` and `zod` `4.6.7` requirements. Node 24+ is not supported or claimed. The currently integrated SQLite backend remains provisional until the protected single-backend gate passes; release state remains `BLOCKED_PENDING_BACKEND_SELECTION`.
 
 ## Explicit non-goals
 

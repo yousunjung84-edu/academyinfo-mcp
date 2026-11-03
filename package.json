@@ -1,6 +1,6 @@
 {
   "name": "academyinfo-mcp",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "mcpName": "io.github.yousunjung84-edu/academyinfo",
   "repository": {
     "type": "git",
@@ -43,15 +43,15 @@
     "prepublishOnly": "npm run package:check"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "1.29.0",
+    "@modelcontextprotocol/sdk": "1.32.2",
     "better-sqlite3": "11.10.0",
     "pino": "10.3.1",
-    "zod": "4.4.3"
+    "zod": "4.6.7"
   },
   "devDependencies": {
     "@types/better-sqlite3": "7.6.13",
     "@types/node": "22.20.1",
     "typescript": "6.0.3",
-    "vitest": "4.1.9"
+    "vitest": "4.1.12"
   }
 }

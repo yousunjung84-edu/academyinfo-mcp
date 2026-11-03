@@ -28,7 +28,7 @@ function hasExplicitNonObjectArguments(message: JSONRPCMessage): message is JSON
 
 /**
  * Preserves SDK transport behavior except for explicit non-object arguments to
- * explore_universities that SDK 1.29.0 otherwise reports as an internal error.
+ * explore_universities that SDK 1.32.2 otherwise reports as an internal error.
  */
 export class ExplicitNonObjectArgumentsGuardTransport implements Transport {
   onclose?: () => void

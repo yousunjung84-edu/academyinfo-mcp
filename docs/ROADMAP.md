@@ -12,7 +12,7 @@ The implemented baseline is file-first, offline, no-key, read-only, and recommen
 
 - Node is exactly `>=22 <23`. Node 24 and later are not supported or claimed.
 - The only intended public lanes are Node 22 macOS/arm64, Windows/x64, and Ubuntu glibc/x64, after each lane has protected public-install evidence.
-- The MCP transport contract is pinned to exact runtime requirements `@modelcontextprotocol/sdk` `1.29.0` and `zod` `4.4.3`. Ranges or silent upgrades are prohibited.
+- The MCP transport contract is pinned to exact runtime requirements `@modelcontextprotocol/sdk` `1.32.2` and `zod` `4.6.7`. Ranges or silent upgrades are prohibited.
 - Stdio stdout contains MCP JSON-RPC only; diagnostics use stderr.
 
 ### Exact eight-tool scope

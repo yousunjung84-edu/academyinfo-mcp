@@ -17,7 +17,7 @@ When public npm `latest` is absent, the **optional workflow verifier chain** (ca
 | Runtime | File-first, offline, no-key, read-only stdio | Local implementation only; not public support proof |
 | Node | Exact engine `>=22 <23` | Node 24+ is unsupported and unclaimed |
 | Public matrix | Node 22 macOS/arm64, Windows/x64, and Ubuntu glibc/x64 | Each lane remains a target until candidate-bound public proof exists |
-| Runtime dependencies | Exact `@modelcontextprotocol/sdk` `1.29.0`, `pino` `10.3.1`, `zod` `4.4.3`, and `better-sqlite3` `11.10.0` | Public proof must verify installed identity and registry integrity |
+| Runtime dependencies | Exact `@modelcontextprotocol/sdk` `1.32.2`, `pino` `10.3.1`, `zod` `4.6.7`, and `better-sqlite3` `11.10.0` | Public proof must verify installed identity and registry integrity |
 | SQLite backend | Sole backend `better-sqlite3` `11.10.0`; no alternate or runtime fallback | Release remains blocked until all-lane prebuilt-only proof exists |
 | Runtime mode | Bundled local snapshot; no API key or runtime network | No live OpenAPI or scraping behavior |
 | Bundled source | Normalized derivative of dataset `15118998` only | Point-in-time data, not a latest-data guarantee |

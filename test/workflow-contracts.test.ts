@@ -1223,10 +1223,10 @@ function laneReceipt(
     },
     installed_identities: {
       "academyinfo-mcp": identity("academyinfo-mcp", "0.1.0"),
-      "@modelcontextprotocol/sdk": identity("@modelcontextprotocol/sdk", "1.29.0"),
+      "@modelcontextprotocol/sdk": identity("@modelcontextprotocol/sdk", "1.32.2"),
       "better-sqlite3": identity("better-sqlite3", "11.10.0"),
       pino: identity("pino", "10.3.1"),
-      zod: identity("zod", "4.4.3"),
+      zod: identity("zod", "4.6.7"),
     },
     protocol,
     generic_stdio_journey_digest_v1: genericStdioJourneyDigest(protocol),

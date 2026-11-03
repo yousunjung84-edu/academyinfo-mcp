@@ -16,8 +16,8 @@ const EXPECTED_TOOLS = [
   "explore_universities",
 ]
 const EXPECTED_DEPENDENCIES = {
-  "@modelcontextprotocol/sdk": "1.29.0",
-  zod: "4.4.3",
+  "@modelcontextprotocol/sdk": "1.32.2",
+  zod: "4.6.7",
   "better-sqlite3": "11.10.0",
   pino: "10.3.1",
 }
