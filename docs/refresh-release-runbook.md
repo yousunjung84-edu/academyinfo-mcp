@@ -34,7 +34,7 @@ Administrator-controlled prerequisites are npm identity/history and ownership, a
 - Dataset: `15118998` only.
 - Runtime: Node `>=22 <23`; no Node 24 support claim.
 - Official public lanes: Node 22 macOS/arm64, Windows/x64, Ubuntu glibc/x64.
-- Runtime dependency boundary: the complete direct production set is exactly `@modelcontextprotocol/sdk` `1.29.0`, `better-sqlite3` `11.10.0`, `pino` `10.3.1`, and `zod` `4.4.3`; `better-sqlite3` `11.10.0` is the sole backend.
+- Runtime dependency boundary: the complete direct production set is exactly `@modelcontextprotocol/sdk` `1.32.2`, `better-sqlite3` `11.10.0`, `pino` `10.3.1`, and `zod` `4.6.7`; `better-sqlite3` `11.10.0` is the sole backend.
 - Tool set: the seven legacy tools plus `explore_universities`, exactly eight.
 - Registered `explore_universities` discovery schema: `tools/list` exposes this exact permissive Draft-07 outer input schema:
 
@@ -239,7 +239,7 @@ For each of Node 22 macOS/arm64, Windows/x64, and Ubuntu glibc/x64:
 3. Enable Python, node-gyp, and compiler traps; demonstrate the traps with a canary.
 4. Run exact `npx -y academyinfo-mcp@<version>` through an external JSON-RPC verifier.
 5. Retain sanitized verbose install logs and prove that no compile/build tool ran.
-6. From the actual npx cache tree, record installed `academyinfo-mcp` and every direct production dependency: SDK `1.29.0`, Pino `10.3.1`, Zod `4.4.3`, and the sole backend `better-sqlite3` `11.10.0`. Resolve public registry metadata and verify each installed tarball against `dist.integrity`.
+6. From the actual npx cache tree, record installed `academyinfo-mcp` and every direct production dependency: SDK `1.32.2`, Pino `10.3.1`, Zod `4.6.7`, and the sole backend `better-sqlite3` `11.10.0`. Resolve public registry metadata and verify each installed tarball against `dist.integrity`.
 7. Record Node/OS/architecture and Ubuntu glibc plus the candidate dist-tag. Record signature/provenance evidence only if it is independently observed; never infer it from the manual publication or an Actions artifact.
 8. Verify initialize, exact eight tools, exact `explore_universities` input schema, bundled query, no-key operation, custom-path boundary as applicable, and JSON-RPC-only stdout.
 9. Fail the lane for dependency drift, controlling duplicate runtime dependency, local artifact reachability, compilation, missing identity/integrity, or incomplete protocol evidence.

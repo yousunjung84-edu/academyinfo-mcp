@@ -91,11 +91,11 @@ export const DATABASE_BACKEND_PACKAGES = ["better-sqlite3", "sql.js"] as const
 
 export const PUBLISHED_DEPENDENCY_IDENTITIES = {
   "@modelcontextprotocol/sdk": {
-    version: "1.29.0",
+    version: "1.32.2",
     lockPath: "node_modules/@modelcontextprotocol/sdk",
-    resolved: "https://registry.npmjs.org/@modelcontextprotocol/sdk/-/sdk-1.29.0.tgz",
+    resolved: "https://registry.npmjs.org/@modelcontextprotocol/sdk/-/sdk-1.32.2.tgz",
     integrity:
-      "sha512-zo37mZA9hJWpULgkRpowewez1y6ML5GsXJPY8FI0tBBCd77HEvza4jDqRKOXgHNn867PVGCyTdzqpz0izu5ZjQ==",
+      "sha512-SWsVtH/0vULSQStoZ6xxH2K09Li8fXYTMC64ZeogCdpZ3XSi1eCPOByV1OpuJxuI3OcmHhosDWYyii07tpPsLw==",
   },
   "better-sqlite3": {
     version: "11.10.0",
@@ -112,11 +112,11 @@ export const PUBLISHED_DEPENDENCY_IDENTITIES = {
       "sha512-r34yH/GlQpKZbU1BvFFqOjhISRo1MNx1tWYsYvmj6KIRHSPMT2+yHOEb1SG6NMvRoHRF0a07kCOox/9yakl1vg==",
   },
   zod: {
-    version: "4.4.3",
+    version: "4.6.7",
     lockPath: "node_modules/zod",
-    resolved: "https://registry.npmjs.org/zod/-/zod-4.4.3.tgz",
+    resolved: "https://registry.npmjs.org/zod/-/zod-4.6.7.tgz",
     integrity:
-      "sha512-ytENFjIJFl2UwYglde2jchW2Hwm4GJFLDiSXWdTrJQBIN9Fcyp7n4DhxJEiWNAJMV1/BqWfW/kkg71UDcHJyTQ==",
+      "sha512-g8W2D2kU6a8untc053fX1uVBKzM7yqAxW/3zwk83+6RyF2+SKOuV+c0wBDhUwzV1PaGapmZH+rmcUzPf+3CGwg==",
   },
 } as const
 export const PUBLISHED_DEPENDENCY_NAMES = Object.keys(PUBLISHED_DEPENDENCY_IDENTITIES).sort()

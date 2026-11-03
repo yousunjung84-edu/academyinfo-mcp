@@ -180,13 +180,13 @@ describe("published package runtime contract", () => {
     const canonicalLock = await readJson("package-lock.json")
 
     const rangedPackage = structuredClone(canonicalPackage)
-    asRecord(rangedPackage.dependencies)["@modelcontextprotocol/sdk"] = "^1.29.0"
+    asRecord(rangedPackage.dependencies)["@modelcontextprotocol/sdk"] = "^1.32.2"
     expect(failureCodes(rangedPackage, canonicalLock)).toContain("published_dependency_spec")
 
     const alternateRegistryLock = structuredClone(canonicalLock)
     const alternatePackages = asRecord(alternateRegistryLock.packages)
     asRecord(alternatePackages["node_modules/zod"]).resolved =
-      "https://registry.example.invalid/zod/-/zod-4.4.3.tgz"
+      "https://registry.example.invalid/zod/-/zod-4.6.7.tgz"
     expect(failureCodes(canonicalPackage, alternateRegistryLock)).toContain(
       "published_dependency_lock_identity",
     )
@@ -271,8 +271,8 @@ describe("Node 22 local-install evidence contract", () => {
 
     expect(smoke).toContain('evidence_kind: "local_tarball_install_smoke"')
     expect(smoke).toContain("public_npm_acceptance: false")
-    expect(smoke).toContain('"@modelcontextprotocol/sdk": "1.29.0"')
-    expect(smoke).toContain('zod: "4.4.3"')
+    expect(smoke).toContain('"@modelcontextprotocol/sdk": "1.32.2"')
+    expect(smoke).toContain('zod: "4.6.7"')
     expect(smoke).toContain('"explore_universities"')
     expect(smoke).toContain("inputSchema: tool.inputSchema")
     expect(smoke).not.toMatch(/console\.log\([^\n]*(?:bin|packageRoot|packageJsonPath)/u)

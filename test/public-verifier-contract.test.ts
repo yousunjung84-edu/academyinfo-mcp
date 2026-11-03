@@ -516,8 +516,8 @@ describe("cross-platform public installed verifier contract", () => {
     expect(verifierSource).toContain('"better-sqlite3", BETTER_SQLITE3_VERSION')
     expect(verifierSource).toContain('"pino", PINO_VERSION')
     expect(verifierSource).toContain('"zod", ZOD_VERSION')
-    expect(verifierSource).toContain('SDK_VERSION = "1.29.0"')
-    expect(verifierSource).toContain('ZOD_VERSION = "4.4.3"')
+    expect(verifierSource).toContain('SDK_VERSION = "1.32.2"')
+    expect(verifierSource).toContain('ZOD_VERSION = "4.6.7"')
     expect(verifierSource).toContain('BETTER_SQLITE3_VERSION = "11.10.0"')
     expect(verifierSource).toContain('PINO_VERSION = "10.3.1"')
     expect(verifierSource).toContain("Ubuntu ambiguity journey returned partial or guessed data")
@@ -540,14 +540,14 @@ describe("cross-platform public installed verifier contract", () => {
 
   it("requires the exact installed application direct dependency map", () => {
     const dependencies = {
-      "@modelcontextprotocol/sdk": "1.29.0",
+      "@modelcontextprotocol/sdk": "1.32.2",
       "better-sqlite3": "11.10.0",
       pino: "10.3.1",
-      zod: "4.4.3",
+      zod: "4.6.7",
     }
     expect(hasExactDirectDependencies(dependencies)).toBe(true)
     expect(hasExactDirectDependencies({ ...dependencies, undeclared: "1.0.0" })).toBe(false)
-    expect(hasExactDirectDependencies({ ...dependencies, zod: "^4.4.3" })).toBe(false)
+    expect(hasExactDirectDependencies({ ...dependencies, zod: "^4.6.7" })).toBe(false)
   })
 
   it("pins the exact permissive tools/list schema while internal validation remains strict", () => {
@@ -676,16 +676,16 @@ describe("cross-platform public installed verifier contract", () => {
   it("accepts only credential-free exact public registry resolutions", () => {
     expect(
       validatePublicRegistryResolution(
-        "https://registry.npmjs.org/zod/-/zod-4.4.3.tgz",
+        "https://registry.npmjs.org/zod/-/zod-4.6.7.tgz",
       ).origin,
     ).toBe("https://registry.npmjs.org")
     for (const resolution of [
-      "https://user:pass@registry.npmjs.org/zod/-/zod-4.4.3.tgz",
-      "https://registry.npmjs.org:444/zod/-/zod-4.4.3.tgz",
-      "https://registry.npmjs.org:443/zod/-/zod-4.4.3.tgz",
-      "https://registry.npmjs.org/zod/-/zod-4.4.3.tgz?token=x",
-      "https://registry.npmjs.org/zod/-/zod-4.4.3.tgz#fragment",
-      "https://registry.example.invalid/zod/-/zod-4.4.3.tgz",
+      "https://user:pass@registry.npmjs.org/zod/-/zod-4.6.7.tgz",
+      "https://registry.npmjs.org:444/zod/-/zod-4.6.7.tgz",
+      "https://registry.npmjs.org:443/zod/-/zod-4.6.7.tgz",
+      "https://registry.npmjs.org/zod/-/zod-4.6.7.tgz?token=x",
+      "https://registry.npmjs.org/zod/-/zod-4.6.7.tgz#fragment",
+      "https://registry.example.invalid/zod/-/zod-4.6.7.tgz",
     ]) {
       expect(() => validatePublicRegistryResolution(resolution)).toThrow()
     }

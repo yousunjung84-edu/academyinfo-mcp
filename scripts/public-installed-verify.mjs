@@ -19,8 +19,8 @@ import { StringDecoder } from "node:string_decoder"
 
 const PACKAGE_NAME = "academyinfo-mcp"
 const PUBLIC_REGISTRY = "https://registry.npmjs.org/"
-const SDK_VERSION = "1.29.0"
-const ZOD_VERSION = "4.4.3"
+const SDK_VERSION = "1.32.2"
+const ZOD_VERSION = "4.6.7"
 const BETTER_SQLITE3_VERSION = "11.10.0"
 const PINO_VERSION = "10.3.1"
 const DIRECT_DEPENDENCY_VERSIONS = Object.freeze({

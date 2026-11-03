@@ -24,8 +24,8 @@ The package engine is exactly Node `>=22 <23`. Public support is limited to Node
 
 The public transport contract is intentionally tied to exact runtime dependencies:
 
-- `@modelcontextprotocol/sdk` `1.29.0`;
-- `zod` `4.4.3`.
+- `@modelcontextprotocol/sdk` `1.32.2`;
+- `zod` `4.6.7`.
 
 They must be exact package requirements, not ranges. An upgrade requires an explicit contract revision and review of request parsing, omitted/nonobject calls, unknown-key handling, registered JSON Schema, structured content, raw stdio, SDK-client behavior, and installed dependency identities.
 

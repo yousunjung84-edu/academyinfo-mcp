@@ -443,28 +443,24 @@ describe("explore_universities registered boundary", () => {
       })
       expect(explore?.inputSchema).not.toHaveProperty("required")
 
+      // SDK 1.32 treats omitted arguments as an empty object, so the request reaches
+      // the handler and gets the tool's own invalid_request envelope (accepted in 0.5.1).
       const omitted = await client.callTool({ name: "explore_universities" })
-      expect(omitted).toEqual(expect.objectContaining({
-        isError: true,
-        content: [{
-          type: "text",
-          text: [
-            "MCP error -32602: Input validation error: Invalid arguments for tool explore_universities: [",
-            "  {",
-            "    \"expected\": \"object\",",
-            "    \"code\": \"invalid_type\",",
-            "    \"path\": [],",
-            "    \"message\": \"Invalid input: expected object, received undefined\"",
-            "  }",
-            "]",
-          ].join("\n"),
-        }],
+      expect(omitted).not.toHaveProperty("isError")
+      expect(omitted.structuredContent).toEqual(expect.objectContaining({
+        status: "invalid_request",
+        data: expect.objectContaining({
+          error: { code: "invalid_request", message: "Request must include university_queries." },
+          validation: expect.objectContaining({
+            class: "schema",
+            issues: [expect.objectContaining({ code: "MISSING_UNIVERSITY_QUERIES", path: "/university_queries" })],
+          }),
+        }),
       }))
-      expect(omitted).not.toHaveProperty("structuredContent")
       expect(exploreUniversitiesBatchMock).not.toHaveBeenCalled()
 
       // This in-memory harness intentionally has no production transport guard. SDK
-      // 1.29.0 rejects these before the handler but reports its stock parser error.
+      // 1.32.2 rejects these before the handler but reports its stock parser error.
       for (const nonobject of [null, [], "value", 1, true] as const) {
         await expect(
           client.callTool({
