@@ -46,7 +46,7 @@ silent last-one-wins overwrite.
 {
   "mcpServers": {
     "academyinfo": {
-      "description": "대학알리미 공시데이터 — 488개 대학·캠퍼스 17개 지표 비교",
+      "description": "대학알리미 공시데이터 — 487개 대학·캠퍼스 17개 지표 비교",
       "url": "https://academyinfo-mcp-433006350023.asia-northeast3.run.app/mcp"
     }
   }

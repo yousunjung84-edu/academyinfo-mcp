@@ -63,11 +63,11 @@ AI 비서에게 이렇게 물어보세요:
 
 > "전남대학교 본교와 부산대학교로 비교해줘."
 
-두 번째 호출은 `status: "ok"`와 함께 기관별 값·출처·연도·단위를 반환합니다 — 예 (2025 번들 스냅샷):
+두 번째 호출은 `status: "ok"`와 함께 기관별 값·출처·연도·단위를 반환합니다 — 예 (번들 스냅샷: 취업률 2025 공시·경쟁률 2026 공시):
 
 | 대학 | 취업률 | 신입생 경쟁률 |
 |---|---:|---:|
-| 전남대학교 본교 | 57.6% | 7.4:1 |
+| 전남대학교 본교 | 57.6% | 7.3:1 |
 | 부산대학교 | 57.5% | 9:1 |
 
 이 2단계 흐름은 실패가 아니라 **설계된 동작**입니다: 모호한 이름은 추측 대신 후보를 돌려주고,
@@ -88,7 +88,7 @@ npm 패키지 자체는 stdio 전용입니다. 웹/모바일 클라이언트에�
 {
   "mcpServers": {
     "academyinfo": {
-      "description": "대학알리미 공시데이터 — 488개 대학·캠퍼스 17개 지표 비교",
+      "description": "대학알리미 공시데이터 — 487개 대학·캠퍼스 17개 지표 비교",
       "url": "https://academyinfo-mcp-433006350023.asia-northeast3.run.app/mcp"
     }
   }
@@ -143,23 +143,23 @@ Node `>=22 <23`을 사용하세요. Node 24 이상은 지원하지 않으며 지
 
 | 지표 | 이름 | 스냅샷 연도 | 단위 |
 |---|---|---:|---|
-| `competition_rate` | 신입생 경쟁률 | 2025 | `:1` |
-| `fill_rate` | 신입생 충원율 | 2025 | `%` |
+| `competition_rate` | 신입생 경쟁률 | 2026 | `:1` |
+| `fill_rate` | 신입생 충원율 | 2026 | `%` |
 | `employment_rate` | 취업률 | 2025 | `%` |
-| `scholarship_per_student` | 학생 1인당 연간 장학금 | 2025 | `원` |
+| `scholarship_per_student` | 학생 1인당 연간 장학금 | 2026 | `원` |
 | `avg_tuition` | 평균 등록금 | 2026 | `천원` |
-| `admission_quota` | 입학정원 | 2025 | `명` |
-| `graduates_count` | 졸업생수 | 2025 | `명` |
-| `fulltime_faculty_count` | 전임교원수(학부+대학원) | 2025 | `명` |
-| `enrolled_students` | 재학생 | 2025 | `명` |
-| `international_students` | 외국인 학생 수 | 2025 | `명` |
-| `students_per_fulltime_faculty` | 전임교원 1인당 학생 수(학생정원기준)(학부+대학원) | 2025 | `명` |
-| `fulltime_faculty_ratio_quota` | 전임교원 확보율(학생정원기준)(학부+대학원) | 2025 | `%` |
-| `fulltime_faculty_ratio_enrolled` | 전임 교원 확보율(재학생 기준)(학부+대학원) | 2025 | `%` |
-| `fulltime_faculty_lecture_ratio` | 전임교원 강의 담당 비율 | 2025 | `%` |
-| `education_expense_per_student` | 학생 1인당 교육비(학부+대학원) | 2025 | `천원` |
-| `dormitory_capacity_rate` | 기숙사 수용율(학부+대학원) | 2025 | `%` |
-| `books_per_student` | 학생 1인당 도서 자료 수(학부+대학원) | 2025 | `권` |
+| `admission_quota` | 입학정원 | 2026 | `명` |
+| `graduates_count` | 졸업생수 | 2026 | `명` |
+| `fulltime_faculty_count` | 전임교원수(학부+대학원) | 2026 | `명` |
+| `enrolled_students` | 재학생 | 2026 | `명` |
+| `international_students` | 외국인 학생 수 | 2026 | `명` |
+| `students_per_fulltime_faculty` | 전임교원 1인당 학생 수(학생정원기준)(학부+대학원) | 2026 | `명` |
+| `fulltime_faculty_ratio_quota` | 전임교원 확보율(학생정원기준)(학부+대학원) | 2026 | `%` |
+| `fulltime_faculty_ratio_enrolled` | 전임 교원 확보율(재학생 기준)(학부+대학원) | 2026 | `%` |
+| `fulltime_faculty_lecture_ratio` | 전임교원 강의 담당 비율 | 2026 | `%` |
+| `education_expense_per_student` | 학생 1인당 교육비(학부+대학원) | 2026 | `천원` |
+| `dormitory_capacity_rate` | 기숙사 수용률(학부+대학원) | 2026 | `%` |
+| `books_per_student` | 학생 1인당 도서 자료 수(학부+대학원) | 2026 | `권` |
 
 이 연도는 현재 번들된 **시점 고정 스냅샷**을 설명하는 것이지, 실시간 피드나 최신 데이터 보장이
 아닙니다. 데이터셋 `15139279`는 번들·활성화·사용되지 않으며, 실시간 OpenAPI 접근과 스크래핑은

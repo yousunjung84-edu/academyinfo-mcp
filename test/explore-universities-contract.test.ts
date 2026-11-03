@@ -986,7 +986,7 @@ describe("explore_universities batch outcomes", () => {
     ])
     expect(explanations[0]).toEqual(expect.objectContaining({
       source_column: expect.any(String),
-      base_year: "2025",
+      base_year: "2026",
       unit: "%",
       source: expect.objectContaining({ dataset_id: "15118998", license: expect.any(String) }),
       warnings: expect.any(Array),

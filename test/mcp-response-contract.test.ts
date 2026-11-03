@@ -341,7 +341,7 @@ describe("MCP response contract", () => {
             reason: "blank_in_source",
             value: null,
             raw_value: "-",
-            source_column: "신입생 경쟁률\n(2025,:1)",
+            source_column: "신입생 경쟁률\n(2026,:1)",
           }),
         ]),
       )
@@ -359,15 +359,15 @@ describe("MCP response contract", () => {
           const response = responseSchema.parse(result.structuredContent)
           const data = z
             .object({
-              raw_rows: z.literal(488),
-              observations: z.literal(8206),
+              raw_rows: z.literal(487),
+              observations: z.literal(8189),
             })
             .parse(response.data)
 
           expect(response.status).toBe("ok")
           expectFactualDataOnly(response.data)
-          expect(data.raw_rows).toBe(488)
-          expect(data.observations).toBe(8206)
+          expect(data.raw_rows).toBe(487)
+          expect(data.observations).toBe(8189)
         },
         { cwd: externalCwd },
       )

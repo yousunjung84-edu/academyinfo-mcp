@@ -25,7 +25,7 @@ describe("zeros that cannot be aggregated are withheld, not served", () => {
   it("withholds a per-student zero and keeps the source text", async () => {
     await withMcpServer(reservedKeyOverrides("", ""), async (harness) => {
       const result = await harness.callTool("get_university_metrics", {
-        // An operating campus: 2,808 enrolled and 137 faculty, yet the source
+        // An operating campus: 2,840 enrolled and 123 faculty, yet the source
         // records 0 for both per-student indicators.
         university_name: "전남대학교 제2캠퍼스",
         indicators: [
@@ -54,7 +54,7 @@ describe("zeros that cannot be aggregated are withheld, not served", () => {
 
       // Ordinary values are unaffected.
       expect(find(metrics, "employment_rate")?.["value"]).toBe(59.2)
-      expect(find(metrics, "international_students")?.["value"]).toBe(149)
+      expect(find(metrics, "international_students")?.["value"]).toBe(165)
     })
   }, 30_000)
 
@@ -102,7 +102,7 @@ describe("zeros that cannot be aggregated are withheld, not served", () => {
       // The main campus reports a real figure and is untouched.
       expect(
         find(main?.["metrics"] as readonly Entry[], "education_expense_per_student")?.["value"],
-      ).toBe(26483.1)
+      ).toBe(26926.5)
     })
   }, 30_000)
 
